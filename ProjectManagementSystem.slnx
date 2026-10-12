@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/ProjectManagementSystem.Application.Contracts/ProjectManagementSystem.Application.Contracts.csproj" Id="08fb84d2-5c07-47a1-a87b-00ca67e3df8f" />
+    <Project Path="src/ProjectManagementSystem.Application/ProjectManagementSystem.Application.csproj" Id="98f6be0f-fd03-4dfa-8d2c-5554f09e2103" />
     <Project Path="src/ProjectManagementSystem.Domain/ProjectManagementSystem.Domain.csproj" Id="f19c6e01-d061-4fca-a3dd-154b3bb14eb8" />
   </Folder>
 </Solution>
