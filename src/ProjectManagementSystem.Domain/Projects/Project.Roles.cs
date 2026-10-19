@@ -69,7 +69,4 @@ public sealed partial class Project
         if (IsRoleEverAssigned(role.Id))
             throw new DomainException($"Role '{role.Name}' cannot be {action} because it has been assigned to a team member.");
     }
-
-    // There are no team members yet, so a role cannot have been assigned to anyone.
-    private bool IsRoleEverAssigned(Guid roleId) => false;
 }
