@@ -1,6 +1,7 @@
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Projects.Events;
+using ProjectManagementSystem.Domain.Projects.Funding;
 
 namespace ProjectManagementSystem.Domain.Projects;
 
@@ -23,14 +24,15 @@ public sealed partial class Project : AggregateRoot<Guid>
 
     public DateTime? CompletionDate { get; private set; }
 
-    public Project(Guid id, string title, string description) : base(id)
+    public Project(Guid id, string title, string description, Currency currency) : base(id)
     {
         Title = Guard.NotEmpty(title, nameof(Title));
         Description = description ?? string.Empty;
+        Currency = currency ?? throw new ArgumentNullException(nameof(currency));
         State = ProjectState.Created;
         CreationDate = DateTime.UtcNow;
 
-        RaiseDomainEvent(new ProjectCreated(Id, Title, CreationDate));
+        RaiseDomainEvent(new ProjectCreated(Id, Title, Currency.Code, CreationDate));
     }
 
     public void Start()
