@@ -2,6 +2,7 @@ using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Projects.Events;
 using ProjectManagementSystem.Domain.Projects.Funding;
+using ProjectManagementSystem.Domain.Projects.Schedule;
 
 namespace ProjectManagementSystem.Domain.Projects;
 
@@ -31,6 +32,7 @@ public sealed partial class Project : AggregateRoot<Guid>
         Currency = currency ?? throw new ArgumentNullException(nameof(currency));
         State = ProjectState.Created;
         CreationDate = DateTime.UtcNow;
+        ScheduleNetwork = new ScheduleNetwork(Guid.NewGuid(), id);
 
         RaiseDomainEvent(new ProjectCreated(Id, Title, Currency.Code, CreationDate));
     }
