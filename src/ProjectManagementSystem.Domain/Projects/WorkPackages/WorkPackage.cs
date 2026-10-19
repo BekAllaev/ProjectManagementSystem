@@ -84,6 +84,9 @@ public sealed class WorkPackage : Entity<Guid>
 
     internal void CancelTask(Guid taskId) => GetTask(taskId).Cancel();
 
+    internal TimeEntry LogWork(Guid taskId, Guid employeeId, DateOnly date, decimal hours) =>
+        GetTask(taskId).LogWork(employeeId, date, hours);
+
     private void EnsureOpen(string action)
     {
         if (Status != WorkPackageStatus.Open)

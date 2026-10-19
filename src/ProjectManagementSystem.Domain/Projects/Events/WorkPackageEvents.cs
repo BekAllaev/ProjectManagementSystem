@@ -28,3 +28,11 @@ public sealed record TaskStarted(Guid ProjectId, Guid WorkPackageId, Guid TaskId
 public sealed record TaskCompleted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : IDomainEvent;
 
 public sealed record TaskCancelled(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : IDomainEvent;
+
+public sealed record WorkLogged(
+    Guid ProjectId,
+    Guid WorkPackageId,
+    Guid TaskId,
+    Guid EmployeeId,
+    DateOnly Date,
+    decimal Hours) : IDomainEvent;
