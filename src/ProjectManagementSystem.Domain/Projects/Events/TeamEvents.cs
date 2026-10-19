@@ -8,6 +8,9 @@ public sealed record TeamMemberAdded(
     Guid EmployeeId,
     Guid RoleId,
     DateOnly From,
-    DateOnly? To) : IDomainEvent;
+    DateOnly? To,
+    decimal HourlyRate) : IDomainEvent;
 
 public sealed record TeamMembershipEnded(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, DateOnly To) : IDomainEvent;
+
+public sealed record HourlyRateChanged(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, decimal Amount, DateOnly From) : IDomainEvent;
