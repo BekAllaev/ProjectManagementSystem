@@ -1,6 +1,6 @@
-﻿namespace ProjectManagementSystem.Domain.Interfaces;
+namespace ProjectManagementSystem.Domain.Interfaces;
 
-internal interface IEntity<TKey> 
+public interface IEntity<TKey>
 {
     public TKey Id { get; }
 }
