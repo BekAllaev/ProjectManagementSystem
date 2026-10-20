@@ -26,7 +26,8 @@ only by id. Every rule that spans more than one aggregate is listed in
 - **Role** (entity): `Id`, `Name`, `Description`
 - **TeamMember** (entity): `Id`, `EmployeeId`, `RoleId`, `From`, `To` (an empty `To` means the employee is
   still on the project), `HourlyRates`
-- **HourlyRate** (value object): `Amount`, `From`. A rate is valid until `From` of the next one.
+- **HourlyRate** (value object): `Amount`, `From`. A rate is valid until `From` of the next one. The history
+  of rates is used only to pick the rate for a time entry (see [TaskTimeLog](#4-tasktimelog)).
 
 **Invariants:**
 - periods of the same employee do not overlap, `From ≤ To`;
@@ -80,16 +81,33 @@ notified.
 
 ### 4. TaskTimeLog
 
-One per task, created on the first `SetHours`.
+One per task, created on the first `LogTime`.
 
-**Root:** `TaskTimeLog`: `Id` = TaskId, `WorkPackageId`
+**Root:** `TaskTimeLog`: `Id` = TaskId, `WorkPackageId`, `ProjectId`
 
 **Inside:**
-- **EmployeeTime** (value object): `EmployeeId`, `Hours`. One record per employee.
+- **TimeEntry** (entity with local identity): `Id`, `EmployeeId`, `WorkDate`, `Hours`, `HourlyRate`
 
-**Methods:** `SetHours(employeeId, hours)` overwrites the value. History is not stored in the aggregate.
+The hourly rate in an entry is a snapshot, like the price in an order line: it is the rate of the employee
+valid on `WorkDate` and it never changes afterwards, even if the rate of the employee changes later.
+The local `Id` makes it possible to point at one wrong entry (for example, one of two identical entries
+of 2 hours).
 
-**Event:** `WorkedHoursSet` with the absolute number of hours.
+**Methods:**
+- `LogTime(employeeId, workDate, hours, hourlyRate)` adds an entry;
+- `RemoveEntry(entryId)` removes an entry. A mistake is fixed by removing the wrong entry and logging
+  the right one.
+
+**Invariants:**
+- `Hours > 0`, `HourlyRate > 0`;
+- `LogTime` and `RemoveEntry` only while the task is InProgress; after the task is finished the log does
+  not change (checked by the domain service, see [Cross-aggregate rules](#cross-aggregate-rules)).
+
+**Events:**
+- `TimeLogged(ProjectId, WorkPackageId, TaskId, EntryId, EmployeeId, WorkDate, Hours, HourlyRate)`;
+- `TimeEntryRemoved(ProjectId, TaskId, EntryId)`.
+
+The aggregate grows with the number of entries. For one task it is tens of entries, which is fine.
 
 ### 5. Milestone
 
@@ -144,7 +162,8 @@ Shared by all projects, projects reference it by id.
 | A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | domain service rejects; re-check after commit with the same Specification, a violation raises `ResponsiblePersonLeftTeam` for manual handling |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handler of `WorkPackageCancelled` / `TaskCancelled` → `RemoveDependenciesOf` |
 | A dependency links only tasks that are not cancelled | ScheduleNetwork ↔ WorkPackage | domain service + handler of `DependencyAdded` removes it if a task is already cancelled |
-| `SetHours` only on an InProgress task, by a current team member | TaskTimeLog ↔ WorkPackage, Project | domain service; a race with `CompleteTask` is accepted |
+| `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | domain service; a race with `CompleteTask` is accepted |
+| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | domain service reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | Tasks in a milestone | Milestone ↔ WorkPackage | only references by TaskId; cancelled tasks are ignored on the read side |
 
@@ -170,13 +189,17 @@ Schedule:
 
 - a task whose FS predecessor is not finished gets a warning.
 
-Funding (from `FundingAdded`, `WorkedHoursSet`, `TeamMemberAdded`, `HourlyRateChanged`):
+Funding (from `FundingAdded`, `TimeLogged`, `TimeEntryRemoved`):
 
 - total funding = Σ `FundingTranche.Amount`;
-- actual cost (AC): every `WorkedHoursSet` adds (new hours − previous hours) × the employee's hourly rate
-  valid on the date of the event;
+- actual cost (AC) = Σ `Hours` × `HourlyRate` over time entries; AC on a report date (EVM) is the same sum
+  filtered by `WorkDate`;
 - remaining = total funding − AC at any moment;
-- past costs are not recalculated: a rate cannot be changed retroactively.
+- past costs are never recalculated: every entry keeps its own rate.
+
+The read model upserts a row by `EntryId` on `TimeLogged` and deletes it on `TimeEntryRemoved`, then
+recomputes the sums. A repeated delivery of an event does not double anything, so no separate
+deduplication is needed.
 
 ## Open questions
 
