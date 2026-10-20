@@ -1,6 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Contracts.Schedule;
-using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Services;
@@ -11,22 +10,24 @@ namespace ProjectManagementSystem.Application.Schedule;
 public sealed class ScheduleAppService(
     IRepository<ScheduleNetwork> networks,
     IRepository<WorkPackage> workPackages,
-    IWorkPackageLookup workPackageLookup,
     DependencyService dependencyService,
     IUnitOfWork unitOfWork) : IScheduleAppService
 {
     /// <summary>
-    /// The network of the project is created on its first dependency.
+    /// The network of the project is created on its first dependency. The domain service checks that each
+    /// task belongs to the given work package.
     /// </summary>
     public async Task AddDependencyAsync(
         Guid projectId,
+        Guid predecessorWorkPackageId,
         Guid predecessorTaskId,
+        Guid successorWorkPackageId,
         Guid successorTaskId,
         DependencyTypeDto type,
         CancellationToken cancellationToken = default)
     {
-        var predecessorWorkPackage = await GetWorkPackageOfTaskAsync(predecessorTaskId, cancellationToken);
-        var successorWorkPackage = await GetWorkPackageOfTaskAsync(successorTaskId, cancellationToken);
+        var predecessorWorkPackage = await workPackages.GetAsync(predecessorWorkPackageId, cancellationToken);
+        var successorWorkPackage = await workPackages.GetAsync(successorWorkPackageId, cancellationToken);
 
         var network = await networks.FindAsync(projectId, cancellationToken);
         var isNew = network is null;
@@ -55,14 +56,6 @@ public sealed class ScheduleAppService(
 
         networks.Update(network);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task<WorkPackage> GetWorkPackageOfTaskAsync(Guid taskId, CancellationToken cancellationToken)
-    {
-        var workPackageId = await workPackageLookup.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
-            ?? throw new EntityNotFoundException("Task", taskId);
-
-        return await workPackages.GetAsync(workPackageId, cancellationToken);
     }
 
     private static DependencyType ToDomain(DependencyTypeDto type) => type switch

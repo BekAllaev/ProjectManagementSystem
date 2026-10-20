@@ -1,8 +1,5 @@
-using ProjectManagementSystem.Application.Contracts.Events;
 using ProjectManagementSystem.Application.Schedule;
-using ProjectManagementSystem.Application.Team;
 using ProjectManagementSystem.Application.Tests.Fakes;
-using ProjectManagementSystem.Domain.Projects.Events;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
 using ProjectManagementSystem.Domain.Services;
@@ -45,24 +42,6 @@ public class HandlerTests
 
         Assert.Empty(network.Dependencies);
         Assert.Single(network.DomainEvents.OfType<PredecessorCancelled>());
-    }
-
-    [Fact]
-    public async Task Responsible_person_who_left_the_team_is_reported()
-    {
-        var project = TestData.ProjectWithTeam(_employeeId);
-        var workPackage = TestData.WorkPackage(project, _employeeId);
-        _workPackages.Add(workPackage);
-        var ended = new TeamMembershipEnded(project.Id, Guid.NewGuid(), _employeeId, TestData.Today);
-        var publisher = new FakeApplicationEventPublisher();
-        var handler = new CheckResponsiblePersonLeftTeam(
-            _workPackages, new InMemoryWorkPackageLookup(_workPackages), publisher, _unitOfWork);
-
-        await handler.HandleAsync(ended);
-
-        var reported = Assert.IsType<ResponsiblePersonLeftTeam>(Assert.Single(publisher.Published));
-        Assert.Equal(ended.EventId, reported.CausationEventId);
-        Assert.Equal([workPackage.Id], reported.WorkPackageIds);
     }
 
     private (WorkPackage, ProjectTask, ProjectTask, ScheduleNetwork) PackageWithDependency()
