@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Domain.Projects.WorkPackages;
+namespace ProjectManagementSystem.Domain.WorkPackages;
 
 public enum ProjectTaskStatus
 {
