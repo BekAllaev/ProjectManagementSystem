@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Exceptions;
 
-namespace ProjectManagementSystem.Domain.Projects.Funding;
+namespace ProjectManagementSystem.Domain.Projects;
 
 /// <summary>
 /// ISO 4217 currency code, for example USD or EUR.

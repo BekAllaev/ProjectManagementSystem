@@ -1,14 +1,13 @@
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Projects.Events;
-using ProjectManagementSystem.Domain.Projects.Funding;
 
 namespace ProjectManagementSystem.Domain.Projects;
 
 /// <summary>
-/// Root of the project aggregate. For now it is a "mega aggregate" that owns everything
-/// related to a project; each area lives in its own partial file so it can be cut out
-/// into a separate aggregate later.
+/// Root of the project aggregate: life cycle of the project, its roles and its team with hourly rates.
+/// Work packages, the schedule network, time logs, milestones, funding and risks are separate
+/// aggregates that refer to the project by id.
 /// </summary>
 public sealed partial class Project : AggregateRoot<Guid>
 {
@@ -23,6 +22,11 @@ public sealed partial class Project : AggregateRoot<Guid>
     public DateTime? StartDate { get; private set; }
 
     public DateTime? CompletionDate { get; private set; }
+
+    /// <summary>
+    /// Currency of all money of the project: hourly rates, time entries and funding.
+    /// </summary>
+    public Currency Currency { get; }
 
     public Project(Guid id, string title, string description, Currency currency) : base(id)
     {

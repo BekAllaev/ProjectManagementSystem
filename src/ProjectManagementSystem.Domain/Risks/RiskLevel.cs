@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Domain.Projects.Risks;
+namespace ProjectManagementSystem.Domain.Risks;
 
 /// <summary>
 /// Used for both probability and impact of a risk.

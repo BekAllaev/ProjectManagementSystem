@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Base;
 
-namespace ProjectManagementSystem.Domain.Projects.Funding;
+namespace ProjectManagementSystem.Domain.Funding;
 
 /// <summary>
 /// One portion of money given to the project. Amount is in the currency of the project.

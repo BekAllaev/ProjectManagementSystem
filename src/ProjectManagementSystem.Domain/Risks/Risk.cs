@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Base;
 
-namespace ProjectManagementSystem.Domain.Projects.Risks;
+namespace ProjectManagementSystem.Domain.Risks;
 
 /// <summary>
 /// Entry of the risk register (PMBOK: individual project risk).
@@ -8,8 +8,10 @@ namespace ProjectManagementSystem.Domain.Projects.Risks;
 /// risks take no part in the rules of the rest of the domain, so this supporting part
 /// does not need a rich model.
 /// </summary>
-public sealed class Risk : Entity<Guid>
+public sealed class Risk : AggregateRoot<Guid>
 {
+    public Guid ProjectId { get; }
+
     public string Description { get; set; }
 
     public RiskLevel Probability { get; set; }
@@ -23,9 +25,10 @@ public sealed class Risk : Entity<Guid>
 
     public RiskStatus Status { get; set; }
 
-    internal Risk(Guid id, string description, RiskLevel probability, RiskLevel impact, Guid ownerId, RiskStatus status)
+    public Risk(Guid id, Guid projectId, string description, RiskLevel probability, RiskLevel impact, Guid ownerId, RiskStatus status)
         : base(id)
     {
+        ProjectId = projectId;
         Description = description;
         Probability = probability;
         Impact = impact;
