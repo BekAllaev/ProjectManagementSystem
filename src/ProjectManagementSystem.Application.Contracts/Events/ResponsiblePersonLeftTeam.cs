@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Application.Events;
+namespace ProjectManagementSystem.Application.Contracts.Events;
 
 /// <summary>
 /// An employee left the project team while still responsible for open work: a work package or a task

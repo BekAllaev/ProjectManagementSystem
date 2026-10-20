@@ -1,5 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
-using ProjectManagementSystem.Application.Events;
+using ProjectManagementSystem.Application.Contracts.Events;
 using ProjectManagementSystem.Domain.Projects.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Domain.WorkPackages.Specifications;
