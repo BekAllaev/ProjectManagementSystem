@@ -31,14 +31,14 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   never loaded on their own.
 - An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
   `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
-- **Searching by anything else is done by the application layer** through `IWorkPackageLookup`, implemented
-  by the infrastructure over the same storage. A lookup only says which aggregates to load; the rule is
-  always checked again on the loaded aggregates. (Queries and commands of CQRS come later.)
+- **There is no search by anything else yet.** Queries and commands (CQRS) come later. Until then the caller
+  passes the ids it already knows (for example the work package of a task), and the domain service checks
+  that they fit together (the task is really in that work package).
 - **Domain services do not use repositories.** They get loaded aggregates as arguments, check the rule and
   change one aggregate. If a new aggregate is needed (a time log), the service creates it and the caller
   adds it to the repository.
 - **Application services** (`Application/*AppService`) implement the interfaces of
-  `Application.Contracts`: they run the queries, load the aggregates, call the domain service, and save
+  `Application.Contracts`: they load the aggregates, call the domain service, and save
   the changed aggregate with the unit of work.
 
 ### 1. Project
@@ -188,7 +188,6 @@ Shared by all projects, projects reference it by id.
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkAssignmentService` + `IsTeamMemberOnSpecification` |
-| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `TeamMembershipService` rejects with `IsResponsibleForOpenWorkSpecification`; the handler `CheckResponsiblePersonLeftTeam` of `TeamMembershipEnded` re-checks after commit with the same Specification and raises the application event `ResponsiblePersonLeftTeam` for manual handling |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
 | A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `DependencyService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
 | `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TimeTrackingService`; a race with `CompleteTask` is accepted |
@@ -196,11 +195,13 @@ Shared by all projects, projects reference it by id.
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | Tasks in a milestone | Milestone ↔ WorkPackage | only references by TaskId; cancelled tasks are ignored on the read side |
 
-Event handlers live in `src/ProjectManagementSystem.Application`; application events such as
-`ResponsiblePersonLeftTeam`, which other parts of the system consume, are contracts and live in
-`src/ProjectManagementSystem.Application.Contracts`. Every handler is idempotent, because the
-outbox may deliver an event more than once. `ResponsiblePersonLeftTeam` carries the id of the
-`TeamMembershipEnded` event that caused it (`CausationEventId`), so consumers can drop duplicates.
+Event handlers live in `src/ProjectManagementSystem.Application`. Every handler is idempotent, because the
+outbox may deliver an event more than once.
+
+**Postponed until there is a search (CQRS):** "a responsible person of an open package/task cannot be removed
+from the team". Checking it needs the work packages of the project where the employee is responsible for open
+work, which a CRUD repository cannot find. Until then `Project.EndTeamMembership` checks only the rules inside
+`Project`. See [issue #3](https://github.com/BekAllaev/ProjectManagementSystem/issues/3).
 
 ## Infrastructure
 

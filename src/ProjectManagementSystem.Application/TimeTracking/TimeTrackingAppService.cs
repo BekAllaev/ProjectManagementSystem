@@ -1,6 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Contracts.TimeTracking;
-using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
@@ -13,14 +12,15 @@ public sealed class TimeTrackingAppService(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
     IRepository<TaskTimeLog> timeLogs,
-    IWorkPackageLookup workPackageLookup,
     TimeTrackingService timeTrackingService,
     IUnitOfWork unitOfWork) : ITimeTrackingAppService
 {
     /// <summary>
-    /// The time log of the task is created on its first entry.
+    /// The time log of the task is created on its first entry. The domain service checks that the task
+    /// (and its existing time log) belongs to the given work package.
     /// </summary>
     public async Task<Guid> LogTimeAsync(
+        Guid workPackageId,
         Guid taskId,
         Guid employeeId,
         DateOnly workDate,
@@ -28,9 +28,7 @@ public sealed class TimeTrackingAppService(
         CancellationToken cancellationToken = default)
     {
         var timeLog = await timeLogs.FindAsync(taskId, cancellationToken);
-        var workPackage = await workPackages.GetAsync(
-            timeLog?.WorkPackageId ?? await FindWorkPackageIdOfTaskAsync(taskId, cancellationToken),
-            cancellationToken);
+        var workPackage = await workPackages.GetAsync(workPackageId, cancellationToken);
         var project = await projects.GetAsync(workPackage.ProjectId, cancellationToken);
 
         var isNew = timeLog is null;
@@ -57,8 +55,4 @@ public sealed class TimeTrackingAppService(
         timeLogs.Update(timeLog);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
-
-    private async Task<Guid> FindWorkPackageIdOfTaskAsync(Guid taskId, CancellationToken cancellationToken) =>
-        await workPackageLookup.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
-        ?? throw new EntityNotFoundException("Task", taskId);
 }

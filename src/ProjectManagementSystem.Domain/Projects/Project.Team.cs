@@ -27,11 +27,7 @@ public sealed partial class Project
         return teamMember.Id;
     }
 
-    /// <summary>
-    /// Goes through <see cref="Services.TeamMembershipService"/>, which rejects it while the employee is
-    /// responsible for an open work package or task.
-    /// </summary>
-    internal void EndTeamMembership(Guid employeeId, DateOnly to)
+    public void EndTeamMembership(Guid employeeId, DateOnly to)
     {
         var teamMember = _teamMembers.SingleOrDefault(m => m.EmployeeId == employeeId && m.To is null)
             ?? throw new DomainException($"Employee '{employeeId}' has no open team membership in the project.");
