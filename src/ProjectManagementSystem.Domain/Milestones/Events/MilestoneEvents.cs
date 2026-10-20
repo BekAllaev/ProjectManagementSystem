@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Base;
 
-namespace ProjectManagementSystem.Domain.Projects.Events;
+namespace ProjectManagementSystem.Domain.Milestones.Events;
 
 public sealed record MilestoneCreated(
     Guid ProjectId,
