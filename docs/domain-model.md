@@ -179,7 +179,9 @@ Shared by all projects, projects reference it by id.
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | Tasks in a milestone | Milestone ↔ WorkPackage | only references by TaskId; cancelled tasks are ignored on the read side |
 
-Event handlers live in `src/ProjectManagementSystem.Application`. Every handler is idempotent, because the
+Event handlers live in `src/ProjectManagementSystem.Application`; application events such as
+`ResponsiblePersonLeftTeam`, which other parts of the system consume, are contracts and live in
+`src/ProjectManagementSystem.Application.Contracts`. Every handler is idempotent, because the
 outbox may deliver an event more than once. `ResponsiblePersonLeftTeam` carries the id of the
 `TeamMembershipEnded` event that caused it (`CausationEventId`), so consumers can drop duplicates.
 

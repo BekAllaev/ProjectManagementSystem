@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Application.Events;
+namespace ProjectManagementSystem.Application.Contracts.Events;
 
 /// <summary>
 /// Fact noticed by the application layer, not raised by an aggregate. Usually a signal for a person

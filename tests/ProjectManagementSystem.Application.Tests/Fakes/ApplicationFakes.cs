@@ -1,5 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
-using ProjectManagementSystem.Application.Events;
+using ProjectManagementSystem.Application.Contracts.Events;
 
 namespace ProjectManagementSystem.Application.Tests.Fakes;
 

@@ -1,4 +1,4 @@
-using ProjectManagementSystem.Application.Events;
+using ProjectManagementSystem.Application.Contracts.Events;
 using ProjectManagementSystem.Application.Schedule;
 using ProjectManagementSystem.Application.Team;
 using ProjectManagementSystem.Domain.Projects.Events;
