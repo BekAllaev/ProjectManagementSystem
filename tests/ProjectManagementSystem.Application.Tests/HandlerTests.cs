@@ -56,7 +56,7 @@ public class HandlerTests
         var ended = new TeamMembershipEnded(project.Id, Guid.NewGuid(), _employeeId, TestData.Today);
         var publisher = new FakeApplicationEventPublisher();
         var handler = new CheckResponsiblePersonLeftTeam(
-            _workPackages, new InMemoryWorkPackageQueries(_workPackages), publisher, _unitOfWork);
+            _workPackages, new InMemoryWorkPackageLookup(_workPackages), publisher, _unitOfWork);
 
         await handler.HandleAsync(ended);
 

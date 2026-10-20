@@ -27,7 +27,7 @@ public sealed class InMemoryRepository<TAggregate> : IRepository<TAggregate> whe
     public void Delete(TAggregate aggregate) => _items.Remove(aggregate.Id);
 }
 
-public sealed class InMemoryWorkPackageQueries(InMemoryRepository<WorkPackage> workPackages) : IWorkPackageQueries
+public sealed class InMemoryWorkPackageLookup(InMemoryRepository<WorkPackage> workPackages) : IWorkPackageLookup
 {
     public Task<Guid?> FindWorkPackageIdOfTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
         Task.FromResult(workPackages.All.SingleOrDefault(wp => wp.ContainsTask(taskId))?.Id);

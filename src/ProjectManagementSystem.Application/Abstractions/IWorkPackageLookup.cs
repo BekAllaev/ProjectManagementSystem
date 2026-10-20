@@ -1,11 +1,11 @@
 namespace ProjectManagementSystem.Application.Abstractions;
 
 /// <summary>
-/// Searches work packages by something other than their id. Implemented on the read side, so results
-/// may be slightly stale: they only tell which aggregates to load, and the rules are checked again on
-/// the loaded aggregates.
+/// Finds work packages by something other than their id, because the repository works only by id.
+/// Implemented by the infrastructure over the same storage as the aggregates. It only tells which
+/// aggregates to load: the rules are always checked again on the loaded aggregates.
 /// </summary>
-public interface IWorkPackageQueries
+public interface IWorkPackageLookup
 {
     Task<Guid?> FindWorkPackageIdOfTaskAsync(Guid taskId, CancellationToken cancellationToken = default);
 

@@ -13,13 +13,13 @@ namespace ProjectManagementSystem.Application.Team;
 /// </summary>
 public sealed class CheckResponsiblePersonLeftTeam(
     IRepository<WorkPackage> workPackages,
-    IWorkPackageQueries workPackageQueries,
+    IWorkPackageLookup workPackageLookup,
     IApplicationEventPublisher publisher,
     IUnitOfWork unitOfWork) : IDomainEventHandler<TeamMembershipEnded>
 {
     public async Task HandleAsync(TeamMembershipEnded domainEvent, CancellationToken cancellationToken = default)
     {
-        var candidateIds = await workPackageQueries.ListWorkPackageIdsWithOpenWorkOfAsync(
+        var candidateIds = await workPackageLookup.ListWorkPackageIdsWithOpenWorkOfAsync(
             domainEvent.ProjectId, domainEvent.EmployeeId, cancellationToken);
         var candidates = await workPackages.GetManyAsync(candidateIds, cancellationToken);
 

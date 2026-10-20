@@ -13,7 +13,7 @@ public sealed class TimeTrackingAppService(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
     IRepository<TaskTimeLog> timeLogs,
-    IWorkPackageQueries workPackageQueries,
+    IWorkPackageLookup workPackageLookup,
     TimeTrackingService timeTrackingService,
     IUnitOfWork unitOfWork) : ITimeTrackingAppService
 {
@@ -59,6 +59,6 @@ public sealed class TimeTrackingAppService(
     }
 
     private async Task<Guid> FindWorkPackageIdOfTaskAsync(Guid taskId, CancellationToken cancellationToken) =>
-        await workPackageQueries.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
+        await workPackageLookup.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
         ?? throw new EntityNotFoundException("Task", taskId);
 }

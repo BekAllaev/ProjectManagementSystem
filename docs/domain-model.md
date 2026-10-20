@@ -31,9 +31,9 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   never loaded on their own.
 - An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
   `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
-- **Searching by anything else is a query of the application layer** (`IWorkPackageQueries`, implemented on
-  the read side). A query only says which aggregates to load; it may be slightly stale, so the rule is
-  always checked again on the loaded aggregates.
+- **Searching by anything else is done by the application layer** through `IWorkPackageLookup`, implemented
+  by the infrastructure over the same storage. A lookup only says which aggregates to load; the rule is
+  always checked again on the loaded aggregates. (Queries and commands of CQRS come later.)
 - **Domain services do not use repositories.** They get loaded aggregates as arguments, check the rule and
   change one aggregate. If a new aggregate is needed (a time log), the service creates it and the caller
   adds it to the repository.
