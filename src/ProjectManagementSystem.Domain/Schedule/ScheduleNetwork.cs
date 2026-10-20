@@ -6,7 +6,7 @@ namespace ProjectManagementSystem.Domain.Schedule;
 
 /// <summary>
 /// Dependencies between tasks of one project, possibly from different work packages.
-/// There is one network per project. The network is always acyclic.
+/// There is one network per project, so its id is the id of the project. The network is always acyclic.
 /// Tasks live in other aggregates, so a new dependency is added through
 /// <see cref="Services.DependencyService"/>, which checks that both tasks exist and are not cancelled.
 /// </summary>
@@ -14,13 +14,12 @@ public sealed class ScheduleNetwork : AggregateRoot<Guid>
 {
     private readonly List<Dependency> _dependencies = [];
 
-    public Guid ProjectId { get; }
+    public Guid ProjectId => Id;
 
     public IReadOnlyCollection<Dependency> Dependencies => _dependencies.AsReadOnly();
 
-    public ScheduleNetwork(Guid id, Guid projectId) : base(id)
+    public ScheduleNetwork(Guid projectId) : base(projectId)
     {
-        ProjectId = projectId;
     }
 
     internal void AddDependency(Dependency dependency)

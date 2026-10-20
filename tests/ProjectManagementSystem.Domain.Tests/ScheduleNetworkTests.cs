@@ -6,7 +6,7 @@ namespace ProjectManagementSystem.Domain.Tests;
 
 public class ScheduleNetworkTests
 {
-    private readonly ScheduleNetwork _network = new(Guid.NewGuid(), Guid.NewGuid());
+    private readonly ScheduleNetwork _network = new(Guid.NewGuid());
     private readonly Guid _a = Guid.NewGuid();
     private readonly Guid _b = Guid.NewGuid();
     private readonly Guid _c = Guid.NewGuid();

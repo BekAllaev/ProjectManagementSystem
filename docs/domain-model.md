@@ -17,12 +17,29 @@ only by id. Every rule that spans more than one aggregate is listed in
 | Risk | `Risk` | risk | `Risks/` |
 | Employee | `Employee` | employee (shared by all projects) | `Employees/` |
 
-Every aggregate has its events in `Events/` and its repository interface next to the root. Domain services
-are in `Services/`, specifications in `Specifications/` of the aggregate they are checked on.
+Every aggregate has its events in `Events/`. Domain services are in `Services/`, specifications in
+`Specifications/` of the aggregate they are checked on.
 
 Operations whose rule needs another aggregate are `internal` on the aggregate and public on a domain
 service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is called only by
 `WorkAssignmentService.AddTask`, which checks the team of the project first.
+
+## Repositories, domain services and application services
+
+- **One repository** `IRepository<TAggregate>` for all aggregates, with CRUD by id only: `FindAsync`, `Add`,
+  `Update`, `Delete`. It accepts only aggregate roots, so inner entities (tasks, time entries, roles) are
+  never loaded on their own.
+- An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
+  `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
+- **Searching by anything else is a query of the application layer** (`IWorkPackageQueries`, implemented on
+  the read side). A query only says which aggregates to load; it may be slightly stale, so the rule is
+  always checked again on the loaded aggregates.
+- **Domain services do not use repositories.** They get loaded aggregates as arguments, check the rule and
+  change one aggregate. If a new aggregate is needed (a time log), the service creates it and the caller
+  adds it to the repository.
+- **Application services** (`Application/*AppService`) implement the interfaces of
+  `Application.Contracts`: they run the queries, load the aggregates, call the domain service, and save
+  the changed aggregate with the unit of work.
 
 ### 1. Project
 
@@ -73,9 +90,9 @@ Time spent on tasks is not stored here: it lives in [TaskTimeLog](#4-tasktimelog
 
 ### 3. ScheduleNetwork
 
-One per project, created by `DependencyService` on the first dependency of the project.
+One per project, created by `ScheduleAppService` on the first dependency of the project.
 
-**Root:** `ScheduleNetwork`: `Id`, `ProjectId`
+**Root:** `ScheduleNetwork`: `Id` = ProjectId
 
 **Inside:**
 - **Dependency** (value object): `PredecessorTaskId`, `PredecessorWorkPackageId`, `SuccessorTaskId`,
@@ -96,6 +113,8 @@ notified.
 One per task, created on the first `LogTime`.
 
 **Root:** `TaskTimeLog`: `Id` = TaskId, `WorkPackageId`, `ProjectId`
+
+Created by `TimeTrackingService.CreateTimeLog` on the first entry.
 
 **Inside:**
 - **TimeEntry** (entity with local identity): `Id`, `EmployeeId`, `WorkDate`, `Hours`, `HourlyRate`
@@ -135,7 +154,7 @@ milestone is frozen.
 
 One per project, created on the first funding of the project. Amounts are in the currency of the project.
 
-**Root:** `ProjectFunding`: `Id`, `ProjectId`
+**Root:** `ProjectFunding`: `Id` = ProjectId
 
 **Inside:**
 - **FundingTranche** (value object): `Amount`, `Date`, `Reason`

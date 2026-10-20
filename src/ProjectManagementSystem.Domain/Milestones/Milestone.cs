@@ -93,7 +93,7 @@ public sealed class Milestone : AggregateRoot<Guid>
 
     /// <summary>
     /// Allowed at any moment and in any status. Tasks of the milestone are not affected.
-    /// The repository removes the milestone when it saves this change.
+    /// The caller deletes the milestone from the repository.
     /// </summary>
     public void Delete() => RaiseDomainEvent(new MilestoneDeleted(ProjectId, Id));
 
