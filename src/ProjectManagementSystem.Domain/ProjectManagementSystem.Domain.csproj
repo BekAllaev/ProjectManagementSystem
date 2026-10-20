@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="ProjectManagementSystem.Tests" />
+    <InternalsVisibleTo Include="ProjectManagementSystem.Domain.Tests" />
   </ItemGroup>
 
 </Project>

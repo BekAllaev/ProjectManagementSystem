@@ -1,12 +1,10 @@
-using ProjectManagementSystem.Application.Abstractions;
-using ProjectManagementSystem.Application.Events;
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.TimeTracking;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Tests.Fakes;
+namespace ProjectManagementSystem.Domain.Tests.Fakes;
 
 public class InMemoryRepository<TAggregate> : IRepository<TAggregate> where TAggregate : AggregateRoot<Guid>
 {
@@ -35,22 +33,4 @@ public sealed class InMemoryScheduleNetworkRepository : InMemoryRepository<Sched
 
 public sealed class InMemoryTaskTimeLogRepository : InMemoryRepository<TaskTimeLog>, ITaskTimeLogRepository
 {
-}
-
-public sealed class FakeUnitOfWork : IUnitOfWork
-{
-    public int SaveCount { get; private set; }
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        SaveCount++;
-        return Task.CompletedTask;
-    }
-}
-
-public sealed class FakeApplicationEventPublisher : IApplicationEventPublisher
-{
-    public List<ApplicationEvent> Published { get; } = [];
-
-    public void Publish(ApplicationEvent applicationEvent) => Published.Add(applicationEvent);
 }

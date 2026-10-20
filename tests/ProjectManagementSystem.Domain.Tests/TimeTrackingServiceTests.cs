@@ -3,9 +3,9 @@ using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.TimeTracking.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
-using ProjectManagementSystem.Tests.Fakes;
+using ProjectManagementSystem.Domain.Tests.Fakes;
 
-namespace ProjectManagementSystem.Tests.Domain;
+namespace ProjectManagementSystem.Domain.Tests;
 
 public class TimeTrackingServiceTests
 {
