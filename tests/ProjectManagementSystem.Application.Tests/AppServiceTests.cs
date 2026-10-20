@@ -19,7 +19,7 @@ public class AppServiceTests
     private readonly InMemoryRepository<WorkPackage> _workPackages = new();
     private readonly InMemoryRepository<ScheduleNetwork> _networks = new();
     private readonly InMemoryRepository<TaskTimeLog> _timeLogs = new();
-    private readonly InMemoryWorkPackageQueries _queries;
+    private readonly InMemoryWorkPackageLookup _workPackageLookup;
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly Guid _employeeId = Guid.NewGuid();
     private readonly Project _project;
@@ -27,7 +27,7 @@ public class AppServiceTests
 
     public AppServiceTests()
     {
-        _queries = new InMemoryWorkPackageQueries(_workPackages);
+        _workPackageLookup = new InMemoryWorkPackageLookup(_workPackages);
         _project = TestData.ProjectWithTeam(_employeeId);
         _workPackage = TestData.WorkPackage(_project, _employeeId);
         _projects.Add(_project);
@@ -40,7 +40,7 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         var otherSuccessor = TestData.Task(_project, _workPackage, _employeeId);
-        var service = new ScheduleAppService(_networks, _workPackages, _queries, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_networks, _workPackages, _workPackageLookup, new DependencyService(), _unitOfWork);
 
         await service.AddDependencyAsync(_project.Id, predecessor.Id, successor.Id, DependencyTypeDto.FinishToStart);
         await service.AddDependencyAsync(_project.Id, predecessor.Id, otherSuccessor.Id, DependencyTypeDto.StartToStart);
@@ -57,7 +57,7 @@ public class AppServiceTests
         var task = TestData.Task(_project, _workPackage, _employeeId);
         _workPackage.StartTask(task.Id);
         var service = new TimeTrackingAppService(
-            _projects, _workPackages, _timeLogs, _queries, new TimeTrackingService(), _unitOfWork);
+            _projects, _workPackages, _timeLogs, _workPackageLookup, new TimeTrackingService(), _unitOfWork);
 
         await service.LogTimeAsync(task.Id, _employeeId, TestData.Today, 2m);
         var entryId = await service.LogTimeAsync(task.Id, _employeeId, TestData.Today, 3m);
@@ -72,7 +72,7 @@ public class AppServiceTests
     public async Task Responsible_person_of_open_work_cannot_leave_the_team()
     {
         var service = new TeamMembershipAppService(
-            _projects, _workPackages, _queries, new TeamMembershipService(), _unitOfWork);
+            _projects, _workPackages, _workPackageLookup, new TeamMembershipService(), _unitOfWork);
 
         await Assert.ThrowsAsync<DomainException>(() =>
             service.EndTeamMembershipAsync(_project.Id, _employeeId, TestData.Today));

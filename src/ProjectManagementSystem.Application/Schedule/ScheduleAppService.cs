@@ -11,7 +11,7 @@ namespace ProjectManagementSystem.Application.Schedule;
 public sealed class ScheduleAppService(
     IRepository<ScheduleNetwork> networks,
     IRepository<WorkPackage> workPackages,
-    IWorkPackageQueries workPackageQueries,
+    IWorkPackageLookup workPackageLookup,
     DependencyService dependencyService,
     IUnitOfWork unitOfWork) : IScheduleAppService
 {
@@ -59,7 +59,7 @@ public sealed class ScheduleAppService(
 
     private async Task<WorkPackage> GetWorkPackageOfTaskAsync(Guid taskId, CancellationToken cancellationToken)
     {
-        var workPackageId = await workPackageQueries.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
+        var workPackageId = await workPackageLookup.FindWorkPackageIdOfTaskAsync(taskId, cancellationToken)
             ?? throw new EntityNotFoundException("Task", taskId);
 
         return await workPackages.GetAsync(workPackageId, cancellationToken);
