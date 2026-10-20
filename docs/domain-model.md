@@ -110,11 +110,9 @@ notified.
 
 ### 4. TaskTimeLog
 
-One per task, created on the first `LogTime`.
+One per task, created by `TimeTrackingService.CreateTimeLog` on the first entry.
 
 **Root:** `TaskTimeLog`: `Id` = TaskId, `WorkPackageId`, `ProjectId`
-
-Created by `TimeTrackingService.CreateTimeLog` on the first entry.
 
 **Inside:**
 - **TimeEntry** (entity with local identity): `Id`, `EmployeeId`, `WorkDate`, `Hours`, `HourlyRate`
