@@ -6,21 +6,31 @@ The former "mega aggregate" `Project` is split into several aggregates. Aggregat
 only by id. Every rule that spans more than one aggregate is listed in
 [Cross-aggregate rules](#cross-aggregate-rules).
 
-| Aggregate | Root | One per |
-|---|---|---|
-| Project | `Project` | project |
-| WorkPackage | `WorkPackage` | work package |
-| ScheduleNetwork | `ScheduleNetwork` | project |
-| TaskTimeLog | `TaskTimeLog` | task |
-| Milestone | `Milestone` | milestone |
-| ProjectFunding | `ProjectFunding` | project |
-| Risk | `Risk` | risk |
-| Employee | `Employee` | employee (shared by all projects) |
+| Aggregate | Root | One per | Folder (`src/ProjectManagementSystem.Domain`) |
+|---|---|---|---|
+| Project | `Project` | project | `Projects/` |
+| WorkPackage | `WorkPackage` | work package | `WorkPackages/` |
+| ScheduleNetwork | `ScheduleNetwork` | project | `Schedule/` |
+| TaskTimeLog | `TaskTimeLog` | task | `TimeTracking/` |
+| Milestone | `Milestone` | milestone | `Milestones/` |
+| ProjectFunding | `ProjectFunding` | project | `Funding/` |
+| Risk | `Risk` | risk | `Risks/` |
+| Employee | `Employee` | employee (shared by all projects) | `Employees/` |
+
+Every aggregate has its events in `Events/` and its repository interface next to the root. Domain services
+are in `Services/`, specifications in `Specifications/` of the aggregate they are checked on.
+
+Operations whose rule needs another aggregate are `internal` on the aggregate and public on a domain
+service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is called only by
+`WorkAssignmentService.AddTask`, which checks the team of the project first.
 
 ### 1. Project
 
-**Root:** `Project`: `Id`, `Title`, `Description`, `State` (Created / InProgress / Completed),
+**Root:** `Project`: `Id`, `Title`, `Description`, `Currency`, `State` (Created / InProgress / Completed),
 `CreationDate`, `StartDate`, `CompletionDate`
+
+`Currency` is the currency of all money of the project: hourly rates, time entries and funding. It stays on
+`Project` because the hourly rates of the team are in it.
 
 **Inside:**
 - **Role** (entity): `Id`, `Name`, `Description`
@@ -55,13 +65,15 @@ only by id. Every rule that spans more than one aggregate is listed in
 - task status transitions: `Start` (Open → InProgress), `Complete` (InProgress → Completed),
   `Cancel` (any unfinished → Cancelled).
 
-**Events:** `WorkPackageCompleted`, `WorkPackageCancelled`, `TaskCancelled`, `ResponsiblePersonChanged`
+**Events:** `WorkPackageCompleted`, `WorkPackageCancelled` (with the ids of the tasks it cancelled),
+`TaskCancelled`, `ResponsiblePersonChanged` (`TaskId` is empty for the package itself); also
+`WorkPackageCreated`, `TaskAdded`, `TaskStarted`, `TaskCompleted`.
 
 Time spent on tasks is not stored here: it lives in [TaskTimeLog](#4-tasktimelog).
 
 ### 3. ScheduleNetwork
 
-One per project.
+One per project, created by `DependencyService` on the first dependency of the project.
 
 **Root:** `ScheduleNetwork`: `Id`, `ProjectId`
 
@@ -121,9 +133,9 @@ milestone is frozen.
 
 ### 6. ProjectFunding
 
-One per project.
+One per project, created on the first funding of the project. Amounts are in the currency of the project.
 
-**Root:** `ProjectFunding`: `Id`, `ProjectId`, `Currency`
+**Root:** `ProjectFunding`: `Id`, `ProjectId`
 
 **Inside:**
 - **FundingTranche** (value object): `Amount`, `Date`, `Reason`
@@ -158,14 +170,18 @@ Shared by all projects, projects reference it by id.
 
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
-| The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | domain service + Specification |
-| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | domain service rejects; re-check after commit with the same Specification, a violation raises `ResponsiblePersonLeftTeam` for manual handling |
-| Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handler of `WorkPackageCancelled` / `TaskCancelled` → `RemoveDependenciesOf` |
-| A dependency links only tasks that are not cancelled | ScheduleNetwork ↔ WorkPackage | domain service + handler of `DependencyAdded` removes it if a task is already cancelled |
-| `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | domain service; a race with `CompleteTask` is accepted |
-| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | domain service reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
+| The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkAssignmentService` + `IsTeamMemberOnSpecification` |
+| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `TeamMembershipService` rejects with `IsResponsibleForOpenWorkSpecification`; the handler `CheckResponsiblePersonLeftTeam` of `TeamMembershipEnded` re-checks after commit with the same Specification and raises the application event `ResponsiblePersonLeftTeam` for manual handling |
+| Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
+| A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `DependencyService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
+| `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TimeTrackingService`; a race with `CompleteTask` is accepted |
+| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TimeTrackingService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | Tasks in a milestone | Milestone ↔ WorkPackage | only references by TaskId; cancelled tasks are ignored on the read side |
+
+Event handlers live in `src/ProjectManagementSystem.Application`. Every handler is idempotent, because the
+outbox may deliver an event more than once. `ResponsiblePersonLeftTeam` carries the id of the
+`TeamMembershipEnded` event that caused it (`CausationEventId`), so consumers can drop duplicates.
 
 ## Infrastructure
 
