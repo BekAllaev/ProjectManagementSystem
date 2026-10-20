@@ -72,7 +72,11 @@ One per project.
 
 **Methods:** `AddDependency`, `RemoveDependency`, `RemoveDependenciesOf(taskIds)`
 
-**Events:** `DependencyAdded`, `DependencyRemoved`
+**Events:** `DependencyAdded`, `DependencyRemoved`, `PredecessorCancelled`
+
+`RemoveDependenciesOf(taskIds)` raises `PredecessorCancelled` for every removed dependency whose predecessor
+is among the cancelled tasks and whose successor is not, so the responsible person of the successor can be
+notified.
 
 ### 4. TaskTimeLog
 
