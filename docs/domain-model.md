@@ -188,6 +188,7 @@ Shared by all projects, projects reference it by id.
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkAssignmentService` + `IsTeamMemberOnSpecification` |
+| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `TeamMembershipService` rejects with `IsResponsibleForOpenWorkSpecification`; no application service and no re-check after commit yet (needs a search, see issue #3) |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
 | A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `DependencyService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
 | `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TimeTrackingService`; a race with `CompleteTask` is accepted |
@@ -198,10 +199,12 @@ Shared by all projects, projects reference it by id.
 Event handlers live in `src/ProjectManagementSystem.Application`. Every handler is idempotent, because the
 outbox may deliver an event more than once.
 
-**Postponed until there is a search (CQRS):** "a responsible person of an open package/task cannot be removed
-from the team". Checking it needs the work packages of the project where the employee is responsible for open
-work, which a CRUD repository cannot find. Until then `Project.EndTeamMembership` checks only the rules inside
-`Project`. See [issue #3](https://github.com/BekAllaev/ProjectManagementSystem/issues/3).
+**Application side postponed until there is a search (CQRS):** the rule "a responsible person of an open
+package/task cannot be removed from the team" is in the domain (`TeamMembershipService` with
+`IsResponsibleForOpenWorkSpecification`, `Project.EndTeamMembership` is internal), but the application layer
+cannot call it yet: it needs the work packages of the project where the employee is responsible for open work,
+which a CRUD repository cannot find. For the same reason there is no re-check after commit yet. See
+[issue #3](https://github.com/BekAllaev/ProjectManagementSystem/issues/3).
 
 ## Infrastructure
 
