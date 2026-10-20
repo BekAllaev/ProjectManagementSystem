@@ -1,4 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
@@ -10,8 +11,8 @@ namespace ProjectManagementSystem.Application.Schedule;
 /// checked it. Then the dependency is removed here, as if it had existed before the cancellation.
 /// </summary>
 public sealed class RemoveDependencyOfAlreadyCancelledTask(
-    IWorkPackageRepository workPackages,
-    IScheduleNetworkRepository networks,
+    IRepository<WorkPackage> workPackages,
+    IRepository<ScheduleNetwork> networks,
     IUnitOfWork unitOfWork) : IDomainEventHandler<DependencyAdded>
 {
     public async Task HandleAsync(DependencyAdded domainEvent, CancellationToken cancellationToken = default)
@@ -28,11 +29,12 @@ public sealed class RemoveDependencyOfAlreadyCancelledTask(
         if (cancelledTaskIds.Count == 0)
             return;
 
-        var network = await networks.FindByProjectIdAsync(domainEvent.ProjectId, cancellationToken);
+        var network = await networks.FindAsync(domainEvent.ProjectId, cancellationToken);
         if (network is null)
             return;
 
         network.RemoveDependenciesOf(cancelledTaskIds);
+        networks.Update(network);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

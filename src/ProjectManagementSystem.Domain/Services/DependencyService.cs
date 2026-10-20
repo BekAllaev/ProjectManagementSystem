@@ -10,40 +10,30 @@ namespace ProjectManagementSystem.Domain.Services;
 /// cancelled concurrently, which is handled after the commit by a handler of <c>DependencyAdded</c>.
 /// Only <see cref="ScheduleNetwork"/> is changed.
 /// </summary>
-public sealed class DependencyService(IWorkPackageRepository workPackages, IScheduleNetworkRepository networks)
+public sealed class DependencyService
 {
-    public async Task AddDependencyAsync(
-        Guid projectId,
+    public void AddDependency(
+        ScheduleNetwork network,
+        WorkPackage predecessorWorkPackage,
         Guid predecessorTaskId,
+        WorkPackage successorWorkPackage,
         Guid successorTaskId,
-        DependencyType type,
-        CancellationToken cancellationToken = default)
+        DependencyType type)
     {
-        var predecessorWorkPackageId = await GetWorkPackageIdOfTaskAsync(projectId, predecessorTaskId, cancellationToken);
-        var successorWorkPackageId = await GetWorkPackageIdOfTaskAsync(projectId, successorTaskId, cancellationToken);
-
-        var network = await networks.FindByProjectIdAsync(projectId, cancellationToken);
-        if (network is null)
-        {
-            network = new ScheduleNetwork(Guid.NewGuid(), projectId);
-            networks.Add(network);
-        }
+        EnsureCanTakePart(network, predecessorWorkPackage, predecessorTaskId);
+        EnsureCanTakePart(network, successorWorkPackage, successorTaskId);
 
         network.AddDependency(new Dependency(
-            predecessorTaskId, predecessorWorkPackageId, successorTaskId, successorWorkPackageId, type));
+            predecessorTaskId, predecessorWorkPackage.Id, successorTaskId, successorWorkPackage.Id, type));
     }
 
-    private async Task<Guid> GetWorkPackageIdOfTaskAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    private static void EnsureCanTakePart(ScheduleNetwork network, WorkPackage workPackage, Guid taskId)
     {
-        var workPackage = await workPackages.FindByTaskIdAsync(taskId, cancellationToken);
-
-        if (workPackage is null || workPackage.ProjectId != projectId)
-            throw new EntityNotFoundException("Task", taskId);
+        if (workPackage.ProjectId != network.ProjectId)
+            throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{network.ProjectId}'.");
 
         var task = workPackage.GetTask(taskId);
         if (task.Status == ProjectTaskStatus.Cancelled)
             throw new DomainException($"Cancelled task '{task.Name}' cannot take part in a dependency.");
-
-        return workPackage.Id;
     }
 }

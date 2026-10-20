@@ -12,22 +12,31 @@ namespace ProjectManagementSystem.Domain.Services;
 /// never changed retroactively, so the rate read here cannot be replaced later. A race with completing
 /// the task is accepted. Only <see cref="TaskTimeLog"/> is changed.
 /// </summary>
-public sealed class TimeTrackingService(ITaskTimeLogRepository timeLogs)
+public sealed class TimeTrackingService
 {
-    /// <returns>Id of the new time entry.</returns>
-    public async Task<Guid> LogTimeAsync(
+    /// <summary>
+    /// Creates the time log of a task before its first entry.
+    /// </summary>
+    /// <returns>New time log; the caller adds it to the repository.</returns>
+    public TaskTimeLog CreateTimeLog(WorkPackage workPackage, Guid taskId)
+    {
+        var task = workPackage.GetTask(taskId);
+
+        return new TaskTimeLog(task.Id, workPackage.Id, workPackage.ProjectId);
+    }
+
+    public TimeEntry LogTime(
         Project project,
         WorkPackage workPackage,
-        Guid taskId,
+        TaskTimeLog timeLog,
         Guid employeeId,
         DateOnly workDate,
-        decimal hours,
-        CancellationToken cancellationToken = default)
+        decimal hours)
     {
         if (workPackage.ProjectId != project.Id)
             throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
 
-        EnsureTaskIsInProgress(workPackage, taskId);
+        EnsureTaskIsInProgress(workPackage, timeLog);
 
         if (workDate > DateOnly.FromDateTime(DateTime.UtcNow))
             throw new DomainException("Time cannot be logged for a future date.");
@@ -37,29 +46,22 @@ public sealed class TimeTrackingService(ITaskTimeLogRepository timeLogs)
 
         var hourlyRate = project.GetHourlyRateOn(employeeId, workDate);
 
-        var timeLog = await timeLogs.FindAsync(taskId, cancellationToken);
-        if (timeLog is null)
-        {
-            timeLog = new TaskTimeLog(taskId, workPackage.Id, project.Id);
-            timeLogs.Add(timeLog);
-        }
-
-        return timeLog.LogTime(employeeId, workDate, hours, hourlyRate.Amount).Id;
+        return timeLog.LogTime(employeeId, workDate, hours, hourlyRate.Amount);
     }
 
     public void RemoveEntry(WorkPackage workPackage, TaskTimeLog timeLog, Guid entryId)
     {
-        if (timeLog.WorkPackageId != workPackage.Id)
-            throw new DomainException($"Time log of task '{timeLog.TaskId}' does not belong to work package '{workPackage.Id}'.");
-
-        EnsureTaskIsInProgress(workPackage, timeLog.TaskId);
+        EnsureTaskIsInProgress(workPackage, timeLog);
 
         timeLog.RemoveEntry(entryId);
     }
 
-    private static void EnsureTaskIsInProgress(WorkPackage workPackage, Guid taskId)
+    private static void EnsureTaskIsInProgress(WorkPackage workPackage, TaskTimeLog timeLog)
     {
-        var task = workPackage.GetTask(taskId);
+        if (timeLog.WorkPackageId != workPackage.Id)
+            throw new DomainException($"Time log of task '{timeLog.TaskId}' does not belong to work package '{workPackage.Id}'.");
+
+        var task = workPackage.GetTask(timeLog.TaskId);
 
         if (task.Status != ProjectTaskStatus.InProgress)
             throw new DomainException($"Time can be changed only on a task in progress. Task '{task.Name}' is {task.Status}.");
