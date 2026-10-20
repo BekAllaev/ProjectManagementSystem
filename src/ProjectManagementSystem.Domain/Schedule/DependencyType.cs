@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Domain.Projects.Schedule;
+namespace ProjectManagementSystem.Domain.Schedule;
 
 public enum DependencyType
 {

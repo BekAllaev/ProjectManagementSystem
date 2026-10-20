@@ -1,13 +1,16 @@
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
+using ProjectManagementSystem.Domain.Schedule.Events;
 
-namespace ProjectManagementSystem.Domain.Projects.Schedule;
+namespace ProjectManagementSystem.Domain.Schedule;
 
 /// <summary>
-/// Dependencies between tasks of the project, possibly from different work packages.
-/// The network is always acyclic.
+/// Dependencies between tasks of one project, possibly from different work packages.
+/// There is one network per project. The network is always acyclic.
+/// Tasks live in other aggregates, so a new dependency is added through
+/// <see cref="Services.DependencyService"/>, which checks that both tasks exist and are not cancelled.
 /// </summary>
-public sealed class ScheduleNetwork : Entity<Guid>
+public sealed class ScheduleNetwork : AggregateRoot<Guid>
 {
     private readonly List<Dependency> _dependencies = [];
 
@@ -15,7 +18,7 @@ public sealed class ScheduleNetwork : Entity<Guid>
 
     public IReadOnlyCollection<Dependency> Dependencies => _dependencies.AsReadOnly();
 
-    internal ScheduleNetwork(Guid id, Guid projectId) : base(id)
+    public ScheduleNetwork(Guid id, Guid projectId) : base(id)
     {
         ProjectId = projectId;
     }
@@ -32,31 +35,37 @@ public sealed class ScheduleNetwork : Entity<Guid>
             throw new DomainException("Dependency would create a cycle in the schedule network.");
 
         _dependencies.Add(dependency);
+        RaiseDomainEvent(new DependencyAdded(ProjectId, dependency));
     }
 
-    internal Dependency RemoveDependency(Guid predecessorTaskId, Guid successorTaskId)
+    public void RemoveDependency(Guid predecessorTaskId, Guid successorTaskId)
     {
         var dependency = FindDependency(predecessorTaskId, successorTaskId)
             ?? throw new DomainException("Dependency between these tasks does not exist.");
 
         _dependencies.Remove(dependency);
-        return dependency;
+        RaiseDomainEvent(new DependencyRemoved(ProjectId, dependency));
     }
 
     /// <summary>
-    /// Removes every dependency in which any of the given tasks takes part.
+    /// Removes every dependency in which any of the given (cancelled) tasks takes part.
+    /// Successors of cancelled tasks get <see cref="PredecessorCancelled"/>, so their
+    /// responsible persons can be notified. Calling it again for the same tasks changes nothing.
     /// </summary>
-    /// <returns>Removed dependencies.</returns>
-    internal IReadOnlyList<Dependency> RemoveDependenciesOf(IReadOnlyCollection<Guid> taskIds)
+    public void RemoveDependenciesOf(IReadOnlyCollection<Guid> cancelledTaskIds)
     {
         var removed = _dependencies
-            .Where(d => taskIds.Contains(d.PredecessorTaskId) || taskIds.Contains(d.SuccessorTaskId))
+            .Where(d => cancelledTaskIds.Contains(d.PredecessorTaskId) || cancelledTaskIds.Contains(d.SuccessorTaskId))
             .ToList();
 
         foreach (var dependency in removed)
+        {
             _dependencies.Remove(dependency);
+            RaiseDomainEvent(new DependencyRemoved(ProjectId, dependency));
 
-        return removed;
+            if (cancelledTaskIds.Contains(dependency.PredecessorTaskId) && !cancelledTaskIds.Contains(dependency.SuccessorTaskId))
+                RaiseDomainEvent(new PredecessorCancelled(ProjectId, dependency));
+        }
     }
 
     private Dependency? FindDependency(Guid predecessorTaskId, Guid successorTaskId) =>

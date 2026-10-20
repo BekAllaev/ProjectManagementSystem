@@ -1,7 +1,7 @@
 using ProjectManagementSystem.Domain.Base;
-using ProjectManagementSystem.Domain.Projects.Schedule;
+using ProjectManagementSystem.Domain.Schedule;
 
-namespace ProjectManagementSystem.Domain.Projects.Events;
+namespace ProjectManagementSystem.Domain.Schedule.Events;
 
 public sealed record DependencyAdded(Guid ProjectId, Dependency Dependency) : DomainEvent;
 

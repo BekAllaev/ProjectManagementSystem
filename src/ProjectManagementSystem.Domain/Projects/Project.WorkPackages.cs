@@ -61,8 +61,6 @@ public sealed partial class Project
 
         var cancelledTaskIds = workPackage.Cancel(reason);
         RaiseDomainEvent(new WorkPackageCancelled(Id, workPackage.Id, workPackage.CancellationReason!, cancelledTaskIds));
-
-        RemoveDependenciesOf(cancelledTaskIds);
     }
 
     public void StartTask(Guid workPackageId, Guid taskId)
@@ -87,8 +85,6 @@ public sealed partial class Project
 
         workPackage.CancelTask(taskId);
         RaiseDomainEvent(new TaskCancelled(Id, workPackage.Id, taskId));
-
-        RemoveDependenciesOf([taskId]);
     }
 
     /// <summary>
