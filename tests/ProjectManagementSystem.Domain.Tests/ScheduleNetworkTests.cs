@@ -2,7 +2,7 @@ using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
 
-namespace ProjectManagementSystem.Tests.Domain;
+namespace ProjectManagementSystem.Domain.Tests;
 
 public class ScheduleNetworkTests
 {

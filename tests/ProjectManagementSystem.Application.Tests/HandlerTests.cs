@@ -6,9 +6,10 @@ using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
-using ProjectManagementSystem.Tests.Fakes;
+using ProjectManagementSystem.Application.Tests.Fakes;
+using ProjectManagementSystem.Domain.Tests.Fakes;
 
-namespace ProjectManagementSystem.Tests.Application;
+namespace ProjectManagementSystem.Application.Tests;
 
 public class HandlerTests
 {

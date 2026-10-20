@@ -2,7 +2,7 @@ using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Tests.Fakes;
+namespace ProjectManagementSystem.Domain.Tests.Fakes;
 
 public static class TestData
 {

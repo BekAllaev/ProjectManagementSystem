@@ -1,9 +1,9 @@
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Milestones;
 using ProjectManagementSystem.Domain.Milestones.Events;
-using ProjectManagementSystem.Tests.Fakes;
+using ProjectManagementSystem.Domain.Tests.Fakes;
 
-namespace ProjectManagementSystem.Tests.Domain;
+namespace ProjectManagementSystem.Domain.Tests;
 
 public class MilestoneTests
 {
