@@ -5,4 +5,10 @@ namespace ProjectManagementSystem.Domain.Interfaces;
 /// </summary>
 public interface IDomainEvent
 {
+    /// <summary>
+    /// Time-ordered id (UUID v7), so events can be sorted and deduplicated by it.
+    /// </summary>
+    Guid EventId { get; }
+
+    DateTime OccurredAt { get; }
 }

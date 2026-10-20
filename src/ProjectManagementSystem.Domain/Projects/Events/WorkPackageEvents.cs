@@ -1,18 +1,18 @@
-using ProjectManagementSystem.Domain.Interfaces;
+using ProjectManagementSystem.Domain.Base;
 
 namespace ProjectManagementSystem.Domain.Projects.Events;
 
-public sealed record WorkPackageCreated(Guid ProjectId, Guid WorkPackageId, string Description, Guid ResponsiblePersonId) : IDomainEvent;
+public sealed record WorkPackageCreated(Guid ProjectId, Guid WorkPackageId, string Description, Guid ResponsiblePersonId) : DomainEvent;
 
-public sealed record WorkPackageResponsiblePersonChanged(Guid ProjectId, Guid WorkPackageId, Guid ResponsiblePersonId) : IDomainEvent;
+public sealed record WorkPackageResponsiblePersonChanged(Guid ProjectId, Guid WorkPackageId, Guid ResponsiblePersonId) : DomainEvent;
 
-public sealed record WorkPackageCompleted(Guid ProjectId, Guid WorkPackageId) : IDomainEvent;
+public sealed record WorkPackageCompleted(Guid ProjectId, Guid WorkPackageId) : DomainEvent;
 
 public sealed record WorkPackageCancelled(
     Guid ProjectId,
     Guid WorkPackageId,
     string Reason,
-    IReadOnlyList<Guid> CancelledTaskIds) : IDomainEvent;
+    IReadOnlyList<Guid> CancelledTaskIds) : DomainEvent;
 
 public sealed record TaskAdded(
     Guid ProjectId,
@@ -21,13 +21,13 @@ public sealed record TaskAdded(
     string Name,
     string Description,
     Guid ResponsiblePersonId,
-    decimal EstimatedEffort) : IDomainEvent;
+    decimal EstimatedEffort) : DomainEvent;
 
-public sealed record TaskStarted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : IDomainEvent;
+public sealed record TaskStarted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : DomainEvent;
 
-public sealed record TaskCompleted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : IDomainEvent;
+public sealed record TaskCompleted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : DomainEvent;
 
-public sealed record TaskCancelled(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : IDomainEvent;
+public sealed record TaskCancelled(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : DomainEvent;
 
 public sealed record WorkLogged(
     Guid ProjectId,
@@ -35,4 +35,4 @@ public sealed record WorkLogged(
     Guid TaskId,
     Guid EmployeeId,
     DateOnly Date,
-    decimal Hours) : IDomainEvent;
+    decimal Hours) : DomainEvent;

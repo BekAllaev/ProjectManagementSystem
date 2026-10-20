@@ -1,4 +1,4 @@
-using ProjectManagementSystem.Domain.Interfaces;
+using ProjectManagementSystem.Domain.Base;
 
 namespace ProjectManagementSystem.Domain.Projects.Events;
 
@@ -9,8 +9,8 @@ public sealed record TeamMemberAdded(
     Guid RoleId,
     DateOnly From,
     DateOnly? To,
-    decimal HourlyRate) : IDomainEvent;
+    decimal HourlyRate) : DomainEvent;
 
-public sealed record TeamMembershipEnded(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, DateOnly To) : IDomainEvent;
+public sealed record TeamMembershipEnded(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, DateOnly To) : DomainEvent;
 
-public sealed record HourlyRateChanged(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, decimal Amount, DateOnly From) : IDomainEvent;
+public sealed record HourlyRateChanged(Guid ProjectId, Guid TeamMemberId, Guid EmployeeId, decimal Amount, DateOnly From) : DomainEvent;
