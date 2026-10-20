@@ -1,9 +1,9 @@
-using ProjectManagementSystem.Domain.Interfaces;
+using ProjectManagementSystem.Domain.Base;
 
 namespace ProjectManagementSystem.Domain.Projects.Events;
 
-public sealed record ProjectCreated(Guid ProjectId, string Title, string Currency, DateTime CreationDate) : IDomainEvent;
+public sealed record ProjectCreated(Guid ProjectId, string Title, string Currency, DateTime CreationDate) : DomainEvent;
 
-public sealed record ProjectStarted(Guid ProjectId, DateTime StartDate) : IDomainEvent;
+public sealed record ProjectStarted(Guid ProjectId, DateTime StartDate) : DomainEvent;
 
-public sealed record ProjectCompleted(Guid ProjectId, DateTime CompletionDate) : IDomainEvent;
+public sealed record ProjectCompleted(Guid ProjectId, DateTime CompletionDate) : DomainEvent;
