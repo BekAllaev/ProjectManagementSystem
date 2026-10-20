@@ -1,10 +1,13 @@
 using ProjectManagementSystem.Domain.Base;
 
-namespace ProjectManagementSystem.Domain.Projects.Events;
+namespace ProjectManagementSystem.Domain.WorkPackages.Events;
 
 public sealed record WorkPackageCreated(Guid ProjectId, Guid WorkPackageId, string Description, Guid ResponsiblePersonId) : DomainEvent;
 
-public sealed record WorkPackageResponsiblePersonChanged(Guid ProjectId, Guid WorkPackageId, Guid ResponsiblePersonId) : DomainEvent;
+/// <summary>
+/// Responsible person of the work package (<paramref name="TaskId"/> is empty) or of one of its tasks was changed.
+/// </summary>
+public sealed record ResponsiblePersonChanged(Guid ProjectId, Guid WorkPackageId, Guid? TaskId, Guid ResponsiblePersonId) : DomainEvent;
 
 public sealed record WorkPackageCompleted(Guid ProjectId, Guid WorkPackageId) : DomainEvent;
 
@@ -28,11 +31,3 @@ public sealed record TaskStarted(Guid ProjectId, Guid WorkPackageId, Guid TaskId
 public sealed record TaskCompleted(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : DomainEvent;
 
 public sealed record TaskCancelled(Guid ProjectId, Guid WorkPackageId, Guid TaskId) : DomainEvent;
-
-public sealed record WorkLogged(
-    Guid ProjectId,
-    Guid WorkPackageId,
-    Guid TaskId,
-    Guid EmployeeId,
-    DateOnly Date,
-    decimal Hours) : DomainEvent;

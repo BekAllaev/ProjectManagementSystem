@@ -1,13 +1,15 @@
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
+using ProjectManagementSystem.Domain.WorkPackages.Events;
 
-namespace ProjectManagementSystem.Domain.Projects.WorkPackages;
+namespace ProjectManagementSystem.Domain.WorkPackages;
 
 /// <summary>
-/// Group of related tasks. It is changed only through <see cref="Project"/>, which checks
-/// the rules that need the team of the project.
+/// Group of related tasks of a project. Operations that assign a responsible person are internal:
+/// they go through <see cref="Services.WorkAssignmentService"/>, which checks that the person is
+/// a member of the project team.
 /// </summary>
-public sealed class WorkPackage : Entity<Guid>
+public sealed class WorkPackage : AggregateRoot<Guid>
 {
     private readonly List<ProjectTask> _tasks = [];
 
@@ -29,6 +31,8 @@ public sealed class WorkPackage : Entity<Guid>
         Description = Guard.NotEmpty(description, nameof(Description));
         ResponsiblePersonId = responsiblePersonId;
         Status = WorkPackageStatus.Open;
+
+        RaiseDomainEvent(new WorkPackageCreated(ProjectId, Id, Description, ResponsiblePersonId));
     }
 
     public bool ContainsTask(Guid taskId) => _tasks.Any(t => t.Id == taskId);
@@ -36,7 +40,11 @@ public sealed class WorkPackage : Entity<Guid>
     public ProjectTask GetTask(Guid taskId) =>
         _tasks.SingleOrDefault(t => t.Id == taskId) ?? throw new EntityNotFoundException("Task", taskId);
 
-    internal void ChangeResponsiblePerson(Guid employeeId) => ResponsiblePersonId = employeeId;
+    internal void ChangeResponsiblePerson(Guid employeeId)
+    {
+        ResponsiblePersonId = employeeId;
+        RaiseDomainEvent(new ResponsiblePersonChanged(ProjectId, Id, TaskId: null, employeeId));
+    }
 
     internal ProjectTask AddTask(string name, string description, Guid responsiblePersonId, decimal estimatedEffort)
     {
@@ -44,10 +52,37 @@ public sealed class WorkPackage : Entity<Guid>
 
         var task = new ProjectTask(Guid.NewGuid(), Id, name, description, responsiblePersonId, estimatedEffort);
         _tasks.Add(task);
+
+        RaiseDomainEvent(new TaskAdded(
+            ProjectId, Id, task.Id, task.Name, task.Description, task.ResponsiblePersonId, task.EstimatedEffort));
         return task;
     }
 
-    internal void Complete()
+    internal void ChangeTaskResponsiblePerson(Guid taskId, Guid employeeId)
+    {
+        GetTask(taskId).ChangeResponsiblePerson(employeeId);
+        RaiseDomainEvent(new ResponsiblePersonChanged(ProjectId, Id, taskId, employeeId));
+    }
+
+    public void StartTask(Guid taskId)
+    {
+        GetTask(taskId).Start();
+        RaiseDomainEvent(new TaskStarted(ProjectId, Id, taskId));
+    }
+
+    public void CompleteTask(Guid taskId)
+    {
+        GetTask(taskId).Complete();
+        RaiseDomainEvent(new TaskCompleted(ProjectId, Id, taskId));
+    }
+
+    public void CancelTask(Guid taskId)
+    {
+        GetTask(taskId).Cancel();
+        RaiseDomainEvent(new TaskCancelled(ProjectId, Id, taskId));
+    }
+
+    public void Complete()
     {
         EnsureOpen("complete");
 
@@ -55,13 +90,13 @@ public sealed class WorkPackage : Entity<Guid>
             throw new DomainException("Work package can be completed only when all its tasks are completed or cancelled.");
 
         Status = WorkPackageStatus.Completed;
+        RaiseDomainEvent(new WorkPackageCompleted(ProjectId, Id));
     }
 
     /// <summary>
     /// Cancels the package and all its unfinished tasks. Completed tasks stay completed.
     /// </summary>
-    /// <returns>Ids of the tasks that were cancelled by this call.</returns>
-    internal IReadOnlyList<Guid> Cancel(string reason)
+    public void Cancel(string reason)
     {
         EnsureOpen("cancel");
         reason = Guard.NotEmpty(reason, nameof(CancellationReason));
@@ -75,17 +110,8 @@ public sealed class WorkPackage : Entity<Guid>
 
         Status = WorkPackageStatus.Cancelled;
         CancellationReason = reason;
-        return cancelledTaskIds;
+        RaiseDomainEvent(new WorkPackageCancelled(ProjectId, Id, reason, cancelledTaskIds));
     }
-
-    internal void StartTask(Guid taskId) => GetTask(taskId).Start();
-
-    internal void CompleteTask(Guid taskId) => GetTask(taskId).Complete();
-
-    internal void CancelTask(Guid taskId) => GetTask(taskId).Cancel();
-
-    internal TimeEntry LogWork(Guid taskId, Guid employeeId, DateOnly date, decimal hours) =>
-        GetTask(taskId).LogWork(employeeId, date, hours);
 
     private void EnsureOpen(string action)
     {

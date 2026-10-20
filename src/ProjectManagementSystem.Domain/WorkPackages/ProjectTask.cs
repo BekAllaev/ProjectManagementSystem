@@ -1,16 +1,15 @@
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Exceptions;
 
-namespace ProjectManagementSystem.Domain.Projects.WorkPackages;
+namespace ProjectManagementSystem.Domain.WorkPackages;
 
 /// <summary>
 /// Task of a work package. Named ProjectTask to avoid a clash with <see cref="System.Threading.Tasks.Task"/>.
-/// It is changed only through its <see cref="WorkPackage"/>.
+/// It is changed only through its <see cref="WorkPackage"/>. Time spent on the task is kept in
+/// <see cref="TimeTracking.TaskTimeLog"/>.
 /// </summary>
 public sealed class ProjectTask : Entity<Guid>
 {
-    private readonly List<TimeEntry> _timeEntries = [];
-
     public Guid WorkPackageId { get; }
 
     public string Name { get; private set; }
@@ -25,8 +24,6 @@ public sealed class ProjectTask : Entity<Guid>
     /// Estimated effort in hours.
     /// </summary>
     public decimal EstimatedEffort { get; private set; }
-
-    public IReadOnlyCollection<TimeEntry> TimeEntries => _timeEntries.AsReadOnly();
 
     public bool IsFinished => Status is ProjectTaskStatus.Completed or ProjectTaskStatus.Cancelled;
 
@@ -44,6 +41,14 @@ public sealed class ProjectTask : Entity<Guid>
         ResponsiblePersonId = responsiblePersonId;
         EstimatedEffort = Guard.Positive(estimatedEffort, nameof(EstimatedEffort));
         Status = ProjectTaskStatus.Open;
+    }
+
+    internal void ChangeResponsiblePerson(Guid employeeId)
+    {
+        if (IsFinished)
+            throw new DomainException($"Responsible person of task '{Name}' cannot be changed because it is {Status}.");
+
+        ResponsiblePersonId = employeeId;
     }
 
     internal void Start()
@@ -64,15 +69,6 @@ public sealed class ProjectTask : Entity<Guid>
             throw new DomainException($"Task '{Name}' cannot be cancelled because it is already {Status}.");
 
         Status = ProjectTaskStatus.Cancelled;
-    }
-
-    internal TimeEntry LogWork(Guid employeeId, DateOnly date, decimal hours)
-    {
-        EnsureStatus(ProjectTaskStatus.InProgress, "logged work on");
-
-        var timeEntry = new TimeEntry(employeeId, date, hours);
-        _timeEntries.Add(timeEntry);
-        return timeEntry;
     }
 
     private void EnsureStatus(ProjectTaskStatus expected, string action)
