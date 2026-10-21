@@ -1,4 +1,4 @@
-using ProjectManagementSystem.Domain.Projects;
+using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 
 namespace ProjectManagementSystem.Domain.Tests;
@@ -14,7 +14,18 @@ public class ProjectTests
         project.Start();
         Assert.True(project.IsOpen);
 
-        project.Complete();
+        project.Complete(DateTime.UtcNow);
         Assert.False(project.IsOpen);
+    }
+
+    [Fact]
+    public void Closed_project_gets_no_new_work_packages()
+    {
+        var project = TestData.ProjectWithTeam();
+        project.Start();
+        project.Complete(DateTime.UtcNow);
+
+        Assert.Throws<DomainException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => project.Complete(DateTime.UtcNow));
     }
 }

@@ -12,15 +12,17 @@ namespace ProjectManagementSystem.Domain.Services;
 public sealed class TeamMembershipService
 {
     /// <param name="workPackages">
-    /// Work packages of the project in which the employee may be responsible for open work. The rule
-    /// itself is checked here on the loaded aggregates, however the caller found them.
+    /// All work packages of the project, loaded by <see cref="Project.WorkPackageIds"/>. An incomplete
+    /// list is rejected, so the rule cannot be bypassed by leaving a package out.
     /// </param>
     public void EndTeamMembership(
         Project project,
-        IEnumerable<WorkPackage> workPackages,
+        IReadOnlyCollection<WorkPackage> workPackages,
         Guid employeeId,
         DateOnly to)
     {
+        WorkPackagesOfProject.EnsureComplete(project, workPackages);
+
         var isResponsible = new IsResponsibleForOpenWorkSpecification(employeeId);
 
         if (workPackages.Any(wp => wp.ProjectId == project.Id && isResponsible.IsSatisfiedBy(wp)))
