@@ -48,7 +48,7 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   `Application.Contracts`: they load the aggregates, call the domain service, and save
   the changed aggregate with the unit of work. They contain no business rules.
 - Domain services that need the current date get `System.TimeProvider` through the constructor
-  (`WorkAssignmentService`, `TimeTrackingService`, `ProjectClosureService`); "today" is
+  (`WorkAssignmentService`, `TimeTrackingService`, `ProjectService`); "today" is
   `DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime)`.
 
 ### 1. Project
@@ -84,7 +84,7 @@ the project conflict with each other.
 - hourly rates are never changed retroactively and are never removed; a new rate starts after the current one
   and within the membership period;
 - a work package is registered only in an open project;
-- `Complete` (internal, called by `ProjectClosureService`) only from InProgress; it sets `CompletionDate`
+- `Complete` (internal, called by `ProjectService.Complete`) only from InProgress; it sets `CompletionDate`
   (not earlier than `StartDate`) and the project is closed afterwards.
 
 **Events:** `ProjectCreated`, `ProjectStarted`, `ProjectCompleted`; role and team events.
@@ -233,8 +233,8 @@ precondition; the last line of defence against two concurrent registrations is a
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkAssignmentService` + `IsTeamMemberOnSpecification` |
-| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `TeamMembershipService` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
-| A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectClosureService` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`, so the rule holds at commit, no re-check after it |
+| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
+| A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`, so the rule holds at commit, no re-check after it |
 | No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `Project.RegisterWorkPackage` (conflicts with closing through the version of `Project`); `DependencyService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
 | The email of an employee is unique | Employee ↔ all Employees | `EmployeeRegistrationService` with `IEmployeeRepository.ExistsWithEmailAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |

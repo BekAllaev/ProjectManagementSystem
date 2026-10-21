@@ -30,7 +30,7 @@ public static class TestData
     }
 
     /// <summary>
-    /// Starts and completes the project, bypassing <see cref="ProjectClosureService"/>.
+    /// Starts and completes the project, bypassing <see cref="ProjectService.Complete"/>.
     /// </summary>
     public static void Close(Project project)
     {

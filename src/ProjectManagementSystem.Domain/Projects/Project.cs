@@ -56,7 +56,7 @@ public sealed partial class Project : AggregateRoot<Guid>
     }
 
     /// <summary>
-    /// Goes through <see cref="Services.ProjectClosureService"/>, which checks that every work package
+    /// Goes through <see cref="Services.ProjectService.Complete"/>, which checks that every work package
     /// of the project is finished.
     /// </summary>
     internal void Complete(DateTime completionDate)
