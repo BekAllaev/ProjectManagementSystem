@@ -47,18 +47,18 @@ public class WorkPackageServiceTests
     }
 
     [Fact]
-    public void New_work_package_is_registered_in_the_open_project()
+    public void New_work_package_is_created_only_in_an_open_project_and_does_not_change_it()
     {
         var project = TestData.ProjectWithTeam(_member);
 
         var workPackage = _service.CreateWorkPackage(project, "Package", _member);
 
-        Assert.Equal([workPackage.Id], project.WorkPackageIds);
+        Assert.Equal(project.Id, workPackage.ProjectId);
+        Assert.Single(workPackage.DomainEvents.OfType<WorkPackageCreated>());
+        Assert.Empty(project.WorkPackageIds);
 
-        project.Start(DateTime.UtcNow);
-        project.Complete(DateTime.UtcNow);
+        TestData.Close(project);
 
         Assert.Throws<DomainException>(() => _service.CreateWorkPackage(project, "Package", _member));
-        Assert.Single(project.WorkPackageIds);
     }
 }

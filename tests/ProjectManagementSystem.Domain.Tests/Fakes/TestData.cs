@@ -38,8 +38,17 @@ public static class TestData
         project.Complete(DateTime.UtcNow);
     }
 
-    public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId) =>
-        new WorkPackageService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
+    /// <summary>
+    /// Creates a work package and registers it in the project, as the handler of
+    /// <see cref="WorkPackages.Events.WorkPackageCreated"/> does after the commit.
+    /// </summary>
+    public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId)
+    {
+        var workPackage = new WorkPackageService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
+        project.RegisterWorkPackage(workPackage.Id);
+
+        return workPackage;
+    }
 
     public static ProjectTask Task(Project project, WorkPackage workPackage, Guid responsiblePersonId) =>
         new WorkPackageService(TimeProvider).AddTask(project, workPackage, "Task", "Description", responsiblePersonId, estimatedEffort: 8m);

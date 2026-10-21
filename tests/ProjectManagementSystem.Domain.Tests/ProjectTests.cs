@@ -28,4 +28,18 @@ public class ProjectTests
         Assert.Throws<DomainException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
         Assert.Throws<DomainException>(() => project.Complete(DateTime.UtcNow));
     }
+
+    [Fact]
+    public void Registering_a_work_package_again_changes_nothing()
+    {
+        var project = TestData.ProjectWithTeam();
+        var workPackageId = Guid.NewGuid();
+        project.RegisterWorkPackage(workPackageId);
+        project.Start(DateTime.UtcNow);
+        project.Complete(DateTime.UtcNow);
+
+        project.RegisterWorkPackage(workPackageId);
+
+        Assert.Equal([workPackageId], project.WorkPackageIds);
+    }
 }

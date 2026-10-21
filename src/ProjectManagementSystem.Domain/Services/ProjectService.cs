@@ -14,9 +14,10 @@ namespace ProjectManagementSystem.Domain.Services;
 public sealed class ProjectService(TimeProvider timeProvider)
 {
     /// <summary>
-    /// Completes the project when every work package is Completed or Cancelled. Work packages never
-    /// reopen, and the list of packages cannot change concurrently because registering a package changes
-    /// the version of <see cref="Project"/>, so the rule holds at commit and there is no re-check after it.
+    /// Completes the project when every registered work package is Completed or Cancelled. Work packages
+    /// never reopen, and registering a package changes the version of <see cref="Project"/>, so the list
+    /// cannot change concurrently. A package created but not yet registered is cancelled by the handler of
+    /// <see cref="WorkPackages.Events.WorkPackageCreated"/> once it sees the closed project (compensation).
     /// </summary>
     public void Complete(Project project, IReadOnlyCollection<WorkPackage> workPackages)
     {

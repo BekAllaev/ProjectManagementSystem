@@ -9,27 +9,26 @@ namespace ProjectManagementSystem.Domain.Services;
 /// Operations on <see cref="WorkPackage"/> whose rules need the project: creating a work package and
 /// assigning responsible persons to work packages and tasks. The person must be a member of the
 /// project team at the moment of assignment; the team lives in <see cref="Project"/>, so the rule
-/// spans two aggregates. Only <see cref="WorkPackage"/> is changed, except
-/// <see cref="CreateWorkPackage"/>.
+/// spans two aggregates. Only <see cref="WorkPackage"/> is changed.
 /// </summary>
 public sealed class WorkPackageService(TimeProvider timeProvider)
 {
     /// <summary>
-    /// Creates a work package and registers it in the project. This is the only operation that changes
-    /// two aggregates in one transaction (inserts the new <see cref="WorkPackage"/> and updates
-    /// <see cref="Project"/>). It is deliberate: the registration changes the version of the project, so
-    /// creating a package conflicts with closing the project, and a closed project never gets a package
-    /// that <see cref="ProjectService.Complete"/> has not seen.
+    /// Creates a work package in an open project. The project is only read: the package is registered in
+    /// it after the commit by the handler of <see cref="WorkPackages.Events.WorkPackageCreated"/>
+    /// (<see cref="Project.RegisterWorkPackage"/>). If the project is closed in the meantime, the handler
+    /// cancels the package, so a closed project never keeps an open package that
+    /// <see cref="ProjectService.Complete"/> has not seen.
     /// </summary>
-    /// <returns>New work package; the caller adds it to the repository and updates the project in the same unit of work.</returns>
+    /// <returns>New work package; the caller adds it to the repository.</returns>
     public WorkPackage CreateWorkPackage(Project project, string description, Guid responsiblePersonId)
     {
+        if (!project.IsOpen)
+            throw new DomainException($"Project '{project.Id}' is {project.State}; it gets no new work packages.");
+
         EnsureIsCurrentTeamMember(project, responsiblePersonId);
 
-        var workPackage = new WorkPackage(Guid.NewGuid(), project.Id, description, responsiblePersonId);
-        project.RegisterWorkPackage(workPackage.Id);
-
-        return workPackage;
+        return new WorkPackage(Guid.NewGuid(), project.Id, description, responsiblePersonId);
     }
 
     public ProjectTask AddTask(

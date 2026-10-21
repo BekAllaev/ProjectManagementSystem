@@ -46,10 +46,10 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   caller adds it to the repository. A domain service uses a repository only when the rule depends on the
   completeness of a set of aggregates that cannot be listed otherwise: the unique email of an employee
   (`EmployeeService` with `IRepository<Employee>.ExistsAsync`).
-- **One exception to "one aggregate per transaction":** creating a work package also registers it in
-  `Project` (`WorkPackageService.CreateWorkPackage` → `Project.RegisterWorkPackage`). It is the only
-  operation that changes two aggregates in one transaction: the registration changes the version of
-  `Project`, which protects the closing invariant (see [Project](#1-project)).
+- **One aggregate per transaction, without exceptions.** Creating a work package only reads `Project`;
+  the package is registered in `Project` after the commit by the handler of `WorkPackageCreated`
+  (`Project.RegisterWorkPackage`), with a compensation if the project was closed in the meantime
+  (see [Project](#1-project)).
 - **Application services** (`Application/*AppService`) implement the interfaces of
   `Application.Contracts`: they load the aggregates, call the domain service, and save
   the changed aggregate with the unit of work. They contain no business rules.
@@ -69,11 +69,17 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
 A closed project gets no new work packages, milestones, milestone tasks, dependencies or funding. Team, role
 and hourly-rate operations do not check it yet (see [Growth points](#growth-points)).
 
-`WorkPackageIds` holds only the ids of all work packages of the project, finished ones included, never
-references to `WorkPackage`. A package is registered by `WorkPackageService.CreateWorkPackage` through
-the internal `RegisterWorkPackage`. A change of the list changes the version of `Project` like any other
-change inside the aggregate (the persistence mapping must keep it so), so creating a package and closing
-the project conflict with each other.
+`WorkPackageIds` holds only the ids of all registered work packages of the project, finished ones
+included, never references to `WorkPackage`. `WorkPackageService.CreateWorkPackage` creates a package only
+in an open project and does not change `Project`. The handler of `WorkPackageCreated` then calls
+`RegisterWorkPackage` (eventual consistency); registering the same package again changes nothing. A change
+of the list changes the version of `Project` like any other change inside the aggregate (the persistence
+mapping must keep it so), so registering a package and closing the project conflict with each other.
+
+**Compensation.** Between the creation of a package and its registration the project can be closed:
+`ProjectService.Complete` does not see the unregistered package. The handler of `WorkPackageCreated` then
+does not register it but cancels it (reason "project closed"), which cancels its tasks with the usual
+events. So a closed project never keeps an open package.
 
 `Currency` is the currency of all money of the project: hourly rates, time entries and funding. It stays on
 `Project` because the hourly rates of the team are in it.
@@ -105,8 +111,8 @@ the project conflict with each other.
 **Root:** `WorkPackage`: `Id`, `ProjectId`, `Description`, `ResponsiblePersonId`,
 `Status` (Open / Completed / Cancelled), `CancellationReason`
 
-Created only by `WorkPackageService.CreateWorkPackage` (the constructor is internal), which registers
-it in the open project.
+Created only by `WorkPackageService.CreateWorkPackage` (the constructor is internal) in an open project;
+it is registered in the project after the commit (see [Project](#1-project)).
 
 **Inside:**
 - **Task** (entity, `ProjectTask` in code): `Id`, `Name`, `Description`, `ResponsiblePersonId`,
@@ -243,8 +249,8 @@ precondition; the last line of defence against two concurrent registrations is a
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkPackageService` + `IsTeamMemberOnSpecification` |
 | A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
-| A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`, so the rule holds at commit, no re-check after it |
-| No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `Project.RegisterWorkPackage` (conflicts with closing through the version of `Project`); `ScheduleNetworkService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
+| A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`. A package created but not yet registered is cancelled by the handler of `WorkPackageCreated` when it finds the project closed (compensation) |
+| No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `WorkPackageService.CreateWorkPackage` checks `Project.IsOpen`, a concurrent closing is compensated by the handler of `WorkPackageCreated`; `ScheduleNetworkService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
 | The email of an employee is unique | Employee ↔ all Employees | `EmployeeService` with `IRepository<Employee>.ExistsAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
 | A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `ScheduleNetworkService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
@@ -302,9 +308,12 @@ deduplication is needed.
 
 - **Loading all work packages of a project by a search on `ProjectId`** instead of keeping `WorkPackageIds`
   in `Project`. Rejected: a search sees only committed packages, so a package created concurrently with
-  closing the project would be missed. With the id list, creating a package changes `Project`, and closing
-  the project and creating a package become a conflict of versions of `Project`, i.e. the invariant is
-  checked at commit.
+  closing the project would be missed. With the id list, registering a package changes `Project`, and
+  closing the project and registering a package become a conflict of versions of `Project`.
+- **Registering the package in `Project` in the same transaction as its creation.** It kept the closing
+  invariant strict, but broke the rule "one aggregate per transaction". Replaced by registration in the
+  handler of `WorkPackageCreated` with a compensation (cancelling the package) if the project is already
+  closed.
 
 ## Growth points
 

@@ -6,8 +6,7 @@ namespace ProjectManagementSystem.Domain.Interfaces;
 /// <summary>
 /// CRUD access to aggregates by id; only aggregate roots can be stored. The only search is
 /// <see cref="ExistsAsync"/>; loading aggregates by anything else is a query of the application layer. Changes are saved by a unit of work of the application layer,
-/// one aggregate per transaction. The only exception is creating a work package, which also registers it
-/// in its project (see <see cref="Services.WorkPackageService.CreateWorkPackage"/>).
+/// one aggregate per transaction.
 /// </summary>
 public interface IRepository<TAggregate> where TAggregate : AggregateRoot<Guid>
 {
