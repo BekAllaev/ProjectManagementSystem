@@ -4,7 +4,8 @@ namespace ProjectManagementSystem.Domain.Employees;
 
 /// <summary>
 /// Employee is not owned by a single project, so it stays a separate aggregate.
-/// Projects reference employees only by id.
+/// Projects reference employees only by id. The email is unique among all employees, so the employee is
+/// created and its email is changed through <see cref="Services.EmployeeRegistrationService"/>.
 /// </summary>
 public sealed class Employee : AggregateRoot<Guid>
 {
@@ -12,15 +13,24 @@ public sealed class Employee : AggregateRoot<Guid>
 
     public string LastName { get; private set; }
 
+    /// <summary>
+    /// Email as entered.
+    /// </summary>
     public string Email { get; private set; }
+
+    /// <summary>
+    /// Email in the form in which it is unique among all employees, see <see cref="EmailAddress.Normalize"/>.
+    /// </summary>
+    public string NormalizedEmail { get; private set; }
 
     public string? PhotoPath { get; private set; }
 
-    public Employee(Guid id, string firstName, string lastName, string email, string? photoPath = null) : base(id)
+    internal Employee(Guid id, string firstName, string lastName, string email, string? photoPath = null) : base(id)
     {
         FirstName = Guard.NotEmpty(firstName, nameof(FirstName));
         LastName = Guard.NotEmpty(lastName, nameof(LastName));
         Email = Guard.NotEmpty(email, nameof(Email));
+        NormalizedEmail = EmailAddress.Normalize(email);
         PhotoPath = photoPath;
     }
 
@@ -30,7 +40,11 @@ public sealed class Employee : AggregateRoot<Guid>
         LastName = Guard.NotEmpty(lastName, nameof(LastName));
     }
 
-    public void ChangeEmail(string email) => Email = Guard.NotEmpty(email, nameof(Email));
+    internal void ChangeEmail(string email)
+    {
+        Email = Guard.NotEmpty(email, nameof(Email));
+        NormalizedEmail = EmailAddress.Normalize(email);
+    }
 
     public void ChangePhoto(string? photoPath) => PhotoPath = photoPath;
 }
