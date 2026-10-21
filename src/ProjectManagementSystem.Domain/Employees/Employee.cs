@@ -5,7 +5,7 @@ namespace ProjectManagementSystem.Domain.Employees;
 /// <summary>
 /// Employee is not owned by a single project, so it stays a separate aggregate.
 /// Projects reference employees only by id. The email is unique among all employees, so the employee is
-/// created and its email is changed through <see cref="Services.EmployeeRegistrationService"/>.
+/// created and its email is changed through <see cref="Services.EmployeeService"/>.
 /// </summary>
 public sealed class Employee : AggregateRoot<Guid>
 {

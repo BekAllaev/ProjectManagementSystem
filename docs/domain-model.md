@@ -26,8 +26,11 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
 
 ## Repositories, domain services and application services
 
-- **One repository** `IRepository<TAggregate>` for all aggregates, with CRUD by id only: `FindAsync`, `Add`,
-  `Update`, `Delete`. It accepts only aggregate roots, so inner entities (tasks, time entries, roles) are
+- **One repository** `IRepository<TAggregate>` for all aggregates, with CRUD by id: `FindAsync`, `Add`,
+  `Update`, `Delete`, and one search, `ExistsAsync(predicate)`, for rules that depend on a whole set of
+  aggregates. The predicate is translated by the storage, so it compares with values computed beforehand
+  and does not call domain code. There is deliberately no loading of lists by a predicate (see
+  [Considered alternatives](#considered-alternatives)); there are no per-aggregate repository interfaces. It accepts only aggregate roots, so inner entities (tasks, time entries, roles) are
   never loaded on their own.
 - An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
   `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
@@ -35,11 +38,15 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   task), and the domain service checks that they fit together (the task is really in that work package).
   Where a rule needs *all* work packages of a project (closing the project, leaving the team), the caller
   loads them by `Project.WorkPackageIds`, and the domain service checks that the set is exactly that list.
+- **Domain services are named after the aggregate they change** (`ProjectService`, `EmployeeService`,
+  `MilestoneService`, `FundingService`), so a new rule on an aggregate goes into its service instead of a new
+  service per rule. Older services named after an activity (`WorkAssignmentService`, `TimeTrackingService`,
+  `DependencyService`) are not renamed yet.
 - **By default a domain service gets loaded aggregates as arguments**, checks the rule and changes one
   aggregate. If a new aggregate is needed (a time log, a milestone, funding), the service creates it and the
   caller adds it to the repository. A domain service uses a repository only when the rule depends on the
   completeness of a set of aggregates that cannot be listed otherwise: the unique email of an employee
-  (`EmployeeRegistrationService` with `IEmployeeRepository.ExistsWithEmailAsync`).
+  (`EmployeeService` with `IRepository<Employee>.ExistsAsync`).
 - **One exception to "one aggregate per transaction":** creating a work package also registers it in
   `Project` (`WorkAssignmentService.CreateWorkPackage` → `Project.RegisterWorkPackage`). It is the only
   operation that changes two aggregates in one transaction: the registration changes the version of
@@ -223,7 +230,7 @@ Shared by all projects, projects reference it by id.
 
 The email is unique among all employees, compared normalized (`EmailAddress.Normalize`: trimmed, lower-case,
 invariant culture). `Email` keeps the email as entered. An employee is created by
-`EmployeeRegistrationService.RegisterAsync` and its email is changed by `ChangeEmailAsync` (the constructor
+`EmployeeService.RegisterAsync` and its email is changed by `EmployeeService.ChangeEmailAsync` (the constructor
 and `ChangeEmail` are internal); both reject an email used by another employee. The check is the
 precondition; the last line of defence against two concurrent registrations is a unique index on
 `NormalizedEmail` in the database, whose violation the infrastructure translates into a `DomainException`.
@@ -236,7 +243,7 @@ precondition; the last line of defence against two concurrent registrations is a
 | A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
 | A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`, so the rule holds at commit, no re-check after it |
 | No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `Project.RegisterWorkPackage` (conflicts with closing through the version of `Project`); `DependencyService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
-| The email of an employee is unique | Employee ↔ all Employees | `EmployeeRegistrationService` with `IEmployeeRepository.ExistsWithEmailAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
+| The email of an employee is unique | Employee ↔ all Employees | `EmployeeService` with `IRepository<Employee>.ExistsAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
 | A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `DependencyService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
 | `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TimeTrackingService`; a race with `CompleteTask` is accepted |
@@ -261,7 +268,7 @@ Persistence and the composition root do not exist yet. When they are added:
 - register `TimeProvider.System` for the domain services;
 - map `Project.WorkPackageIds` so that a change of only this list updates the version of `Project`
   (for example as a primitive collection stored in the row of the project);
-- implement `IEmployeeRepository`, add a unique index on `Employee.NormalizedEmail` and translate its
+- implement `IRepository<TAggregate>.ExistsAsync` (translated to a query), add a unique index on `Employee.NormalizedEmail` and translate its
   violation into a `DomainException`.
 
 ## Read side (computed, not stored)

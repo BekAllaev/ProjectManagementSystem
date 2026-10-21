@@ -1,15 +1,16 @@
+using ProjectManagementSystem.Domain.Employees;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 
 namespace ProjectManagementSystem.Domain.Tests;
 
-public class EmployeeRegistrationServiceTests
+public class EmployeeServiceTests
 {
-    private readonly InMemoryEmployeeRepository _employees = new();
-    private readonly EmployeeRegistrationService _service;
+    private readonly InMemoryRepository<Employee> _employees = new();
+    private readonly EmployeeService _service;
 
-    public EmployeeRegistrationServiceTests() => _service = new EmployeeRegistrationService(_employees);
+    public EmployeeServiceTests() => _service = new EmployeeService(_employees);
 
     [Fact]
     public async Task Email_is_kept_as_entered_and_compared_normalized()
