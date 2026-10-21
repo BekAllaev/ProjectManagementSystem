@@ -41,7 +41,7 @@ public sealed class FakeRepository<TAggregate>(FakeUnitOfWork unitOfWork) : IRep
     public void Add(TAggregate aggregate)
     {
         _items.Add(aggregate.Id, aggregate);
-        unitOfWork.Track(aggregate);
+        unitOfWork.Track(aggregate, written: true);
     }
 
     public void Update(TAggregate aggregate)
@@ -49,12 +49,12 @@ public sealed class FakeRepository<TAggregate>(FakeUnitOfWork unitOfWork) : IRep
         if (!_items.ContainsKey(aggregate.Id))
             throw new InvalidOperationException($"{typeof(TAggregate).Name} '{aggregate.Id}' was never added.");
 
-        unitOfWork.Track(aggregate);
+        unitOfWork.Track(aggregate, written: true);
     }
 
     public void Delete(TAggregate aggregate)
     {
         _items.Remove(aggregate.Id);
-        unitOfWork.Track(aggregate);
+        unitOfWork.Track(aggregate, written: true);
     }
 }
