@@ -22,7 +22,7 @@ Every aggregate has its events in `Events/`. Domain services are in `Services/`,
 
 Operations whose rule needs another aggregate are `internal` on the aggregate and public on a domain
 service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is called only by
-`WorkAssignmentService.AddTask`, which checks the team of the project first.
+`WorkPackageService.AddTask`, which checks the team of the project first.
 
 ## Repositories, domain services and application services
 
@@ -38,24 +38,23 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   task), and the domain service checks that they fit together (the task is really in that work package).
   Where a rule needs *all* work packages of a project (closing the project, leaving the team), the caller
   loads them by `Project.WorkPackageIds`, and the domain service checks that the set is exactly that list.
-- **Domain services are named after the aggregate they change** (`ProjectService`, `EmployeeService`,
-  `MilestoneService`, `FundingService`), so a new rule on an aggregate goes into its service instead of a new
-  service per rule. Older services named after an activity (`WorkAssignmentService`, `TimeTrackingService`,
-  `DependencyService`) are not renamed yet.
+- **Domain services are named after the aggregate they change** (`ProjectService`, `WorkPackageService`,
+  `ScheduleNetworkService`, `TaskTimeLogService`, `MilestoneService`, `FundingService`, `EmployeeService`), so
+  a new rule on an aggregate goes into its service instead of a new service per rule.
 - **By default a domain service gets loaded aggregates as arguments**, checks the rule and changes one
   aggregate. If a new aggregate is needed (a time log, a milestone, funding), the service creates it and the
   caller adds it to the repository. A domain service uses a repository only when the rule depends on the
   completeness of a set of aggregates that cannot be listed otherwise: the unique email of an employee
   (`EmployeeService` with `IRepository<Employee>.ExistsAsync`).
 - **One exception to "one aggregate per transaction":** creating a work package also registers it in
-  `Project` (`WorkAssignmentService.CreateWorkPackage` → `Project.RegisterWorkPackage`). It is the only
+  `Project` (`WorkPackageService.CreateWorkPackage` → `Project.RegisterWorkPackage`). It is the only
   operation that changes two aggregates in one transaction: the registration changes the version of
   `Project`, which protects the closing invariant (see [Project](#1-project)).
 - **Application services** (`Application/*AppService`) implement the interfaces of
   `Application.Contracts`: they load the aggregates, call the domain service, and save
   the changed aggregate with the unit of work. They contain no business rules.
 - Domain services that need the current date get `System.TimeProvider` through the constructor
-  (`WorkAssignmentService`, `TimeTrackingService`, `ProjectService`); "today" is
+  (`WorkPackageService`, `TaskTimeLogService`, `ProjectService`); "today" is
   `DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime)`.
 
 ### 1. Project
@@ -68,7 +67,7 @@ A closed project gets no new work packages, milestones, milestone tasks, depende
 and hourly-rate operations do not check it yet (see [Growth points](#growth-points)).
 
 `WorkPackageIds` holds only the ids of all work packages of the project, finished ones included, never
-references to `WorkPackage`. A package is registered by `WorkAssignmentService.CreateWorkPackage` through
+references to `WorkPackage`. A package is registered by `WorkPackageService.CreateWorkPackage` through
 the internal `RegisterWorkPackage`. A change of the list changes the version of `Project` like any other
 change inside the aggregate (the persistence mapping must keep it so), so creating a package and closing
 the project conflict with each other.
@@ -103,7 +102,7 @@ the project conflict with each other.
 **Root:** `WorkPackage`: `Id`, `ProjectId`, `Description`, `ResponsiblePersonId`,
 `Status` (Open / Completed / Cancelled), `CancellationReason`
 
-Created only by `WorkAssignmentService.CreateWorkPackage` (the constructor is internal), which registers
+Created only by `WorkPackageService.CreateWorkPackage` (the constructor is internal), which registers
 it in the open project.
 
 **Inside:**
@@ -126,7 +125,7 @@ Time spent on tasks is not stored here: it lives in [TaskTimeLog](#4-tasktimelog
 ### 3. ScheduleNetwork
 
 One per project, created by `ScheduleAppService` on the first dependency of the project.
-`DependencyService.AddDependency` gets the project: the network belongs to it and the project is open.
+`ScheduleNetworkService.AddDependency` gets the project: the network belongs to it and the project is open.
 
 **Root:** `ScheduleNetwork`: `Id` = ProjectId
 
@@ -146,7 +145,7 @@ notified.
 
 ### 4. TaskTimeLog
 
-One per task, created by `TimeTrackingService.CreateTimeLog` on the first entry.
+One per task, created by `TaskTimeLogService.CreateTimeLog` on the first entry.
 
 **Root:** `TaskTimeLog`: `Id` = TaskId, `WorkPackageId`, `ProjectId`
 
@@ -239,15 +238,15 @@ precondition; the last line of defence against two concurrent registrations is a
 
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
-| The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkAssignmentService` + `IsTeamMemberOnSpecification` |
+| The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkPackageService` + `IsTeamMemberOnSpecification` |
 | A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
 | A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`, so the rule holds at commit, no re-check after it |
-| No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `Project.RegisterWorkPackage` (conflicts with closing through the version of `Project`); `DependencyService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
+| No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `Project.RegisterWorkPackage` (conflicts with closing through the version of `Project`); `ScheduleNetworkService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
 | The email of an employee is unique | Employee ↔ all Employees | `EmployeeService` with `IRepository<Employee>.ExistsAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
-| A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `DependencyService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
-| `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TimeTrackingService`; a race with `CompleteTask` is accepted |
-| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TimeTrackingService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
+| A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `ScheduleNetworkService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
+| `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TaskTimeLogService`; a race with `CompleteTask` is accepted |
+| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TaskTimeLogService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | A task added to a milestone exists in a work package of the project and is not cancelled | Milestone ↔ WorkPackage | `MilestoneService.AddTask`; a concurrent cancellation is accepted without compensation, cancelled tasks are ignored on the read side |
 

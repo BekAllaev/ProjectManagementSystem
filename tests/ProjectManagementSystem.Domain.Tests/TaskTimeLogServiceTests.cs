@@ -9,16 +9,16 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Domain.Tests;
 
-public class TimeTrackingServiceTests
+public class TaskTimeLogServiceTests
 {
     private readonly Guid _employeeId = Guid.NewGuid();
-    private readonly TimeTrackingService _service = new(TestData.TimeProvider);
+    private readonly TaskTimeLogService _service = new(TestData.TimeProvider);
     private readonly Project _project;
     private readonly WorkPackage _workPackage;
     private readonly ProjectTask _task;
     private readonly TaskTimeLog _timeLog;
 
-    public TimeTrackingServiceTests()
+    public TaskTimeLogServiceTests()
     {
         _project = TestData.ProjectWithTeam(_employeeId);
         _workPackage = TestData.WorkPackage(_project, _employeeId);
@@ -75,7 +75,7 @@ public class TimeTrackingServiceTests
     {
         _workPackage.StartTask(_task.Id);
         var yesterday = new FakeTimeProvider(new DateTimeOffset(TestData.Today.AddDays(-1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
-        var service = new TimeTrackingService(yesterday);
+        var service = new TaskTimeLogService(yesterday);
 
         Assert.Throws<DomainException>(() =>
             service.LogTime(_project, _workPackage, _timeLog, _employeeId, TestData.Today, 1m));

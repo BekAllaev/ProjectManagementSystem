@@ -12,7 +12,7 @@ public sealed class ScheduleAppService(
     IRepository<Project> projects,
     IRepository<ScheduleNetwork> networks,
     IRepository<WorkPackage> workPackages,
-    DependencyService dependencyService,
+    ScheduleNetworkService scheduleNetworkService,
     IUnitOfWork unitOfWork) : IScheduleAppService
 {
     /// <summary>
@@ -36,7 +36,7 @@ public sealed class ScheduleAppService(
         var isNew = network is null;
         network ??= new ScheduleNetwork(projectId);
 
-        dependencyService.AddDependency(
+        scheduleNetworkService.AddDependency(
             project,
             network, predecessorWorkPackage, predecessorTaskId, successorWorkPackage, successorTaskId, ToDomain(type));
 

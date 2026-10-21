@@ -6,7 +6,7 @@ namespace ProjectManagementSystem.Domain.WorkPackages;
 
 /// <summary>
 /// Group of related tasks of a project. Operations that assign a responsible person are internal:
-/// they go through <see cref="Services.WorkAssignmentService"/>, which checks that the person is
+/// they go through <see cref="Services.WorkPackageService"/>, which checks that the person is
 /// a member of the project team.
 /// </summary>
 public sealed class WorkPackage : AggregateRoot<Guid>

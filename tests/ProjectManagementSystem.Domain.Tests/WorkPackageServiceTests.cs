@@ -5,9 +5,9 @@ using ProjectManagementSystem.Domain.Tests.Fakes;
 
 namespace ProjectManagementSystem.Domain.Tests;
 
-public class WorkAssignmentServiceTests
+public class WorkPackageServiceTests
 {
-    private readonly WorkAssignmentService _service = new(TestData.TimeProvider);
+    private readonly WorkPackageService _service = new(TestData.TimeProvider);
     private readonly Guid _member = Guid.NewGuid();
     private readonly Guid _other = Guid.NewGuid();
 

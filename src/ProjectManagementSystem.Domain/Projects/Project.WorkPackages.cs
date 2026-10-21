@@ -12,7 +12,7 @@ public sealed partial class Project
     public IReadOnlyCollection<Guid> WorkPackageIds => _workPackageIds;
 
     /// <summary>
-    /// Goes through <see cref="Services.WorkAssignmentService.CreateWorkPackage"/>, which creates the
+    /// Goes through <see cref="Services.WorkPackageService.CreateWorkPackage"/>, which creates the
     /// work package; no new work package can appear in a closed project.
     /// </summary>
     internal void RegisterWorkPackage(Guid workPackageId)

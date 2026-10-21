@@ -7,12 +7,13 @@ using ProjectManagementSystem.Domain.WorkPackages;
 namespace ProjectManagementSystem.Domain.Services;
 
 /// <summary>
-/// Logs time on tasks. Time is logged and removed only while the task is InProgress, by a member of
+/// Operations on <see cref="TaskTimeLog"/> whose rules need the project and the work package: logging
+/// and removing time on tasks. Time is logged and removed only while the task is InProgress, by a member of
 /// the project team on the work date. The entry gets the hourly rate valid on the work date; rates are
 /// never changed retroactively, so the rate read here cannot be replaced later. A race with completing
 /// the task is accepted. Only <see cref="TaskTimeLog"/> is changed.
 /// </summary>
-public sealed class TimeTrackingService(TimeProvider timeProvider)
+public sealed class TaskTimeLogService(TimeProvider timeProvider)
 {
     /// <summary>
     /// Creates the time log of a task before its first entry.
