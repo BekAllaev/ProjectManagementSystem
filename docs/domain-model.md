@@ -249,7 +249,7 @@ precondition; the last line of defence against two concurrent registrations is a
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkPackageService` + `IsTeamMemberOnSpecification` |
-| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`; no re-check after commit yet (see [Growth points](#growth-points)) |
+| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`. Re-check after commit by `CheckResponsiblePersonsAreTeamMembers` (an assignment racing with leaving the team, a package not registered yet, a membership ending in the future): the management of the project is notified, nothing is changed automatically |
 | A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`. A package created but not yet registered is cancelled by the handler of `WorkPackageCreated` when it finds the project closed (compensation) |
 | No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `WorkPackageService.CreateWorkPackage` checks `Project.IsOpen`, a concurrent closing is compensated by the handler of `WorkPackageCreated`; `ScheduleNetworkService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
 | The email of an employee is unique | Employee ↔ all Employees | `EmployeeService` with `IRepository<Employee>.ExistsAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
@@ -260,8 +260,21 @@ precondition; the last line of defence against two concurrent registrations is a
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | A task added to a milestone exists in a work package of the project and is not cancelled | Milestone ↔ WorkPackage | `MilestoneService.AddTask`; a concurrent cancellation is accepted without compensation, cancelled tasks are ignored on the read side |
 
-Event handlers live in `src/ProjectManagementSystem.Application`. Every handler is idempotent, because the
-outbox may deliver an event more than once.
+Event handlers live in `src/ProjectManagementSystem.Application/<Aggregate>/EventHandlers`. Every handler is
+idempotent, because the outbox may deliver an event more than once, and saves its own change (one aggregate)
+with the unit of work.
+
+| Event(s) | Handler | Effect |
+|---|---|---|
+| `WorkPackageCreated` | `RegisterWorkPackageInProject` | `Project.RegisterWorkPackage`; if the project is already closed, cancels the package instead (compensation) |
+| `WorkPackageCreated`, `ResponsiblePersonChanged`, `TaskAdded`, `TeamMembershipEnded` | `CheckResponsiblePersonsAreTeamMembers` | notifies the management of the project about a responsible person of open work without an ongoing team membership |
+| `TaskCancelled` | `RemoveDependenciesOfCancelledTask` | `ScheduleNetwork.RemoveDependenciesOf` |
+| `WorkPackageCancelled` | `RemoveDependenciesOfCancelledWorkPackage` | `ScheduleNetwork.RemoveDependenciesOf` |
+| `DependencyAdded` | `RemoveDependencyOfAlreadyCancelledTask` | removes a dependency on a task cancelled concurrently |
+| `PredecessorCancelled` | `NotifyResponsibleOfSuccessorTask` | notifies the responsible persons of the unfinished successor task and its package |
+
+Notifications go through `INotificationSender`; each has an idempotency key, and a repeated key is not sent
+again.
 
 ## Infrastructure
 
@@ -318,9 +331,10 @@ deduplication is needed.
 
 ## Growth points
 
-- Re-check after commit for leaving the team: a handler of `ResponsiblePersonChanged` (or
-  `TeamMembershipEnded`) that detects a responsible person who is no longer a team member and raises an event
-  for manual handling ([issue #3](https://github.com/BekAllaev/ProjectManagementSystem/issues/3)).
+- The re-check after leaving the team only notifies ([issue #3](https://github.com/BekAllaev/ProjectManagementSystem/issues/3)).
+  The domain has no role for the management of the project yet, so the recipient is empty; a domain event for
+  manual handling (and an automatic reassignment) are possible next steps. A member added with a fixed end
+  date is reported too, because the membership will end while the work is open.
 - Whether team, role and hourly-rate operations are allowed in a closed project.
 
 ## Open questions
