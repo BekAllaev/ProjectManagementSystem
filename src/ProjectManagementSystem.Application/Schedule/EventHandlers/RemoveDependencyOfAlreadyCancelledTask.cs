@@ -4,7 +4,7 @@ using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Application.Schedule;
+namespace ProjectManagementSystem.Application.Schedule.EventHandlers;
 
 /// <summary>
 /// A task can be cancelled concurrently with adding a dependency to it, after the domain service has

@@ -3,7 +3,7 @@ using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
 
-namespace ProjectManagementSystem.Application.Schedule;
+namespace ProjectManagementSystem.Application.Schedule.EventHandlers;
 
 /// <summary>
 /// A cancelled task does not take part in the schedule: its dependencies are removed.

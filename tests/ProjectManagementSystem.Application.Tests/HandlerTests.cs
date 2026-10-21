@@ -1,4 +1,4 @@
-using ProjectManagementSystem.Application.Schedule;
+using ProjectManagementSystem.Application.Schedule.EventHandlers;
 using ProjectManagementSystem.Application.Tests.Fakes;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Schedule.Events;
