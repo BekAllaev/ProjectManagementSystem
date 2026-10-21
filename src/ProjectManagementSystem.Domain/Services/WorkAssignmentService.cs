@@ -18,7 +18,7 @@ public sealed class WorkAssignmentService(TimeProvider timeProvider)
     /// two aggregates in one transaction (inserts the new <see cref="WorkPackage"/> and updates
     /// <see cref="Project"/>). It is deliberate: the registration changes the version of the project, so
     /// creating a package conflicts with closing the project, and a closed project never gets a package
-    /// that <see cref="ProjectClosureService"/> has not seen.
+    /// that <see cref="ProjectService.Complete"/> has not seen.
     /// </summary>
     /// <returns>New work package; the caller adds it to the repository and updates the project in the same unit of work.</returns>
     public WorkPackage CreateWorkPackage(Project project, string description, Guid responsiblePersonId)

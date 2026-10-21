@@ -28,7 +28,7 @@ public sealed partial class Project
     }
 
     /// <summary>
-    /// Goes through <see cref="Services.TeamMembershipService"/>, which rejects it while the employee is
+    /// Goes through <see cref="Services.ProjectService.EndTeamMembership"/>, which rejects it while the employee is
     /// responsible for an open work package or task.
     /// </summary>
     internal void EndTeamMembership(Guid employeeId, DateOnly to)
