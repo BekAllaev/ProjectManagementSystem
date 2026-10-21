@@ -12,7 +12,7 @@ namespace ProjectManagementSystem.Domain.Services;
 /// never changed retroactively, so the rate read here cannot be replaced later. A race with completing
 /// the task is accepted. Only <see cref="TaskTimeLog"/> is changed.
 /// </summary>
-public sealed class TimeTrackingService
+public sealed class TimeTrackingService(TimeProvider timeProvider)
 {
     /// <summary>
     /// Creates the time log of a task before its first entry.
@@ -38,7 +38,7 @@ public sealed class TimeTrackingService
 
         EnsureTaskIsInProgress(workPackage, timeLog);
 
-        if (workDate > DateOnly.FromDateTime(DateTime.UtcNow))
+        if (workDate > DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime))
             throw new DomainException("Time cannot be logged for a future date.");
 
         if (!new IsTeamMemberOnSpecification(employeeId, workDate).IsSatisfiedBy(project))

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.WorkPackages;
@@ -7,6 +8,12 @@ namespace ProjectManagementSystem.Domain.Tests.Fakes;
 public static class TestData
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>
+    /// Time provider for domain services, set to the start of <see cref="Today"/>.
+    /// </summary>
+    public static TimeProvider TimeProvider =>
+        new FakeTimeProvider(new DateTimeOffset(Today.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
 
     /// <summary>
     /// Project with one role and the given employees in the team since 30 days ago, rate 50.
@@ -23,8 +30,8 @@ public static class TestData
     }
 
     public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId) =>
-        new WorkAssignmentService().CreateWorkPackage(project, "Work package", responsiblePersonId);
+        new WorkAssignmentService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
 
     public static ProjectTask Task(Project project, WorkPackage workPackage, Guid responsiblePersonId) =>
-        new WorkAssignmentService().AddTask(project, workPackage, "Task", "Description", responsiblePersonId, estimatedEffort: 8m);
+        new WorkAssignmentService(TimeProvider).AddTask(project, workPackage, "Task", "Description", responsiblePersonId, estimatedEffort: 8m);
 }

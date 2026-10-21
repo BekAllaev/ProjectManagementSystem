@@ -70,7 +70,7 @@ public class AppServiceTests
         var task = TestData.Task(_project, _workPackage, _employeeId);
         _workPackage.StartTask(task.Id);
         var service = new TimeTrackingAppService(
-            _projects, _workPackages, _timeLogs, new TimeTrackingService(), _unitOfWork);
+            _projects, _workPackages, _timeLogs, new TimeTrackingService(TestData.TimeProvider), _unitOfWork);
 
         await service.LogTimeAsync(_workPackage.Id, task.Id, _employeeId, TestData.Today, 2m);
         var entryId = await service.LogTimeAsync(_workPackage.Id, task.Id, _employeeId, TestData.Today, 3m);
