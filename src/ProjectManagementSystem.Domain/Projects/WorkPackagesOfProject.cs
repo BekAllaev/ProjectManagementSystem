@@ -1,8 +1,7 @@
 using ProjectManagementSystem.Domain.Exceptions;
-using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Domain.Services;
+namespace ProjectManagementSystem.Domain.Projects;
 
 internal static class WorkPackagesOfProject
 {
