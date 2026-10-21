@@ -40,6 +40,7 @@ public class CreateWorkPackageTests
         var workPackageId = await _app.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", _member));
 
         Assert.Equal(1, _app.UnitOfWork.SaveCount);
+        Assert.Same(_app.WorkPackages.All.Single(), Assert.Single(_app.UnitOfWork.ChangedAggregates));
         var created = Assert.IsType<WorkPackageCreated>(Assert.Single(_app.UnitOfWork.CollectedEvents));
         Assert.Equal(workPackageId, created.WorkPackageId);
         Assert.Equal(project.Id, created.ProjectId);
