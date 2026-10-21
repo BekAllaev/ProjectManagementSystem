@@ -22,6 +22,7 @@ namespace ProjectManagementSystem.Application.Tests.Fakes;
 public sealed class TestApplication : IDisposable
 {
     private readonly ServiceProvider _services;
+    private int _deliveredEventCount;
 
     public TestApplication(Action<IServiceCollection>? configure = null)
     {
@@ -39,6 +40,7 @@ public sealed class TestApplication : IDisposable
         services.AddSingleton<TimeProvider>(TimeProvider);
         services.AddApplication();
         services.AddSingleton<IUnitOfWork>(UnitOfWork);
+        services.AddSingleton<INotificationSender>(Notifications);
         services.AddSingleton<IRepository<Project>>(Projects);
         services.AddSingleton<IRepository<WorkPackage>>(WorkPackages);
         services.AddSingleton<IRepository<ScheduleNetwork>>(Networks);
@@ -58,6 +60,8 @@ public sealed class TestApplication : IDisposable
     public FakeTimeProvider TimeProvider { get; } = new(new DateTimeOffset(TestData.Today.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
 
     public FakeUnitOfWork UnitOfWork { get; } = new();
+
+    public FakeNotificationSender Notifications { get; } = new();
 
     public FakeRepository<Project> Projects { get; }
 
@@ -87,6 +91,34 @@ public sealed class TestApplication : IDisposable
         await using var scope = _services.CreateAsyncScope();
 
         await scope.ServiceProvider.GetRequiredService<IDomainEventDispatcher>().DispatchAsync(domainEvent);
+    }
+
+    /// <summary>
+    /// Stands in for the outbox processor: dispatches every collected event that was not delivered yet, in the
+    /// order of saving, including the events saved by the handlers themselves.
+    /// </summary>
+    /// <returns>The delivered events, for a redelivery.</returns>
+    public async Task<IReadOnlyList<IDomainEvent>> DeliverEventsAsync()
+    {
+        var delivered = new List<IDomainEvent>();
+
+        while (_deliveredEventCount < UnitOfWork.CollectedEvents.Count)
+        {
+            var domainEvent = UnitOfWork.CollectedEvents[_deliveredEventCount++];
+            await DispatchAsync(domainEvent);
+            delivered.Add(domainEvent);
+        }
+
+        return delivered;
+    }
+
+    /// <summary>
+    /// Delivers the given events once more, as the outbox does after a crash before marking them processed.
+    /// </summary>
+    public async Task RedeliverAsync(IEnumerable<IDomainEvent> events)
+    {
+        foreach (var domainEvent in events.ToList())
+            await DispatchAsync(domainEvent);
     }
 
     public void Dispose() => _services.Dispose();
