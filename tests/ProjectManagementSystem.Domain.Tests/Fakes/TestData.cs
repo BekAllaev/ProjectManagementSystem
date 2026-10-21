@@ -39,8 +39,8 @@ public static class TestData
     }
 
     public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId) =>
-        new WorkAssignmentService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
+        new WorkPackageService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
 
     public static ProjectTask Task(Project project, WorkPackage workPackage, Guid responsiblePersonId) =>
-        new WorkAssignmentService(TimeProvider).AddTask(project, workPackage, "Task", "Description", responsiblePersonId, estimatedEffort: 8m);
+        new WorkPackageService(TimeProvider).AddTask(project, workPackage, "Task", "Description", responsiblePersonId, estimatedEffort: 8m);
 }

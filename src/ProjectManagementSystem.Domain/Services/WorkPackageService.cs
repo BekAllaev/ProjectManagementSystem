@@ -6,12 +6,13 @@ using ProjectManagementSystem.Domain.WorkPackages;
 namespace ProjectManagementSystem.Domain.Services;
 
 /// <summary>
-/// Assigns responsible persons to work packages and tasks. The person must be a member of the
+/// Operations on <see cref="WorkPackage"/> whose rules need the project: creating a work package and
+/// assigning responsible persons to work packages and tasks. The person must be a member of the
 /// project team at the moment of assignment; the team lives in <see cref="Project"/>, so the rule
 /// spans two aggregates. Only <see cref="WorkPackage"/> is changed, except
 /// <see cref="CreateWorkPackage"/>.
 /// </summary>
-public sealed class WorkAssignmentService(TimeProvider timeProvider)
+public sealed class WorkPackageService(TimeProvider timeProvider)
 {
     /// <summary>
     /// Creates a work package and registers it in the project. This is the only operation that changes

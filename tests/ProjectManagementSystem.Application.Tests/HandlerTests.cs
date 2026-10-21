@@ -51,7 +51,7 @@ public class HandlerTests
         var predecessor = TestData.Task(project, workPackage, _employeeId);
         var successor = TestData.Task(project, workPackage, _employeeId);
         var network = new ScheduleNetwork(project.Id);
-        new DependencyService().AddDependency(
+        new ScheduleNetworkService().AddDependency(
             project, network, workPackage, predecessor.Id, workPackage, successor.Id, DependencyType.FinishToStart);
         _workPackages.Add(workPackage);
         _networks.Add(network);

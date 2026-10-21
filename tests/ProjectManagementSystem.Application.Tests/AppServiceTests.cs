@@ -37,7 +37,7 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         var otherSuccessor = TestData.Task(_project, _workPackage, _employeeId);
-        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new ScheduleNetworkService(), _unitOfWork);
 
         await service.AddDependencyAsync(
             _project.Id, _workPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart);
@@ -57,7 +57,7 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         _workPackages.Add(otherPackage);
-        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new ScheduleNetworkService(), _unitOfWork);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() => service.AddDependencyAsync(
             _project.Id, otherPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart));
@@ -70,7 +70,7 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         TestData.Close(_project);
-        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new ScheduleNetworkService(), _unitOfWork);
 
         await Assert.ThrowsAsync<DomainException>(() => service.AddDependencyAsync(
             _project.Id, _workPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart));
@@ -84,7 +84,7 @@ public class AppServiceTests
         var task = TestData.Task(_project, _workPackage, _employeeId);
         _workPackage.StartTask(task.Id);
         var service = new TimeTrackingAppService(
-            _projects, _workPackages, _timeLogs, new TimeTrackingService(TestData.TimeProvider), _unitOfWork);
+            _projects, _workPackages, _timeLogs, new TaskTimeLogService(TestData.TimeProvider), _unitOfWork);
 
         await service.LogTimeAsync(_workPackage.Id, task.Id, _employeeId, TestData.Today, 2m);
         var entryId = await service.LogTimeAsync(_workPackage.Id, task.Id, _employeeId, TestData.Today, 3m);

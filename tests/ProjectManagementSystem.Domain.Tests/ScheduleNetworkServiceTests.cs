@@ -5,9 +5,9 @@ using ProjectManagementSystem.Domain.Tests.Fakes;
 
 namespace ProjectManagementSystem.Domain.Tests;
 
-public class DependencyServiceTests
+public class ScheduleNetworkServiceTests
 {
-    private readonly DependencyService _service = new();
+    private readonly ScheduleNetworkService _service = new();
     private readonly Guid _employeeId = Guid.NewGuid();
 
     [Fact]

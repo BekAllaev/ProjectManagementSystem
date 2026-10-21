@@ -12,7 +12,7 @@ public sealed class TimeTrackingAppService(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
     IRepository<TaskTimeLog> timeLogs,
-    TimeTrackingService timeTrackingService,
+    TaskTimeLogService taskTimeLogService,
     IUnitOfWork unitOfWork) : ITimeTrackingAppService
 {
     /// <summary>
@@ -32,9 +32,9 @@ public sealed class TimeTrackingAppService(
         var project = await projects.GetAsync(workPackage.ProjectId, cancellationToken);
 
         var isNew = timeLog is null;
-        timeLog ??= timeTrackingService.CreateTimeLog(workPackage, taskId);
+        timeLog ??= taskTimeLogService.CreateTimeLog(workPackage, taskId);
 
-        var entry = timeTrackingService.LogTime(project, workPackage, timeLog, employeeId, workDate, hours);
+        var entry = taskTimeLogService.LogTime(project, workPackage, timeLog, employeeId, workDate, hours);
 
         if (isNew)
             timeLogs.Add(timeLog);
@@ -50,7 +50,7 @@ public sealed class TimeTrackingAppService(
         var timeLog = await timeLogs.GetAsync(taskId, cancellationToken);
         var workPackage = await workPackages.GetAsync(timeLog.WorkPackageId, cancellationToken);
 
-        timeTrackingService.RemoveEntry(workPackage, timeLog, entryId);
+        taskTimeLogService.RemoveEntry(workPackage, timeLog, entryId);
 
         timeLogs.Update(timeLog);
         await unitOfWork.SaveChangesAsync(cancellationToken);

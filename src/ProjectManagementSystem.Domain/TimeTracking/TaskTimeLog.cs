@@ -6,7 +6,7 @@ namespace ProjectManagementSystem.Domain.TimeTracking;
 
 /// <summary>
 /// Time logged on one task; its id is the id of the task. Created on the first logged entry.
-/// Changed only through <see cref="Services.TimeTrackingService"/>, which checks the rules that need
+/// Changed only through <see cref="Services.TaskTimeLogService"/>, which checks the rules that need
 /// the task (it must be InProgress) and the team (membership and hourly rate on the work date).
 /// A wrong entry is fixed by removing it and logging the right one.
 /// </summary>

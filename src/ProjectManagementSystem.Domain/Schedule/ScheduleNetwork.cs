@@ -8,7 +8,7 @@ namespace ProjectManagementSystem.Domain.Schedule;
 /// Dependencies between tasks of one project, possibly from different work packages.
 /// There is one network per project, so its id is the id of the project. The network is always acyclic.
 /// Tasks live in other aggregates, so a new dependency is added through
-/// <see cref="Services.DependencyService"/>, which checks that both tasks exist and are not cancelled.
+/// <see cref="Services.ScheduleNetworkService"/>, which checks that both tasks exist and are not cancelled.
 /// </summary>
 public sealed class ScheduleNetwork : AggregateRoot<Guid>
 {
