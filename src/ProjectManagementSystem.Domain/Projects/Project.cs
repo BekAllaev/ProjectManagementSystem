@@ -28,6 +28,11 @@ public sealed partial class Project : AggregateRoot<Guid>
     /// </summary>
     public Currency Currency { get; }
 
+    /// <summary>
+    /// Created and InProgress projects are open: planning happens before the start.
+    /// </summary>
+    public bool IsOpen => State != ProjectState.Completed;
+
     public Project(Guid id, string title, string description, Currency currency) : base(id)
     {
         Title = Guard.NotEmpty(title, nameof(Title));
@@ -59,6 +64,12 @@ public sealed partial class Project : AggregateRoot<Guid>
         State = ProjectState.Completed;
 
         RaiseDomainEvent(new ProjectCompleted(Id, CompletionDate!.Value));
+    }
+
+    private void EnsureOpen(string action)
+    {
+        if (!IsOpen)
+            throw new DomainException($"Cannot {action} a project that is {State}.");
     }
 
     private void SetStartDate(DateTime startDate)
