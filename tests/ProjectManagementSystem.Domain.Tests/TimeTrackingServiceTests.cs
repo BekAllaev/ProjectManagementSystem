@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
@@ -11,7 +12,7 @@ namespace ProjectManagementSystem.Domain.Tests;
 public class TimeTrackingServiceTests
 {
     private readonly Guid _employeeId = Guid.NewGuid();
-    private readonly TimeTrackingService _service = new();
+    private readonly TimeTrackingService _service = new(TestData.TimeProvider);
     private readonly Project _project;
     private readonly WorkPackage _workPackage;
     private readonly ProjectTask _task;
@@ -67,6 +68,17 @@ public class TimeTrackingServiceTests
         Assert.Throws<DomainException>(() => LogTime(TestData.Today.AddDays(-31), 1m));
         Assert.Throws<DomainException>(() =>
             _service.LogTime(_project, _workPackage, _timeLog, Guid.NewGuid(), TestData.Today, 1m));
+    }
+
+    [Fact]
+    public void Today_comes_from_the_time_provider()
+    {
+        _workPackage.StartTask(_task.Id);
+        var yesterday = new FakeTimeProvider(new DateTimeOffset(TestData.Today.AddDays(-1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
+        var service = new TimeTrackingService(yesterday);
+
+        Assert.Throws<DomainException>(() =>
+            service.LogTime(_project, _workPackage, _timeLog, _employeeId, TestData.Today, 1m));
     }
 
     [Fact]

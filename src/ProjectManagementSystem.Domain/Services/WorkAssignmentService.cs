@@ -10,7 +10,7 @@ namespace ProjectManagementSystem.Domain.Services;
 /// project team at the moment of assignment; the team lives in <see cref="Project"/>, so the rule
 /// spans two aggregates. Only <see cref="WorkPackage"/> is changed.
 /// </summary>
-public sealed class WorkAssignmentService
+public sealed class WorkAssignmentService(TimeProvider timeProvider)
 {
     /// <returns>New work package; the caller adds it to the repository.</returns>
     public WorkPackage CreateWorkPackage(Project project, string description, Guid responsiblePersonId)
@@ -50,9 +50,9 @@ public sealed class WorkAssignmentService
         workPackage.ChangeTaskResponsiblePerson(taskId, employeeId);
     }
 
-    private static void EnsureIsCurrentTeamMember(Project project, Guid employeeId)
+    private void EnsureIsCurrentTeamMember(Project project, Guid employeeId)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         if (!new IsTeamMemberOnSpecification(employeeId, today).IsSatisfiedBy(project))
             throw new DomainException($"Employee '{employeeId}' is not a member of the project team.");
