@@ -56,6 +56,9 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
 - Domain services that need the current date get `System.TimeProvider` through the constructor
   (`WorkPackageService`, `TaskTimeLogService`, `ProjectService`); "today" is
   `DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime)`.
+- Aggregates never read the clock: methods that record a moment get it as a parameter
+  (`new Project(..., creationDate)`, `Project.Start(startDate)`, `Project.ChangeHourlyRate(..., today)`,
+  `Milestone.Complete(completedAt)`); the caller takes it from `TimeProvider`.
 
 ### 1. Project
 

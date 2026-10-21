@@ -11,7 +11,7 @@ public class ProjectTests
         var project = TestData.ProjectWithTeam();
         Assert.True(project.IsOpen);
 
-        project.Start();
+        project.Start(DateTime.UtcNow);
         Assert.True(project.IsOpen);
 
         project.Complete(DateTime.UtcNow);
@@ -22,7 +22,7 @@ public class ProjectTests
     public void Closed_project_gets_no_new_work_packages()
     {
         var project = TestData.ProjectWithTeam();
-        project.Start();
+        project.Start(DateTime.UtcNow);
         project.Complete(DateTime.UtcNow);
 
         Assert.Throws<DomainException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
