@@ -2,6 +2,6 @@ namespace ProjectManagementSystem.Domain.Milestones;
 
 public enum MilestoneStatus
 {
-    Open,
-    Completed
+    Open = 0,
+    Completed = 1
 }
