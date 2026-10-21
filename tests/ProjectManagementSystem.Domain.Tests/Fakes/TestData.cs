@@ -29,6 +29,15 @@ public static class TestData
         return project;
     }
 
+    /// <summary>
+    /// Starts and completes the project, bypassing <see cref="ProjectClosureService"/>.
+    /// </summary>
+    public static void Close(Project project)
+    {
+        project.Start();
+        project.Complete(DateTime.UtcNow);
+    }
+
     public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId) =>
         new WorkAssignmentService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
 

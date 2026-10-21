@@ -6,8 +6,9 @@ namespace ProjectManagementSystem.Domain.Milestones;
 
 /// <summary>
 /// Checkpoint of the project that refers to tasks from any work packages of the project.
-/// Tasks are referenced only by id: the milestone does not check them, and cancelled tasks
-/// are ignored on the read side. One task can be in several milestones. After completion
+/// Tasks are referenced only by id. The milestone is created and gets its tasks through
+/// <see cref="Services.MilestoneService"/>, which checks the project and the tasks; a task cancelled
+/// later stays in the milestone and is ignored on the read side. One task can be in several milestones. After completion
 /// the milestone is frozen. Progress, lateness and "closed with unfinished tasks" are computed
 /// on the read side.
 /// </summary>
@@ -32,7 +33,7 @@ public sealed class Milestone : AggregateRoot<Guid>
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
 
-    public Milestone(Guid id, Guid projectId, string name, string description, DateOnly targetDate) : base(id)
+    internal Milestone(Guid id, Guid projectId, string name, string description, DateOnly targetDate) : base(id)
     {
         ProjectId = projectId;
         Name = Guard.NotEmpty(name, nameof(Name));
@@ -43,7 +44,7 @@ public sealed class Milestone : AggregateRoot<Guid>
         RaiseDomainEvent(new MilestoneCreated(ProjectId, Id, Name, Description, TargetDate));
     }
 
-    public void AddTask(Guid taskId)
+    internal void AddTask(Guid taskId)
     {
         EnsureOpen("add a task to");
 
