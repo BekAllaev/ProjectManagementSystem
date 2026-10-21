@@ -50,9 +50,10 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   the package is registered in `Project` after the commit by the handler of `WorkPackageCreated`
   (`Project.RegisterWorkPackage`), with a compensation if the project was closed in the meantime
   (see [Project](#1-project)).
-- **Application services** (`Application/*AppService`) implement the interfaces of
-  `Application.Contracts`: they load the aggregates, call the domain service, and save
-  the changed aggregate with the unit of work. They contain no business rules.
+- **Command handlers** (CQRS, one handler per command, in `Application/<Aggregate>/Commands/<UseCase>/`)
+  load the aggregates, call the domain service or the aggregate method and return. The unit of work is
+  saved once by a pipeline behavior. Handlers contain no business rules; there are no application
+  services.
 - Domain services that need the current date get `System.TimeProvider` through the constructor
   (`WorkPackageService`, `TaskTimeLogService`, `ProjectService`); "today" is
   `DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime)`.
@@ -133,7 +134,7 @@ Time spent on tasks is not stored here: it lives in [TaskTimeLog](#4-tasktimelog
 
 ### 3. ScheduleNetwork
 
-One per project, created by `ScheduleAppService` on the first dependency of the project.
+One per project, created by the `AddDependency` command handler on the first dependency of the project.
 `ScheduleNetworkService.AddDependency` gets the project: the network belongs to it and the project is open.
 
 **Root:** `ScheduleNetwork`: `Id` = ProjectId
