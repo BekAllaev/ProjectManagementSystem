@@ -33,4 +33,17 @@ public class TeamMembershipServiceTests
 
         Assert.False(project.IsTeamMemberOn(_developer, TestData.Today.AddDays(1)));
     }
+
+    [Fact]
+    public void Work_packages_must_be_exactly_those_of_the_project()
+    {
+        var project = TestData.ProjectWithTeam(_lead, _developer);
+        var workPackage = TestData.WorkPackage(project, _lead);
+        TestData.Task(project, workPackage, _developer);
+        var foreign = TestData.WorkPackage(TestData.ProjectWithTeam(_developer), _developer);
+
+        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [], _developer, TestData.Today));
+        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [workPackage, foreign], _developer, TestData.Today));
+        Assert.True(project.IsTeamMemberOn(_developer, TestData.Today.AddDays(1)));
+    }
 }

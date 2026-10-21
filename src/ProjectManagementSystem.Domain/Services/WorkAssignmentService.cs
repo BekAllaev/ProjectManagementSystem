@@ -8,16 +8,27 @@ namespace ProjectManagementSystem.Domain.Services;
 /// <summary>
 /// Assigns responsible persons to work packages and tasks. The person must be a member of the
 /// project team at the moment of assignment; the team lives in <see cref="Project"/>, so the rule
-/// spans two aggregates. Only <see cref="WorkPackage"/> is changed.
+/// spans two aggregates. Only <see cref="WorkPackage"/> is changed, except
+/// <see cref="CreateWorkPackage"/>.
 /// </summary>
 public sealed class WorkAssignmentService(TimeProvider timeProvider)
 {
-    /// <returns>New work package; the caller adds it to the repository.</returns>
+    /// <summary>
+    /// Creates a work package and registers it in the project. This is the only operation that changes
+    /// two aggregates in one transaction (inserts the new <see cref="WorkPackage"/> and updates
+    /// <see cref="Project"/>). It is deliberate: the registration changes the version of the project, so
+    /// creating a package conflicts with closing the project, and a closed project never gets a package
+    /// that <see cref="ProjectClosureService"/> has not seen.
+    /// </summary>
+    /// <returns>New work package; the caller adds it to the repository and updates the project in the same unit of work.</returns>
     public WorkPackage CreateWorkPackage(Project project, string description, Guid responsiblePersonId)
     {
         EnsureIsCurrentTeamMember(project, responsiblePersonId);
 
-        return new WorkPackage(Guid.NewGuid(), project.Id, description, responsiblePersonId);
+        var workPackage = new WorkPackage(Guid.NewGuid(), project.Id, description, responsiblePersonId);
+        project.RegisterWorkPackage(workPackage.Id);
+
+        return workPackage;
     }
 
     public ProjectTask AddTask(

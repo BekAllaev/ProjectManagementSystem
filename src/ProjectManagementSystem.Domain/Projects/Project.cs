@@ -5,8 +5,8 @@ using ProjectManagementSystem.Domain.Projects.Events;
 namespace ProjectManagementSystem.Domain.Projects;
 
 /// <summary>
-/// Root of the project aggregate: life cycle of the project, its roles and its team with hourly rates.
-/// Work packages, the schedule network, time logs, milestones, funding and risks are separate
+/// Root of the project aggregate: life cycle of the project, its roles, its team with hourly rates and
+/// the ids of its work packages. Work packages, the schedule network, time logs, milestones, funding and risks are separate
 /// aggregates that refer to the project by id.
 /// </summary>
 public sealed partial class Project : AggregateRoot<Guid>
@@ -55,12 +55,18 @@ public sealed partial class Project : AggregateRoot<Guid>
         RaiseDomainEvent(new ProjectStarted(Id, StartDate!.Value));
     }
 
-    public void Complete()
+    /// <summary>
+    /// Goes through <see cref="Services.ProjectClosureService"/>, which checks that every work package
+    /// of the project is finished.
+    /// </summary>
+    internal void Complete(DateTime completionDate)
     {
+        EnsureOpen("complete");
+
         if (State != ProjectState.InProgress)
             throw new DomainException($"Only a project in state {ProjectState.InProgress} can be completed. Current state: {State}.");
 
-        SetCompletionDate(DateTime.UtcNow);
+        SetCompletionDate(completionDate);
         State = ProjectState.Completed;
 
         RaiseDomainEvent(new ProjectCompleted(Id, CompletionDate!.Value));

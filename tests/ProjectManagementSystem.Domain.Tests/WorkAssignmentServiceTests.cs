@@ -45,4 +45,20 @@ public class WorkAssignmentServiceTests
 
         Assert.Throws<DomainException>(() => _service.AddTask(project, workPackage, "Task", "", _member, 1m));
     }
+
+    [Fact]
+    public void New_work_package_is_registered_in_the_open_project()
+    {
+        var project = TestData.ProjectWithTeam(_member);
+
+        var workPackage = _service.CreateWorkPackage(project, "Package", _member);
+
+        Assert.Equal([workPackage.Id], project.WorkPackageIds);
+
+        project.Start();
+        project.Complete(DateTime.UtcNow);
+
+        Assert.Throws<DomainException>(() => _service.CreateWorkPackage(project, "Package", _member));
+        Assert.Single(project.WorkPackageIds);
+    }
 }
