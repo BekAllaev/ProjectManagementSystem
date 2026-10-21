@@ -9,8 +9,7 @@ namespace ProjectManagementSystem.Domain.Tests;
 
 public class ProjectServiceTests
 {
-    // Project.Start takes the real clock, so the completion must not be earlier than it.
-    private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow.AddDays(1);
+    private static readonly DateTimeOffset Now = new(2026, 3, 2, 12, 0, 0, TimeSpan.Zero);
 
     private readonly ProjectService _service = new(new FakeTimeProvider(Now));
     private readonly Guid _employeeId = Guid.NewGuid();
@@ -21,7 +20,7 @@ public class ProjectServiceTests
     public ProjectServiceTests()
     {
         _project = TestData.ProjectWithTeam(_employeeId);
-        _project.Start();
+        _project.Start(Now.UtcDateTime.AddDays(-1));
     }
 
     [Fact]

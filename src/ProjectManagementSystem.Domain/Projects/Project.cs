@@ -33,23 +33,23 @@ public sealed partial class Project : AggregateRoot<Guid>
     /// </summary>
     public bool IsOpen => State != ProjectState.Completed;
 
-    public Project(Guid id, string title, string description, Currency currency) : base(id)
+    public Project(Guid id, string title, string description, Currency currency, DateTime creationDate) : base(id)
     {
         Title = Guard.NotEmpty(title, nameof(Title));
         Description = description ?? string.Empty;
         Currency = currency ?? throw new ArgumentNullException(nameof(currency));
         State = ProjectState.Created;
-        CreationDate = DateTime.UtcNow;
+        CreationDate = creationDate;
 
         RaiseDomainEvent(new ProjectCreated(Id, Title, Currency.Code, CreationDate));
     }
 
-    public void Start()
+    public void Start(DateTime startDate)
     {
         if (State != ProjectState.Created)
             throw new DomainException($"Only a project in state {ProjectState.Created} can be started. Current state: {State}.");
 
-        SetStartDate(DateTime.UtcNow);
+        SetStartDate(startDate);
         State = ProjectState.InProgress;
 
         RaiseDomainEvent(new ProjectStarted(Id, StartDate!.Value));

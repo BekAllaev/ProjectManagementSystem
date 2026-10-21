@@ -39,7 +39,7 @@ public class TaskTimeLogServiceTests
     public void Entry_keeps_the_rate_valid_on_the_work_date()
     {
         _workPackage.StartTask(_task.Id);
-        _project.ChangeHourlyRate(_employeeId, 70m, TestData.Today);
+        _project.ChangeHourlyRate(_employeeId, 70m, TestData.Today, TestData.Today);
 
         LogTime(TestData.Today.AddDays(-1), 2m);
         LogTime(TestData.Today, 3m);

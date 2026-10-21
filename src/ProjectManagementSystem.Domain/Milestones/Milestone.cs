@@ -83,12 +83,12 @@ public sealed class Milestone : AggregateRoot<Guid>
     /// <summary>
     /// Completed manually at any moment, even if not all tasks are done.
     /// </summary>
-    public void Complete()
+    public void Complete(DateTime completedAt)
     {
         EnsureOpen("complete");
 
         Status = MilestoneStatus.Completed;
-        CompletedAt = DateTime.UtcNow;
+        CompletedAt = completedAt;
         RaiseDomainEvent(new MilestoneCompleted(ProjectId, Id, CompletedAt.Value));
     }
 

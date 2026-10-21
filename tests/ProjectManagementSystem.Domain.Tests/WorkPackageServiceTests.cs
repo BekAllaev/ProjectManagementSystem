@@ -55,7 +55,7 @@ public class WorkPackageServiceTests
 
         Assert.Equal([workPackage.Id], project.WorkPackageIds);
 
-        project.Start();
+        project.Start(DateTime.UtcNow);
         project.Complete(DateTime.UtcNow);
 
         Assert.Throws<DomainException>(() => _service.CreateWorkPackage(project, "Package", _member));

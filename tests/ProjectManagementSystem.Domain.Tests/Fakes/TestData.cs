@@ -20,7 +20,7 @@ public static class TestData
     /// </summary>
     public static Project ProjectWithTeam(params Guid[] employeeIds)
     {
-        var project = new Project(Guid.NewGuid(), "Project", "Description", new Currency("USD"));
+        var project = new Project(Guid.NewGuid(), "Project", "Description", new Currency("USD"), DateTime.UtcNow);
         var roleId = project.CreateRole("Developer", "Writes code");
 
         foreach (var employeeId in employeeIds)
@@ -34,7 +34,7 @@ public static class TestData
     /// </summary>
     public static void Close(Project project)
     {
-        project.Start();
+        project.Start(DateTime.UtcNow);
         project.Complete(DateTime.UtcNow);
     }
 

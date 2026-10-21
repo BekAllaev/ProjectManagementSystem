@@ -42,13 +42,14 @@ public sealed partial class Project
 
     /// <summary>
     /// Adds a new rate to the chain of rates of the membership that covers <paramref name="from"/>.
+    /// <paramref name="today"/> is the current date; a rate cannot start before it.
     /// </summary>
-    public void ChangeHourlyRate(Guid employeeId, decimal amount, DateOnly from)
+    public void ChangeHourlyRate(Guid employeeId, decimal amount, DateOnly from, DateOnly today)
     {
         var teamMember = _teamMembers.SingleOrDefault(m => m.EmployeeId == employeeId && m.IsActiveOn(from))
             ?? throw new DomainException($"Employee '{employeeId}' is not on the project on {from}.");
 
-        var rate = teamMember.ChangeHourlyRate(amount, from, DateOnly.FromDateTime(DateTime.UtcNow));
+        var rate = teamMember.ChangeHourlyRate(amount, from, today);
         RaiseDomainEvent(new HourlyRateChanged(Id, teamMember.Id, employeeId, rate.Amount, rate.From));
     }
 
