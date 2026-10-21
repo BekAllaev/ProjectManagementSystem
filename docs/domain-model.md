@@ -6,10 +6,12 @@
 |---|---|---|
 | `Domain.Shared` | — | enums used by the domain and by the contracts (`ProjectState`, `WorkPackageStatus`, `ProjectTaskStatus`, `MilestoneStatus`, `DependencyType`, `RiskLevel`, `RiskStatus`) |
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
-| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery` and the command records: everything a client (the Blazor UI) needs to send a command |
+| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery` and the command records: the public surface of the backend, the bodies of its HTTP requests |
 | `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
 
-A client references only `Application.Contracts`. Types keep their namespaces when they move between projects
+The HTTP API (later) exposes every command and query: an endpoint deserializes the request body into the
+command record and sends it through MediatR. The contracts never reference the domain, so no domain type leaks
+into the API; a .NET client (for example Blazor WebAssembly) may share them for typed calls. Types keep their namespaces when they move between projects
 (for example `DependencyType` stays in `ProjectManagementSystem.Domain.Schedule`). Enum values are explicit,
 because they are stored as numbers: a new value never shifts the existing ones.
 
