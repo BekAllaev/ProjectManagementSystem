@@ -5,18 +5,23 @@ public sealed partial class Project
     private readonly HashSet<Guid> _workPackageIds = [];
 
     /// <summary>
-    /// Ids of all work packages of the project, finished ones included. Changing the list changes the
-    /// version of the project like any other change inside the aggregate, so creating a work package and
-    /// closing the project conflict with each other.
+    /// Ids of all registered work packages of the project, finished ones included. A new work package is
+    /// registered after its creation is committed (eventual consistency), so for a short time it can be
+    /// missing here. Changing the list changes the version of the project like any other change inside the
+    /// aggregate, so registering a work package and closing the project conflict with each other.
     /// </summary>
     public IReadOnlyCollection<Guid> WorkPackageIds => _workPackageIds;
 
     /// <summary>
-    /// Goes through <see cref="Services.WorkPackageService.CreateWorkPackage"/>, which creates the
-    /// work package; no new work package can appear in a closed project.
+    /// Called by the handler of <see cref="WorkPackages.Events.WorkPackageCreated"/>. No work package can be
+    /// registered in a closed project; the handler cancels such a package instead. Registering the same
+    /// package again changes nothing, so a repeated delivery of the event is harmless.
     /// </summary>
-    internal void RegisterWorkPackage(Guid workPackageId)
+    public void RegisterWorkPackage(Guid workPackageId)
     {
+        if (_workPackageIds.Contains(workPackageId))
+            return;
+
         EnsureOpen("add a work package to");
 
         _workPackageIds.Add(workPackageId);
