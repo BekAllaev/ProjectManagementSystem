@@ -18,9 +18,9 @@ public sealed class UnitOfWorkBehavior<TRequest, TResponse>(IUnitOfWork unitOfWo
         CancellationToken cancellationToken)
     {
         if (request is not IBaseCommand)
-            return await next();
+            return await next(cancellationToken);
 
-        var response = await next();
+        var response = await next(cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return response;
