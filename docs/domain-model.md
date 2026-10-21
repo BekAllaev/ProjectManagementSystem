@@ -1,5 +1,18 @@
 # Domain model
 
+## Projects
+
+| Project | References | Contains |
+|---|---|---|
+| `Domain.Shared` | — | enums used by the domain and by the contracts (`ProjectState`, `WorkPackageStatus`, `ProjectTaskStatus`, `MilestoneStatus`, `DependencyType`, `RiskLevel`, `RiskStatus`) |
+| `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
+| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery` and the command records: everything a client (the Blazor UI) needs to send a command |
+| `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
+
+A client references only `Application.Contracts`. Types keep their namespaces when they move between projects
+(for example `DependencyType` stays in `ProjectManagementSystem.Domain.Schedule`). Enum values are explicit,
+because they are stored as numbers: a new value never shifts the existing ones.
+
 ## Aggregate boundaries
 
 The former "mega aggregate" `Project` is split into several aggregates. Aggregates reference each other
@@ -50,7 +63,8 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   the package is registered in `Project` after the commit by the handler of `WorkPackageCreated`
   (`Project.RegisterWorkPackage`), with a compensation if the project was closed in the meantime
   (see [Project](#1-project)).
-- **Command handlers** (CQRS, one handler per command, in `Application/<Aggregate>/Commands/<UseCase>/`)
+- **Command handlers** (CQRS, one handler per command, in `Application/<Aggregate>/Commands/<UseCase>/`; the
+  command record itself is in the same folder of `Application.Contracts`)
   load the aggregates, call the domain service or the aggregate method and return. The unit of work is
   saved once by a pipeline behavior. Handlers contain no business rules; there are no application
   services.
