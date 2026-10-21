@@ -1,6 +1,7 @@
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Contracts.Schedule;
 using ProjectManagementSystem.Domain.Interfaces;
+using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.WorkPackages;
@@ -8,6 +9,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 namespace ProjectManagementSystem.Application.Schedule;
 
 public sealed class ScheduleAppService(
+    IRepository<Project> projects,
     IRepository<ScheduleNetwork> networks,
     IRepository<WorkPackage> workPackages,
     DependencyService dependencyService,
@@ -26,6 +28,7 @@ public sealed class ScheduleAppService(
         DependencyTypeDto type,
         CancellationToken cancellationToken = default)
     {
+        var project = await projects.GetAsync(projectId, cancellationToken);
         var predecessorWorkPackage = await workPackages.GetAsync(predecessorWorkPackageId, cancellationToken);
         var successorWorkPackage = await workPackages.GetAsync(successorWorkPackageId, cancellationToken);
 
@@ -34,6 +37,7 @@ public sealed class ScheduleAppService(
         network ??= new ScheduleNetwork(projectId);
 
         dependencyService.AddDependency(
+            project,
             network, predecessorWorkPackage, predecessorTaskId, successorWorkPackage, successorTaskId, ToDomain(type));
 
         if (isNew)

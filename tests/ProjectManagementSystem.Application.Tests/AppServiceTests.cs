@@ -37,7 +37,7 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         var otherSuccessor = TestData.Task(_project, _workPackage, _employeeId);
-        var service = new ScheduleAppService(_networks, _workPackages, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
 
         await service.AddDependencyAsync(
             _project.Id, _workPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart);
@@ -57,11 +57,25 @@ public class AppServiceTests
         var predecessor = TestData.Task(_project, _workPackage, _employeeId);
         var successor = TestData.Task(_project, _workPackage, _employeeId);
         _workPackages.Add(otherPackage);
-        var service = new ScheduleAppService(_networks, _workPackages, new DependencyService(), _unitOfWork);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() => service.AddDependencyAsync(
             _project.Id, otherPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart));
         Assert.Empty(_networks.All);
+    }
+
+    [Fact]
+    public async Task Closed_project_gets_no_new_dependencies()
+    {
+        var predecessor = TestData.Task(_project, _workPackage, _employeeId);
+        var successor = TestData.Task(_project, _workPackage, _employeeId);
+        TestData.Close(_project);
+        var service = new ScheduleAppService(_projects, _networks, _workPackages, new DependencyService(), _unitOfWork);
+
+        await Assert.ThrowsAsync<DomainException>(() => service.AddDependencyAsync(
+            _project.Id, _workPackage.Id, predecessor.Id, _workPackage.Id, successor.Id, DependencyTypeDto.FinishToStart));
+        Assert.Empty(_networks.All);
+        Assert.Equal(0, _unitOfWork.SaveCount);
     }
 
     [Fact]
