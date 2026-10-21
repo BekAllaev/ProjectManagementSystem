@@ -23,7 +23,7 @@ public sealed class LoggingBehavior<TRequest, TResponse>(
 
         try
         {
-            var response = await next();
+            var response = await next(cancellationToken);
 
             logger.LogInformation(
                 "Handled {RequestName} in {ElapsedMilliseconds} ms",
