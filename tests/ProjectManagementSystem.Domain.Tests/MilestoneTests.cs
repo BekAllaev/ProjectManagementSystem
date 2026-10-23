@@ -13,7 +13,7 @@ public class MilestoneTests
         var milestone = new Milestone(Guid.NewGuid(), Guid.NewGuid(), "Release", "First release", TestData.Today);
         milestone.AddTask(Guid.NewGuid());
 
-        milestone.Complete(DateTime.UtcNow);
+        milestone.Complete(TestData.Now);
 
         Assert.Equal(MilestoneStatus.Completed, milestone.Status);
         Assert.NotNull(milestone.CompletedAt);
@@ -26,7 +26,7 @@ public class MilestoneTests
     public void Delete_is_allowed_in_any_status()
     {
         var milestone = new Milestone(Guid.NewGuid(), Guid.NewGuid(), "Release", "First release", TestData.Today);
-        milestone.Complete(DateTime.UtcNow);
+        milestone.Complete(TestData.Now);
 
         milestone.Delete();
 
