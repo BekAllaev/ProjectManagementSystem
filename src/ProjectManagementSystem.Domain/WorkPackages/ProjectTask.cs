@@ -27,6 +27,15 @@ public sealed class ProjectTask : Entity<Guid>
 
     public bool IsFinished => Status is ProjectTaskStatus.Completed or ProjectTaskStatus.Cancelled;
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private ProjectTask()
+    {
+        Name = null!;
+        Description = null!;
+    }
+
     internal ProjectTask(
         Guid id,
         Guid workPackageId,

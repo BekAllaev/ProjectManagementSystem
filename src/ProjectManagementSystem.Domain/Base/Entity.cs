@@ -10,4 +10,12 @@ public class Entity<TKey> : IEntity<TKey>
     {
         Id = id;
     }
+
+    /// <summary>
+    /// For EF Core materialization only: the id is set from the stored value.
+    /// </summary>
+    protected Entity()
+    {
+        Id = default!;
+    }
 }

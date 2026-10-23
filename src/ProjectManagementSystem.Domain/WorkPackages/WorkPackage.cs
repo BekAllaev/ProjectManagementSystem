@@ -25,6 +25,14 @@ public sealed class WorkPackage : AggregateRoot<Guid>
 
     public IReadOnlyCollection<ProjectTask> Tasks => _tasks.AsReadOnly();
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private WorkPackage()
+    {
+        Description = null!;
+    }
+
     internal WorkPackage(Guid id, Guid projectId, string description, Guid responsiblePersonId) : base(id)
     {
         ProjectId = projectId;

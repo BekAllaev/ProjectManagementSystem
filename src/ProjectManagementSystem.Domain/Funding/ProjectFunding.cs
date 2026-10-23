@@ -18,6 +18,13 @@ public sealed class ProjectFunding : AggregateRoot<Guid>
 
     public IReadOnlyCollection<FundingTranche> Tranches => _tranches.AsReadOnly();
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private ProjectFunding()
+    {
+    }
+
     internal ProjectFunding(Guid projectId) : base(projectId)
     {
     }

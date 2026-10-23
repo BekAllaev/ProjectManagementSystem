@@ -33,6 +33,16 @@ public sealed partial class Project : AggregateRoot<Guid>
     /// </summary>
     public bool IsOpen => State != ProjectState.Completed;
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private Project()
+    {
+        Title = null!;
+        Description = null!;
+        Currency = null!;
+    }
+
     public Project(Guid id, string title, string description, Currency currency, DateTime creationDate) : base(id)
     {
         Title = Guard.NotEmpty(title, nameof(Title));

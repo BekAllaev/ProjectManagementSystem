@@ -25,6 +25,17 @@ public sealed class Employee : AggregateRoot<Guid>
 
     public string? PhotoPath { get; private set; }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private Employee()
+    {
+        FirstName = null!;
+        LastName = null!;
+        Email = null!;
+        NormalizedEmail = null!;
+    }
+
     internal Employee(Guid id, string firstName, string lastName, string email, string? photoPath = null) : base(id)
     {
         FirstName = Guard.NotEmpty(firstName, nameof(FirstName));

@@ -18,6 +18,13 @@ public class AggregateRoot<TKey> : Entity<TKey>, IAggregateRoot<TKey>
     {
     }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    protected AggregateRoot()
+    {
+    }
+
     public void ClearDomainEvents() => _domainEvents.Clear();
 
     protected void RaiseDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
