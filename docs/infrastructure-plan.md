@@ -41,6 +41,7 @@
    - `TaskTimeLog`: `Entries` — `OwnsMany`.
    - `ProjectFunding`: `Tranches` — `OwnsMany` (shadow key).
    - `Milestone.TaskIds`, `Project.WorkPackageIds` (`HashSet<Guid>`) — OwnsMany не применим к примитивам. По умолчанию — primitive collection EF Core (JSON-колонка). Если при реализации это окажется неудобным — остановиться и обсудить, не решать самостоятельно.
+     **Решено при реализации:** EF Core не принимает `HashSet<Guid>` как primitive collection (только массивы и списки), поэтому поля `_workPackageIds` и `_taskIds` в домене стали `List<Guid>`; уникальность по-прежнему проверяют методы агрегатов.
    - `Risk`, `Employee` — плоские таблицы.
    - Маппинг через backing fields (`_teamMembers`, `_tasks`, …) с `PropertyAccessMode.Field`.
    - `Version` — `IsConcurrencyToken()`; доступ к private setter через поле/`Property(...)`.

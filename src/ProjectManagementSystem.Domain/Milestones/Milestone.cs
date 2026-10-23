@@ -14,7 +14,8 @@ namespace ProjectManagementSystem.Domain.Milestones;
 /// </summary>
 public sealed class Milestone : AggregateRoot<Guid>
 {
-    private readonly HashSet<Guid> _taskIds = [];
+    // A list, not a set: EF Core stores only arrays and lists as a primitive collection. AddTask keeps the ids unique.
+    private readonly List<Guid> _taskIds = [];
 
     public Guid ProjectId { get; }
 
@@ -22,7 +23,7 @@ public sealed class Milestone : AggregateRoot<Guid>
 
     public string Description { get; private set; }
 
-    public IReadOnlyCollection<Guid> TaskIds => _taskIds;
+    public IReadOnlyCollection<Guid> TaskIds => _taskIds.AsReadOnly();
 
     public DateOnly TargetDate { get; private set; }
 
@@ -57,8 +58,10 @@ public sealed class Milestone : AggregateRoot<Guid>
     {
         EnsureOpen("add a task to");
 
-        if (!_taskIds.Add(taskId))
+        if (_taskIds.Contains(taskId))
             throw new DomainException($"Task '{taskId}' is already in milestone '{Name}'.");
+
+        _taskIds.Add(taskId);
 
         RaiseDomainEvent(new MilestoneTaskAdded(ProjectId, Id, taskId));
     }
