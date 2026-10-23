@@ -16,7 +16,8 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers everything the application needs from the infrastructure: persistence, repositories, the unit of
-    /// work and the outbox.
+    /// work and the outbox with its processor. The processor dispatches events through the application, so the host
+    /// also calls <c>AddApplication</c>.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
@@ -26,10 +27,22 @@ public static class DependencyInjection
         services.AddSingleton(EventTypeRegistry.FromAssembly(typeof(IDomainEvent).Assembly));
         services.AddSingleton<DomainEventSerializer>();
         services.AddSingleton<OutboxSignal>();
+        services.AddOutboxOptions();
+        services.AddSingleton<IOutboxDrainer, OutboxDrainer>();
+        services.AddHostedService<OutboxProcessor>();
 
         services.AddScoped<EfUnitOfWork>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<EfUnitOfWork>());
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+
+        return services;
+    }
+
+    internal static IServiceCollection AddOutboxOptions(this IServiceCollection services)
+    {
+        services.AddOptions<OutboxOptions>()
+            .Configure<IConfiguration>((options, configuration) => options.Bind(configuration.GetSection(OutboxOptions.SectionName)))
+            .Validate(options => options.IsValid(), "Outbox options need non-empty backoff lists and positive limits.");
 
         return services;
     }
