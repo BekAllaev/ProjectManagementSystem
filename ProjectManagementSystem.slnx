@@ -10,6 +10,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/ProjectManagementSystem.Application.Tests/ProjectManagementSystem.Application.Tests.csproj" />
     <Project Path="tests/ProjectManagementSystem.Domain.Tests/ProjectManagementSystem.Domain.Tests.csproj" />
+    <Project Path="tests/ProjectManagementSystem.Infrastructure.IntegrationTests/ProjectManagementSystem.Infrastructure.IntegrationTests.csproj" />
     <Project Path="tests/ProjectManagementSystem.Infrastructure.Tests/ProjectManagementSystem.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
