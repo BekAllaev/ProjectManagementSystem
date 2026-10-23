@@ -1,14 +1,16 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Interfaces;
 
 namespace ProjectManagementSystem.Application.Tests.Fakes;
 
 /// <summary>
 /// Does what the real unit of work will do with the outbox: on save it takes the events of every aggregate
-/// touched through a <see cref="FakeRepository{TAggregate}"/>, clears them and keeps them in
-/// <see cref="CollectedEvents"/>. It also records which aggregates the saved command changed.
+/// touched through a <see cref="FakeRepository{TAggregate}"/>, sets their <see cref="IDomainEvent.EventId"/> and
+/// <see cref="IDomainEvent.OccurredAt"/> from the clock, clears them and keeps them in <see cref="CollectedEvents"/>.
+/// It also records which aggregates the saved command changed.
 /// </summary>
-public sealed class FakeUnitOfWork : IUnitOfWork
+public sealed class FakeUnitOfWork(TimeProvider timeProvider) : IUnitOfWork
 {
     private readonly List<IAggregateRoot<Guid>> _tracked = [];
     private readonly List<IAggregateRoot<Guid>> _written = [];
@@ -29,9 +31,11 @@ public sealed class FakeUnitOfWork : IUnitOfWork
         SaveCount++;
         ChangedAggregates = _tracked.Where(a => _written.Contains(a) || a.DomainEvents.Count > 0).ToList();
 
+        var now = timeProvider.GetUtcNow();
+
         foreach (var aggregate in _tracked)
         {
-            _collectedEvents.AddRange(aggregate.DomainEvents);
+            _collectedEvents.AddRange(aggregate.DomainEvents.Select(e => Stamp(e, now)));
             aggregate.ClearDomainEvents();
         }
 
@@ -39,6 +43,11 @@ public sealed class FakeUnitOfWork : IUnitOfWork
         _written.Clear();
         return Task.CompletedTask;
     }
+
+    private static IDomainEvent Stamp(IDomainEvent domainEvent, DateTimeOffset now) =>
+        domainEvent is DomainEvent stampable
+            ? stampable with { EventId = Guid.CreateVersion7(now), OccurredAt = now.UtcDateTime }
+            : domainEvent;
 
     internal void Track(IAggregateRoot<Guid> aggregate, bool written = false)
     {
