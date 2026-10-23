@@ -139,10 +139,9 @@ public sealed class OutboxProcessorTests : IAsyncDisposable
     public async Task Stopping_during_a_drain_ends_the_loop_without_an_error()
     {
         await StartAsync();
-        var stopping = _drainer.NextDrainAsync(waitsForCancellation: true);
+        await _drainer.NextDrainAsync(waitsForCancellation: true);
 
         await _processor.StopAsync(CancellationToken.None);
-        await stopping;
 
         Assert.True(_processor.ExecuteTask!.IsCompletedSuccessfully);
     }
@@ -191,7 +190,8 @@ public sealed class OutboxProcessorTests : IAsyncDisposable
         }
 
         /// <summary>
-        /// Waits for the next drain and ends it as given.
+        /// Waits for the next drain and ends it as given; with <paramref name="waitsForCancellation"/> the drain keeps
+        /// running until the processor is stopped.
         /// </summary>
         public async Task NextDrainAsync(
             DateTime? returns = null,
