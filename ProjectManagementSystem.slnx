@@ -5,6 +5,7 @@
     <Project Path="src/ProjectManagementSystem.Domain/ProjectManagementSystem.Domain.csproj" Id="f19c6e01-d061-4fca-a3dd-154b3bb14eb8" />
     <Project Path="src/ProjectManagementSystem.Domain.Shared/ProjectManagementSystem.Domain.Shared.csproj" />
     <Project Path="src/ProjectManagementSystem.Infrastructure/ProjectManagementSystem.Infrastructure.csproj" />
+    <Project Path="src/ProjectManagementSystem.Migrator/ProjectManagementSystem.Migrator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProjectManagementSystem.Application.Tests/ProjectManagementSystem.Application.Tests.csproj" />

@@ -54,6 +54,7 @@
 6. Таблица `Notifications`: `Id`, `IdempotencyKey` (unique), `ProjectId`, `RecipientEmployeeId` (null = руководство проекта), `Message`, `CreatedAt`, `ReadAt` (null).
 7. Начальная миграция `Initial`.
 8. `DependencyInjection.AddInfrastructure(IServiceCollection, IConfiguration)`: DbContext со строкой подключения `ConnectionStrings:Default`, `EnableRetryOnFailure()`.
+9. **Добавлено при ревью:** проект `src/ProjectManagementSystem.Migrator` — консольное приложение на Generic Host, применяет миграции (`dotnet run --project src/ProjectManagementSystem.Migrator`; с `--script` печатает идемпотентный SQL без подключения к базе). Настройки: `appsettings.json` → `appsettings.{Environment}.json` → user secrets (Development) → переменные окружения → командная строка. Он же startup-проект для `dotnet ef` (`--project src/ProjectManagementSystem.Infrastructure --startup-project src/ProjectManagementSystem.Migrator`). Регистрирует только `AddPersistence` (DbContext), не весь `AddInfrastructure`.
 
 **Ревью:** миграция сгенерирована и собирается; Claude Code приводит сгенерированный SQL (`dotnet ef migrations script`) для проверки. Применение на локальный SQL Server — автор.
 
