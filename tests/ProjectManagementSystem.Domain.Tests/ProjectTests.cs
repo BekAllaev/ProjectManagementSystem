@@ -11,10 +11,10 @@ public class ProjectTests
         var project = TestData.ProjectWithTeam();
         Assert.True(project.IsOpen);
 
-        project.Start(DateTime.UtcNow);
+        project.Start(TestData.Now);
         Assert.True(project.IsOpen);
 
-        project.Complete(DateTime.UtcNow);
+        project.Complete(TestData.Now);
         Assert.False(project.IsOpen);
     }
 
@@ -22,11 +22,11 @@ public class ProjectTests
     public void Closed_project_gets_no_new_work_packages()
     {
         var project = TestData.ProjectWithTeam();
-        project.Start(DateTime.UtcNow);
-        project.Complete(DateTime.UtcNow);
+        project.Start(TestData.Now);
+        project.Complete(TestData.Now);
 
         Assert.Throws<DomainException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
-        Assert.Throws<DomainException>(() => project.Complete(DateTime.UtcNow));
+        Assert.Throws<DomainException>(() => project.Complete(TestData.Now));
     }
 
     [Fact]
@@ -35,8 +35,8 @@ public class ProjectTests
         var project = TestData.ProjectWithTeam();
         var workPackageId = Guid.NewGuid();
         project.RegisterWorkPackage(workPackageId);
-        project.Start(DateTime.UtcNow);
-        project.Complete(DateTime.UtcNow);
+        project.Start(TestData.Now);
+        project.Complete(TestData.Now);
 
         project.RegisterWorkPackage(workPackageId);
 

@@ -7,7 +7,10 @@ namespace ProjectManagementSystem.Domain.Tests.Fakes;
 
 public static class TestData
 {
-    public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    /// <summary>
+    /// Fixed day of the tests: no test reads the system clock.
+    /// </summary>
+    public static DateOnly Today { get; } = new(2026, 3, 2);
 
     /// <summary>
     /// Time provider for domain services, set to the start of <see cref="Today"/>.
@@ -16,11 +19,16 @@ public static class TestData
         new FakeTimeProvider(new DateTimeOffset(Today.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
 
     /// <summary>
+    /// Current moment of <see cref="TimeProvider"/>, in UTC.
+    /// </summary>
+    public static DateTime Now => TimeProvider.GetUtcNow().UtcDateTime;
+
+    /// <summary>
     /// Project with one role and the given employees in the team since 30 days ago, rate 50.
     /// </summary>
     public static Project ProjectWithTeam(params Guid[] employeeIds)
     {
-        var project = new Project(Guid.NewGuid(), "Project", "Description", new Currency("USD"), DateTime.UtcNow);
+        var project = new Project(Guid.NewGuid(), "Project", "Description", new Currency("USD"), Now);
         var roleId = project.CreateRole("Developer", "Writes code");
 
         foreach (var employeeId in employeeIds)
@@ -34,8 +42,8 @@ public static class TestData
     /// </summary>
     public static void Close(Project project)
     {
-        project.Start(DateTime.UtcNow);
-        project.Complete(DateTime.UtcNow);
+        project.Start(Now);
+        project.Complete(Now);
     }
 
     /// <summary>
