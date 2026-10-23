@@ -27,6 +27,13 @@ public sealed class TeamMember : Entity<Guid>
     /// </summary>
     public IReadOnlyList<HourlyRate> HourlyRates => _hourlyRates.AsReadOnly();
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private TeamMember()
+    {
+    }
+
     internal TeamMember(Guid id, Guid employeeId, Guid roleId, DateOnly from, DateOnly? to, decimal hourlyRate) : base(id)
     {
         EnsurePeriodIsValid(from, to);

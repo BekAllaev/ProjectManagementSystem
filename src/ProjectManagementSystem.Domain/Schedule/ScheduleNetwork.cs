@@ -18,6 +18,13 @@ public sealed class ScheduleNetwork : AggregateRoot<Guid>
 
     public IReadOnlyCollection<Dependency> Dependencies => _dependencies.AsReadOnly();
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private ScheduleNetwork()
+    {
+    }
+
     public ScheduleNetwork(Guid projectId) : base(projectId)
     {
     }

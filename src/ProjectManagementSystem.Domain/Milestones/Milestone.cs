@@ -33,6 +33,15 @@ public sealed class Milestone : AggregateRoot<Guid>
     /// </summary>
     public DateTime? CompletedAt { get; private set; }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private Milestone()
+    {
+        Name = null!;
+        Description = null!;
+    }
+
     internal Milestone(Guid id, Guid projectId, string name, string description, DateOnly targetDate) : base(id)
     {
         ProjectId = projectId;

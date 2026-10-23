@@ -12,6 +12,15 @@ public sealed class Role : Entity<Guid>
 
     public string Description { get; private set; }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private Role()
+    {
+        Name = null!;
+        Description = null!;
+    }
+
     internal Role(Guid id, string name, string description) : base(id)
     {
         Name = Guard.NotEmpty(name, nameof(Name));

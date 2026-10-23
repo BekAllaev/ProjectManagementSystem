@@ -25,6 +25,14 @@ public sealed class Risk : AggregateRoot<Guid>
 
     public RiskStatus Status { get; set; }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private Risk()
+    {
+        Description = null!;
+    }
+
     public Risk(Guid id, Guid projectId, string description, RiskLevel probability, RiskLevel impact, Guid ownerId, RiskStatus status)
         : base(id)
     {

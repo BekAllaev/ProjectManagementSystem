@@ -22,6 +22,13 @@ public sealed class TaskTimeLog : AggregateRoot<Guid>
 
     public IReadOnlyCollection<TimeEntry> Entries => _entries.AsReadOnly();
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private TaskTimeLog()
+    {
+    }
+
     internal TaskTimeLog(Guid taskId, Guid workPackageId, Guid projectId) : base(taskId)
     {
         WorkPackageId = workPackageId;

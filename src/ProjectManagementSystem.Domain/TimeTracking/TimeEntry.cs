@@ -17,6 +17,13 @@ public sealed class TimeEntry : Entity<Guid>
 
     public decimal HourlyRate { get; }
 
+    /// <summary>
+    /// For EF Core materialization only; does not raise domain events.
+    /// </summary>
+    private TimeEntry()
+    {
+    }
+
     internal TimeEntry(Guid id, Guid employeeId, DateOnly workDate, decimal hours, decimal hourlyRate) : base(id)
     {
         EmployeeId = employeeId;
