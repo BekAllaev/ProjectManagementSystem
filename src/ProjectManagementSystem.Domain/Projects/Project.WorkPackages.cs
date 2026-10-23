@@ -2,7 +2,8 @@ namespace ProjectManagementSystem.Domain.Projects;
 
 public sealed partial class Project
 {
-    private readonly HashSet<Guid> _workPackageIds = [];
+    // A list, not a set: EF Core stores only arrays and lists as a primitive collection. RegisterWorkPackage keeps the ids unique.
+    private readonly List<Guid> _workPackageIds = [];
 
     /// <summary>
     /// Ids of all registered work packages of the project, finished ones included. A new work package is
@@ -10,7 +11,7 @@ public sealed partial class Project
     /// missing here. Changing the list changes the version of the project like any other change inside the
     /// aggregate, so registering a work package and closing the project conflict with each other.
     /// </summary>
-    public IReadOnlyCollection<Guid> WorkPackageIds => _workPackageIds;
+    public IReadOnlyCollection<Guid> WorkPackageIds => _workPackageIds.AsReadOnly();
 
     /// <summary>
     /// Called by the handler of <see cref="WorkPackages.Events.WorkPackageCreated"/>. No work package can be
