@@ -6,6 +6,7 @@ using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Infrastructure.Outbox;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence.Repositories;
 
 namespace ProjectManagementSystem.Infrastructure;
@@ -16,7 +17,7 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers everything the application needs from the infrastructure: persistence, repositories, the unit of
-    /// work and the outbox with its processor. The processor dispatches events through the application, so the host
+    /// work, the outbox with its processor and the in-app notifications. The processor dispatches events through the application, so the host
     /// also calls <c>AddApplication</c>.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<EfUnitOfWork>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<EfUnitOfWork>());
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+        services.AddScoped<INotificationSender, NotificationSender>();
 
         return services;
     }
