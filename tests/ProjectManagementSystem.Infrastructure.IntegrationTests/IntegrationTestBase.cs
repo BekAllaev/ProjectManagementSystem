@@ -1,3 +1,5 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -6,6 +8,8 @@ using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Domain.Base;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Tests.Fakes;
+using ProjectManagementSystem.Infrastructure.Outbox;
+using ProjectManagementSystem.Infrastructure.Persistence;
 
 namespace ProjectManagementSystem.Infrastructure.IntegrationTests;
 
@@ -47,6 +51,7 @@ public abstract class IntegrationTestBase(IntegrationTestDatabase database) : IA
         services.AddSingleton<TimeProvider>(Clock);
         services.AddApplication();
         services.AddInfrastructure(configuration);
+        ConfigureServices(services);
 
         _services = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
@@ -55,6 +60,39 @@ public abstract class IntegrationTestBase(IntegrationTestDatabase database) : IA
     {
         if (_services is not null)
             await _services.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Extra registrations of a test class, added after the application and the infrastructure.
+    /// </summary>
+    protected virtual void ConfigureServices(IServiceCollection services)
+    {
+    }
+
+    /// <summary>
+    /// Sends a command in its own scope, like one web request.
+    /// </summary>
+    protected async Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request)
+    {
+        await using var scope = Services.CreateAsyncScope();
+
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(request);
+    }
+
+    /// <summary>
+    /// One pass of the outbox, as the processor does it after a signal.
+    /// </summary>
+    protected Task<DateTime?> DrainOutboxAsync() =>
+        Services.GetRequiredService<IOutboxDrainer>().DrainAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Reads the database in a new context, without the repositories and the unit of work.
+    /// </summary>
+    protected async Task<T> QueryAsync<T>(Func<AppDbContext, Task<T>> query)
+    {
+        await using var scope = Services.CreateAsyncScope();
+
+        return await query(scope.ServiceProvider.GetRequiredService<AppDbContext>());
     }
 
     /// <summary>
