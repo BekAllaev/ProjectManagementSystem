@@ -74,6 +74,11 @@
 3. Сериализация событий: `System.Text.Json` + `EventTypeRegistry` — явное соответствие «стабильное имя ↔ тип» (имя = имя класса события; регистрация сканированием сборки Domain по `IDomainEvent` с проверкой уникальности имён при старте). Не использовать `AssemblyQualifiedName`. Проверить round-trip всех событий, включая вложенные record'ы (`Dependency`) и `DateOnly`.
 4. Регистрация в DI: `IRepository<>` → `EfRepository<>`, `IUnitOfWork` → `EfUnitOfWork` (scoped), `OutboxSignal` (singleton).
 
+5. **Решено при реализации:**
+   - `SaveChangesAsync` отклоняет (`InvalidOperationException`) агрегат, который поднял события, но не был передан в `Add` / `Update` / `Delete`: иначе его события потерялись бы, а версия не выросла.
+   - Ошибка занятого email вынесена в `EmployeeService.EmailIsTaken(...)` (public static), её же бросает UoW при нарушении индекса `UX_Employees_NormalizedEmail`.
+   - Unit-тесты Infrastructure без базы — отдельный проект `tests/ProjectManagementSystem.Infrastructure.Tests`; он входит в список проектов, которые запускает CI (наравне с `Domain.Tests` и `Application.Tests`).
+
 **Ревью:** unit-тесты сериализатора (round-trip каждого типа события).
 
 ## Фаза 3 — Outbox processor

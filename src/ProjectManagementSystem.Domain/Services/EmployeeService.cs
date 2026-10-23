@@ -40,6 +40,10 @@ public sealed class EmployeeService(IRepository<Employee> employees)
         employee.ChangeEmail(newEmail);
     }
 
-    private static DomainException EmailIsTaken(string normalizedEmail) =>
+    /// <summary>
+    /// Error of a taken email. Also thrown by the persistence when the unique index stops a concurrent registration
+    /// or change of the email, so the caller sees the same error either way.
+    /// </summary>
+    public static DomainException EmailIsTaken(string normalizedEmail) =>
         new($"Email '{normalizedEmail}' is already used by another employee.");
 }
