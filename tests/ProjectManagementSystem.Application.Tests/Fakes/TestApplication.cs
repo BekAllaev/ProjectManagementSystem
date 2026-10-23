@@ -26,6 +26,7 @@ public sealed class TestApplication : IDisposable
 
     public TestApplication(Action<IServiceCollection>? configure = null)
     {
+        UnitOfWork = new(TimeProvider);
         Projects = new(UnitOfWork);
         WorkPackages = new(UnitOfWork);
         Networks = new(UnitOfWork);
@@ -59,7 +60,7 @@ public sealed class TestApplication : IDisposable
     /// </summary>
     public FakeTimeProvider TimeProvider { get; } = new(new DateTimeOffset(TestData.Today.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
 
-    public FakeUnitOfWork UnitOfWork { get; } = new();
+    public FakeUnitOfWork UnitOfWork { get; }
 
     public FakeNotificationSender Notifications { get; } = new();
 
