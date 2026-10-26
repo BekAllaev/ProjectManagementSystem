@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ProjectManagementSystem.Api/ProjectManagementSystem.Api.csproj" />
     <Project Path="src/ProjectManagementSystem.Application.Contracts/ProjectManagementSystem.Application.Contracts.csproj" />
     <Project Path="src/ProjectManagementSystem.Application/ProjectManagementSystem.Application.csproj" Id="98f6be0f-fd03-4dfa-8d2c-5554f09e2103" />
     <Project Path="src/ProjectManagementSystem.Domain.Shared/ProjectManagementSystem.Domain.Shared.csproj" />
@@ -10,6 +11,7 @@
     <Project Path="src/ProjectManagementSystem/ProjectManagementSystem/ProjectManagementSystem.csproj" Id="64a66662-424b-48ec-8caf-7aec27823440" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ProjectManagementSystem.Api.Tests/ProjectManagementSystem.Api.Tests.csproj" />
     <Project Path="tests/ProjectManagementSystem.Application.Tests/ProjectManagementSystem.Application.Tests.csproj" />
     <Project Path="tests/ProjectManagementSystem.Domain.Tests/ProjectManagementSystem.Domain.Tests.csproj" />
     <Project Path="tests/ProjectManagementSystem.Infrastructure.IntegrationTests/ProjectManagementSystem.Infrastructure.IntegrationTests.csproj" />
