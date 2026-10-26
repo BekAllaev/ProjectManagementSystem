@@ -6,8 +6,8 @@
     <Project Path="src/ProjectManagementSystem.Domain/ProjectManagementSystem.Domain.csproj" Id="f19c6e01-d061-4fca-a3dd-154b3bb14eb8" />
     <Project Path="src/ProjectManagementSystem.Infrastructure/ProjectManagementSystem.Infrastructure.csproj" />
     <Project Path="src/ProjectManagementSystem.Migrator/ProjectManagementSystem.Migrator.csproj" />
-    <Project Path="src/ProjectManagementSystem/ProjectManagementSystem.Client/ProjectManagementSystem.Client.csproj" Id="13f3a04b-b9cf-461b-a23a-7348ba4f996e" />
-    <Project Path="src/ProjectManagementSystem/ProjectManagementSystem/ProjectManagementSystem.csproj" Id="62417530-26f1-4aca-8bd3-4a9bd186c1b1" />
+    <Project Path="src/ProjectManagementSystem/ProjectManagementSystem.Client/ProjectManagementSystem.Client.csproj" Id="8cf2490f-8946-4755-9371-7dcebdd64795" />
+    <Project Path="src/ProjectManagementSystem/ProjectManagementSystem/ProjectManagementSystem.csproj" Id="64a66662-424b-48ec-8caf-7aec27823440" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProjectManagementSystem.Application.Tests/ProjectManagementSystem.Application.Tests.csproj" />
