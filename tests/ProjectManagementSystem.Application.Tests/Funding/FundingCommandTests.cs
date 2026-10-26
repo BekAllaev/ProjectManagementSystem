@@ -38,19 +38,19 @@ public class FundingCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task AddFunding_ClosedProject_ThrowsDomainException()
+    public async Task AddFunding_ClosedProject_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
         TestData.Close(project);
         project.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new AddFundingCommand(project.Id, 5_000m, Today, null)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new AddFundingCommand(project.Id, 5_000m, Today, null)));
         Assert.Empty(App.Fundings.All);
     }
 
     [Fact]
-    public async Task AddFunding_UnknownProject_ThrowsNotFoundException()
+    public async Task AddFunding_UnknownProject_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() => App.SendAsync(new AddFundingCommand(Guid.NewGuid(), 5_000m, Today, null)));
+        await AssertRejectedAsync<AggregateNotFoundException>(() => App.SendAsync(new AddFundingCommand(Guid.NewGuid(), 5_000m, Today, null)));
     }
 }

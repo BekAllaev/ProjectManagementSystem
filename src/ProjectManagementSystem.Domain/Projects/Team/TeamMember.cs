@@ -51,7 +51,7 @@ public sealed class TeamMember : Entity<Guid>
     public HourlyRate GetHourlyRateOn(DateOnly date)
     {
         if (!IsActiveOn(date))
-            throw new DomainException($"Employee '{EmployeeId}' is not on the project on {date}.");
+            throw new DomainRuleViolationException($"Employee '{EmployeeId}' is not on the project on {date}.");
 
         return _hourlyRates.Last(r => r.From <= date);
     }
@@ -62,12 +62,12 @@ public sealed class TeamMember : Entity<Guid>
     internal void End(DateOnly to)
     {
         if (To is not null)
-            throw new DomainException("Team membership has already ended.");
+            throw new DomainRuleViolationException("Team membership has already ended.");
 
         EnsurePeriodIsValid(From, to);
 
         if (_hourlyRates[^1].From > to)
-            throw new DomainException("Team membership cannot end before the start of its last hourly rate.");
+            throw new DomainRuleViolationException("Team membership cannot end before the start of its last hourly rate.");
 
         To = to;
     }
@@ -77,13 +77,13 @@ public sealed class TeamMember : Entity<Guid>
         var rate = new HourlyRate(amount, from);
 
         if (from < today)
-            throw new DomainException("Hourly rate cannot be changed retroactively.");
+            throw new DomainValidationException("Hourly rate cannot be changed retroactively.");
 
         if (from <= _hourlyRates[^1].From)
-            throw new DomainException("New hourly rate must start after the start of the current one.");
+            throw new DomainRuleViolationException("New hourly rate must start after the start of the current one.");
 
         if (!IsActiveOn(from))
-            throw new DomainException("New hourly rate must start within the period of the team membership.");
+            throw new DomainRuleViolationException("New hourly rate must start within the period of the team membership.");
 
         _hourlyRates.Add(rate);
         return rate;
@@ -92,6 +92,6 @@ public sealed class TeamMember : Entity<Guid>
     private static void EnsurePeriodIsValid(DateOnly from, DateOnly? to)
     {
         if (to is not null && from > to)
-            throw new DomainException("Start of the team membership must not be later than its end.");
+            throw new DomainValidationException("Start of the team membership must not be later than its end.");
     }
 }

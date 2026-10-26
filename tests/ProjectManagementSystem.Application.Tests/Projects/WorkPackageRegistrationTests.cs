@@ -24,7 +24,7 @@ public class WorkPackageRegistrationTests : CommandTestBase
         TestData.Close(project);
         project.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member)));
         Assert.Empty(App.WorkPackages.All);
     }
 
@@ -49,7 +49,7 @@ public class WorkPackageRegistrationTests : CommandTestBase
         await App.SendAsync(new StartProjectCommand(project.Id));
         await App.DeliverEventsAsync();
 
-        await Assert.ThrowsAsync<DomainException>(() => App.SendAsync(new CloseProjectCommand(project.Id)));
+        await Assert.ThrowsAsync<DomainRuleViolationException>(() => App.SendAsync(new CloseProjectCommand(project.Id)));
         Assert.True(project.IsOpen);
     }
 

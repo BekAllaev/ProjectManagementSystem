@@ -17,9 +17,9 @@ public class MilestoneTests
 
         Assert.Equal(MilestoneStatus.Completed, milestone.Status);
         Assert.NotNull(milestone.CompletedAt);
-        Assert.Throws<DomainException>(() => milestone.AddTask(Guid.NewGuid()));
-        Assert.Throws<DomainException>(() => milestone.RemoveTask(milestone.TaskIds.Single()));
-        Assert.Throws<DomainException>(() => milestone.ChangeTargetDate(TestData.Today.AddDays(1)));
+        Assert.Throws<DomainRuleViolationException>(() => milestone.AddTask(Guid.NewGuid()));
+        Assert.Throws<DomainRuleViolationException>(() => milestone.RemoveTask(milestone.TaskIds.Single()));
+        Assert.Throws<DomainRuleViolationException>(() => milestone.ChangeTargetDate(TestData.Today.AddDays(1)));
     }
 
     [Fact]

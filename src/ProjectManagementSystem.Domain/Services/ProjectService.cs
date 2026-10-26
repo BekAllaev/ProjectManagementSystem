@@ -27,7 +27,7 @@ public sealed class ProjectService(TimeProvider timeProvider)
             wp.Status is not (WorkPackageStatus.Completed or WorkPackageStatus.Cancelled));
 
         if (unfinished is not null)
-            throw new DomainException(
+            throw new DomainRuleViolationException(
                 $"Project '{project.Id}' cannot be completed because work package '{unfinished.Id}' is {unfinished.Status}.");
 
         project.Complete(timeProvider.GetUtcNow().UtcDateTime);
@@ -48,7 +48,7 @@ public sealed class ProjectService(TimeProvider timeProvider)
         var isResponsible = new IsResponsibleForOpenWorkSpecification(employeeId);
 
         if (workPackages.Any(wp => wp.ProjectId == project.Id && isResponsible.IsSatisfiedBy(wp)))
-            throw new DomainException(
+            throw new DomainRuleViolationException(
                 $"Employee '{employeeId}' is responsible for an open work package or task and cannot leave the team.");
 
         project.EndTeamMembership(employeeId, to);

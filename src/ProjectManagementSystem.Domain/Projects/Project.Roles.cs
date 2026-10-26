@@ -61,12 +61,12 @@ public sealed partial class Project
     private void EnsureRoleNameIsUnique(string name)
     {
         if (_roles.Any(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)))
-            throw new DomainException($"Role with name '{name}' already exists in the project.");
+            throw new DomainRuleViolationException($"Role with name '{name}' already exists in the project.");
     }
 
     private void EnsureRoleWasNeverAssigned(Role role, string action)
     {
         if (IsRoleEverAssigned(role.Id))
-            throw new DomainException($"Role '{role.Name}' cannot be {action} because it has been assigned to a team member.");
+            throw new DomainRuleViolationException($"Role '{role.Name}' cannot be {action} because it has been assigned to a team member.");
     }
 }

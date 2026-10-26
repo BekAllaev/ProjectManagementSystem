@@ -55,7 +55,7 @@ public sealed class ProjectTask : Entity<Guid>
     internal void ChangeResponsiblePerson(Guid employeeId)
     {
         if (IsFinished)
-            throw new DomainException($"Responsible person of task '{Name}' cannot be changed because it is {Status}.");
+            throw new DomainRuleViolationException($"Responsible person of task '{Name}' cannot be changed because it is {Status}.");
 
         ResponsiblePersonId = employeeId;
     }
@@ -75,7 +75,7 @@ public sealed class ProjectTask : Entity<Guid>
     internal void Cancel()
     {
         if (IsFinished)
-            throw new DomainException($"Task '{Name}' cannot be cancelled because it is already {Status}.");
+            throw new DomainRuleViolationException($"Task '{Name}' cannot be cancelled because it is already {Status}.");
 
         Status = ProjectTaskStatus.Cancelled;
     }
@@ -83,6 +83,6 @@ public sealed class ProjectTask : Entity<Guid>
     private void EnsureStatus(ProjectTaskStatus expected, string action)
     {
         if (Status != expected)
-            throw new DomainException($"Task '{Name}' cannot be {action} because it is {Status}, expected {expected}.");
+            throw new DomainRuleViolationException($"Task '{Name}' cannot be {action} because it is {Status}, expected {expected}.");
     }
 }

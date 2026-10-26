@@ -28,7 +28,7 @@ public class MilestoneServiceTests
 
         TestData.Close(_project);
 
-        Assert.Throws<DomainException>(() => _service.Create(_project, "Release", "", TestData.Today));
+        Assert.Throws<DomainRuleViolationException>(() => _service.Create(_project, "Release", "", TestData.Today));
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public class MilestoneServiceTests
         _service.AddTask(_project, milestone, _workPackage, open.Id);
         _service.AddTask(_project, milestone, _workPackage, completed.Id);
 
-        Assert.Throws<DomainException>(() => _service.AddTask(_project, milestone, _workPackage, cancelled.Id));
+        Assert.Throws<DomainRuleViolationException>(() => _service.AddTask(_project, milestone, _workPackage, cancelled.Id));
         Assert.Throws<EntityNotFoundException>(() => _service.AddTask(_project, milestone, _workPackage, Guid.NewGuid()));
         Assert.Equal([open.Id, completed.Id], milestone.TaskIds);
         Assert.Equal(2, milestone.DomainEvents.OfType<MilestoneTaskAdded>().Count());
@@ -61,8 +61,8 @@ public class MilestoneServiceTests
         var milestone = _service.Create(_project, "Release", "", TestData.Today);
         var task = TestData.Task(_project, _workPackage, _employeeId);
 
-        Assert.Throws<DomainException>(() => _service.AddTask(_project, foreignMilestone, _workPackage, task.Id));
-        Assert.Throws<DomainException>(() => _service.AddTask(_project, milestone, foreignPackage, foreignTask.Id));
+        Assert.Throws<DomainValidationException>(() => _service.AddTask(_project, foreignMilestone, _workPackage, task.Id));
+        Assert.Throws<DomainValidationException>(() => _service.AddTask(_project, milestone, foreignPackage, foreignTask.Id));
         Assert.Empty(milestone.TaskIds);
     }
 
@@ -77,6 +77,6 @@ public class MilestoneServiceTests
 
         TestData.Close(_project);
 
-        Assert.Throws<DomainException>(() => _service.AddTask(_project, milestone, _workPackage, task.Id));
+        Assert.Throws<DomainRuleViolationException>(() => _service.AddTask(_project, milestone, _workPackage, task.Id));
     }
 }

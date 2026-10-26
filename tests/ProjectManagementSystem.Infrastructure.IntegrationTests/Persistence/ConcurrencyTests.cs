@@ -57,7 +57,7 @@ public sealed class ConcurrencyTests(IntegrationTestDatabase database) : Integra
         firstRepository.Add(ada);
         await first.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
         secondRepository.Add(twin);
-        var error = await Assert.ThrowsAsync<DomainException>(
+        var error = await Assert.ThrowsAsync<DomainRuleViolationException>(
             () => second.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync());
 
         Assert.Equal(EmployeeService.EmailIsTaken("ada@example.com").Message, error.Message);

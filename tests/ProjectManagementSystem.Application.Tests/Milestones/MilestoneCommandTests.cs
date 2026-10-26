@@ -41,12 +41,12 @@ public class MilestoneCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CreateMilestone_ClosedProject_ThrowsDomainException()
+    public async Task CreateMilestone_ClosedProject_ThrowsDomainRuleViolationException()
     {
         TestData.Close(_project);
         _project.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new CreateMilestoneCommand(_project.Id, "Beta", null, Today)));
         Assert.Empty(App.Milestones.All);
     }
@@ -63,13 +63,13 @@ public class MilestoneCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task AddTaskToMilestone_CancelledTask_ThrowsDomainException()
+    public async Task AddTaskToMilestone_CancelledTask_ThrowsDomainRuleViolationException()
     {
         var milestone = SeedMilestone();
         _workPackage.CancelTask(TaskId);
         _workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new AddTaskToMilestoneCommand(milestone.Id, _workPackage.Id, TaskId)));
         Assert.Empty(milestone.TaskIds);
     }
@@ -121,13 +121,13 @@ public class MilestoneCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RenameMilestone_CompletedMilestone_ThrowsDomainException()
+    public async Task RenameMilestone_CompletedMilestone_ThrowsDomainRuleViolationException()
     {
         var milestone = SeedMilestone();
         milestone.Complete(Now);
         milestone.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new RenameMilestoneCommand(milestone.Id, "Late rename")));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new RenameMilestoneCommand(milestone.Id, "Late rename")));
     }
 
     [Fact]

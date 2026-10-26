@@ -25,8 +25,8 @@ public class ProjectTests
         project.Start(TestData.Now);
         project.Complete(TestData.Now);
 
-        Assert.Throws<DomainException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
-        Assert.Throws<DomainException>(() => project.Complete(TestData.Now));
+        Assert.Throws<DomainRuleViolationException>(() => project.RegisterWorkPackage(Guid.NewGuid()));
+        Assert.Throws<DomainRuleViolationException>(() => project.Complete(TestData.Now));
     }
 
     [Fact]

@@ -51,7 +51,7 @@ public class PipelineBehaviorTests
         var project = _app.Projects.Seed(TestData.ProjectWithTeam());
         var notTeamMember = Guid.NewGuid();
 
-        await Assert.ThrowsAsync<DomainException>(() =>
+        await Assert.ThrowsAsync<DomainRuleViolationException>(() =>
             _app.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", notTeamMember)));
 
         Assert.Equal(0, _app.UnitOfWork.SaveCount);

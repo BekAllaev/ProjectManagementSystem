@@ -18,7 +18,7 @@ public sealed partial class Project
         GetRole(roleId);
 
         if (_teamMembers.Any(m => m.EmployeeId == employeeId && m.Overlaps(from, to)))
-            throw new DomainException("Periods of the same employee on the project must not overlap.");
+            throw new DomainRuleViolationException("Periods of the same employee on the project must not overlap.");
 
         var teamMember = new TeamMember(Guid.NewGuid(), employeeId, roleId, from, to, hourlyRate);
         _teamMembers.Add(teamMember);
@@ -34,7 +34,7 @@ public sealed partial class Project
     internal void EndTeamMembership(Guid employeeId, DateOnly to)
     {
         var teamMember = _teamMembers.SingleOrDefault(m => m.EmployeeId == employeeId && m.To is null)
-            ?? throw new DomainException($"Employee '{employeeId}' has no open team membership in the project.");
+            ?? throw new DomainRuleViolationException($"Employee '{employeeId}' has no open team membership in the project.");
 
         teamMember.End(to);
         RaiseDomainEvent(new TeamMembershipEnded(Id, teamMember.Id, employeeId, to));
@@ -47,7 +47,7 @@ public sealed partial class Project
     public void ChangeHourlyRate(Guid employeeId, decimal amount, DateOnly from, DateOnly today)
     {
         var teamMember = _teamMembers.SingleOrDefault(m => m.EmployeeId == employeeId && m.IsActiveOn(from))
-            ?? throw new DomainException($"Employee '{employeeId}' is not on the project on {from}.");
+            ?? throw new DomainRuleViolationException($"Employee '{employeeId}' is not on the project on {from}.");
 
         var rate = teamMember.ChangeHourlyRate(amount, from, today);
         RaiseDomainEvent(new HourlyRateChanged(Id, teamMember.Id, employeeId, rate.Amount, rate.From));
@@ -56,7 +56,7 @@ public sealed partial class Project
     public HourlyRate GetHourlyRateOn(Guid employeeId, DateOnly date)
     {
         var teamMember = _teamMembers.SingleOrDefault(m => m.EmployeeId == employeeId && m.IsActiveOn(date))
-            ?? throw new DomainException($"Employee '{employeeId}' is not on the project on {date}.");
+            ?? throw new DomainRuleViolationException($"Employee '{employeeId}' is not on the project on {date}.");
 
         return teamMember.GetHourlyRateOn(date);
     }

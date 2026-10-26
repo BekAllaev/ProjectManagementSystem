@@ -21,10 +21,10 @@ public sealed class FundingService
     public void AddFunding(Project project, ProjectFunding funding, decimal amount, DateOnly date, string reason)
     {
         if (funding.Id != project.Id)
-            throw new DomainException($"Funding '{funding.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Funding '{funding.Id}' does not belong to project '{project.Id}'.");
 
         if (!project.IsOpen)
-            throw new DomainException($"Project '{project.Id}' is {project.State}; it gets no new funding.");
+            throw new DomainRuleViolationException($"Project '{project.Id}' is {project.State}; it gets no new funding.");
 
         funding.AddFunding(amount, date, reason);
     }

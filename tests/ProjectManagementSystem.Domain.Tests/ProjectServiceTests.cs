@@ -43,7 +43,7 @@ public class ProjectServiceTests
     {
         var open = TestData.WorkPackage(_project, _employeeId);
 
-        Assert.Throws<DomainException>(() => _service.Complete(_project, [open]));
+        Assert.Throws<DomainRuleViolationException>(() => _service.Complete(_project, [open]));
         Assert.True(_project.IsOpen);
     }
 
@@ -57,8 +57,8 @@ public class ProjectServiceTests
         var foreign = TestData.WorkPackage(otherProject, _employeeId);
         foreign.Complete();
 
-        Assert.Throws<DomainException>(() => _service.Complete(_project, [completed]));
-        Assert.Throws<DomainException>(() => _service.Complete(_project, [open, completed, foreign]));
+        Assert.Throws<DomainValidationException>(() => _service.Complete(_project, [completed]));
+        Assert.Throws<DomainValidationException>(() => _service.Complete(_project, [open, completed, foreign]));
         Assert.True(_project.IsOpen);
     }
 
@@ -67,7 +67,7 @@ public class ProjectServiceTests
     {
         var created = TestData.ProjectWithTeam(_employeeId);
 
-        Assert.Throws<DomainException>(() => _service.Complete(created, []));
+        Assert.Throws<DomainRuleViolationException>(() => _service.Complete(created, []));
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public class ProjectServiceTests
         var workPackage = TestData.WorkPackage(project, _lead);
         TestData.Task(project, workPackage, _developer);
 
-        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [workPackage], _developer, TestData.Today));
-        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [workPackage], _lead, TestData.Today));
+        Assert.Throws<DomainRuleViolationException>(() => _service.EndTeamMembership(project, [workPackage], _developer, TestData.Today));
+        Assert.Throws<DomainRuleViolationException>(() => _service.EndTeamMembership(project, [workPackage], _lead, TestData.Today));
     }
 
     [Fact]
@@ -102,8 +102,8 @@ public class ProjectServiceTests
         TestData.Task(project, workPackage, _developer);
         var foreign = TestData.WorkPackage(TestData.ProjectWithTeam(_developer), _developer);
 
-        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [], _developer, TestData.Today));
-        Assert.Throws<DomainException>(() => _service.EndTeamMembership(project, [workPackage, foreign], _developer, TestData.Today));
+        Assert.Throws<DomainValidationException>(() => _service.EndTeamMembership(project, [], _developer, TestData.Today));
+        Assert.Throws<DomainValidationException>(() => _service.EndTeamMembership(project, [workPackage, foreign], _developer, TestData.Today));
         Assert.True(project.IsTeamMemberOn(_developer, TestData.Today.AddDays(1)));
     }
 }

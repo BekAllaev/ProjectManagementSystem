@@ -28,16 +28,16 @@ public sealed class MilestoneService
     public void AddTask(Project project, Milestone milestone, WorkPackage workPackage, Guid taskId)
     {
         if (milestone.ProjectId != project.Id)
-            throw new DomainException($"Milestone '{milestone.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Milestone '{milestone.Id}' does not belong to project '{project.Id}'.");
 
         if (workPackage.ProjectId != project.Id)
-            throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
 
         EnsureProjectIsOpen(project);
 
         var task = workPackage.GetTask(taskId);
         if (task.Status == ProjectTaskStatus.Cancelled)
-            throw new DomainException($"Cancelled task '{task.Name}' cannot be added to a milestone.");
+            throw new DomainRuleViolationException($"Cancelled task '{task.Name}' cannot be added to a milestone.");
 
         milestone.AddTask(taskId);
     }
@@ -45,6 +45,6 @@ public sealed class MilestoneService
     private static void EnsureProjectIsOpen(Project project)
     {
         if (!project.IsOpen)
-            throw new DomainException($"Project '{project.Id}' is {project.State}; it gets no new milestones or milestone tasks.");
+            throw new DomainRuleViolationException($"Project '{project.Id}' is {project.State}; it gets no new milestones or milestone tasks.");
     }
 }

@@ -21,11 +21,11 @@ public class EmployeeCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RegisterEmployee_EmailUsedInAnotherCase_ThrowsDomainException()
+    public async Task RegisterEmployee_EmailUsedInAnotherCase_ThrowsDomainRuleViolationException()
     {
         await SeedEmployeeAsync("grace@example.com");
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new RegisterEmployeeCommand("Grace", "Hopper", " GRACE@example.com ")));
         Assert.Single(App.Employees.All);
     }
@@ -42,9 +42,9 @@ public class EmployeeCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RenameEmployee_UnknownEmployee_ThrowsNotFoundException()
+    public async Task RenameEmployee_UnknownEmployee_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() => App.SendAsync(new RenameEmployeeCommand(Guid.NewGuid(), "Ada", "King")));
+        await AssertRejectedAsync<AggregateNotFoundException>(() => App.SendAsync(new RenameEmployeeCommand(Guid.NewGuid(), "Ada", "King")));
     }
 
     [Fact]
@@ -59,12 +59,12 @@ public class EmployeeCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ChangeEmployeeEmail_EmailOfAnotherEmployee_ThrowsDomainException()
+    public async Task ChangeEmployeeEmail_EmailOfAnotherEmployee_ThrowsDomainRuleViolationException()
     {
         var employee = await SeedEmployeeAsync("ada@example.com");
         await SeedEmployeeAsync("grace@example.com");
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new ChangeEmployeeEmailCommand(employee.Id, "grace@example.com")));
         Assert.Equal("ada@example.com", employee.Email);
     }

@@ -40,9 +40,9 @@ public class ScheduleNetworkServiceTests
         var foreign = TestData.Task(otherProject, foreignPackage, _employeeId);
         workPackage.CancelTask(cancelled.Id);
 
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainRuleViolationException>(() =>
             _service.AddDependency(project, network, workPackage, task.Id, workPackage, cancelled.Id, DependencyType.FinishToStart));
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainValidationException>(() =>
             _service.AddDependency(project, network, workPackage, task.Id, foreignPackage, foreign.Id, DependencyType.FinishToStart));
         Assert.Empty(network.Dependencies);
     }
@@ -57,12 +57,12 @@ public class ScheduleNetworkServiceTests
         var foreignNetwork = new ScheduleNetwork(Guid.NewGuid());
         var network = new ScheduleNetwork(project.Id);
 
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainValidationException>(() =>
             _service.AddDependency(project, foreignNetwork, workPackage, predecessor.Id, workPackage, successor.Id, DependencyType.FinishToStart));
 
         TestData.Close(project);
 
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainRuleViolationException>(() =>
             _service.AddDependency(project, network, workPackage, predecessor.Id, workPackage, successor.Id, DependencyType.FinishToStart));
         Assert.Empty(network.Dependencies);
     }

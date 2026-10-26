@@ -35,15 +35,15 @@ public sealed class TaskTimeLogService(TimeProvider timeProvider)
         decimal hours)
     {
         if (workPackage.ProjectId != project.Id)
-            throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
 
         EnsureTaskIsInProgress(workPackage, timeLog);
 
         if (workDate > DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime))
-            throw new DomainException("Time cannot be logged for a future date.");
+            throw new DomainValidationException("Time cannot be logged for a future date.");
 
         if (!new IsTeamMemberOnSpecification(employeeId, workDate).IsSatisfiedBy(project))
-            throw new DomainException($"Employee '{employeeId}' is not a member of the project team on {workDate}.");
+            throw new DomainRuleViolationException($"Employee '{employeeId}' is not a member of the project team on {workDate}.");
 
         var hourlyRate = project.GetHourlyRateOn(employeeId, workDate);
 
@@ -60,11 +60,11 @@ public sealed class TaskTimeLogService(TimeProvider timeProvider)
     private static void EnsureTaskIsInProgress(WorkPackage workPackage, TaskTimeLog timeLog)
     {
         if (timeLog.WorkPackageId != workPackage.Id)
-            throw new DomainException($"Time log of task '{timeLog.TaskId}' does not belong to work package '{workPackage.Id}'.");
+            throw new DomainValidationException($"Time log of task '{timeLog.TaskId}' does not belong to work package '{workPackage.Id}'.");
 
         var task = workPackage.GetTask(timeLog.TaskId);
 
         if (task.Status != ProjectTaskStatus.InProgress)
-            throw new DomainException($"Time can be changed only on a task in progress. Task '{task.Name}' is {task.Status}.");
+            throw new DomainRuleViolationException($"Time can be changed only on a task in progress. Task '{task.Name}' is {task.Status}.");
     }
 }

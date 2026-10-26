@@ -24,7 +24,7 @@ public sealed class WorkPackageService(TimeProvider timeProvider)
     public WorkPackage CreateWorkPackage(Project project, string description, Guid responsiblePersonId)
     {
         if (!project.IsOpen)
-            throw new DomainException($"Project '{project.Id}' is {project.State}; it gets no new work packages.");
+            throw new DomainRuleViolationException($"Project '{project.Id}' is {project.State}; it gets no new work packages.");
 
         EnsureIsCurrentTeamMember(project, responsiblePersonId);
 
@@ -66,12 +66,12 @@ public sealed class WorkPackageService(TimeProvider timeProvider)
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         if (!new IsTeamMemberOnSpecification(employeeId, today).IsSatisfiedBy(project))
-            throw new DomainException($"Employee '{employeeId}' is not a member of the project team.");
+            throw new DomainRuleViolationException($"Employee '{employeeId}' is not a member of the project team.");
     }
 
     private static void EnsureBelongsToProject(WorkPackage workPackage, Project project)
     {
         if (workPackage.ProjectId != project.Id)
-            throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Work package '{workPackage.Id}' does not belong to project '{project.Id}'.");
     }
 }

@@ -16,11 +16,11 @@ public class WorkPackageServiceTests
     {
         var project = TestData.ProjectWithTeam(_member);
 
-        Assert.Throws<DomainException>(() => _service.CreateWorkPackage(project, "Package", Guid.NewGuid()));
+        Assert.Throws<DomainRuleViolationException>(() => _service.CreateWorkPackage(project, "Package", Guid.NewGuid()));
 
         var workPackage = _service.CreateWorkPackage(project, "Package", _member);
-        Assert.Throws<DomainException>(() => _service.AddTask(project, workPackage, "Task", "", Guid.NewGuid(), 1m));
-        Assert.Throws<DomainException>(() => _service.ChangeWorkPackageResponsiblePerson(project, workPackage, Guid.NewGuid()));
+        Assert.Throws<DomainRuleViolationException>(() => _service.AddTask(project, workPackage, "Task", "", Guid.NewGuid(), 1m));
+        Assert.Throws<DomainRuleViolationException>(() => _service.ChangeWorkPackageResponsiblePerson(project, workPackage, Guid.NewGuid()));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class WorkPackageServiceTests
         var otherProject = TestData.ProjectWithTeam(_member);
         var workPackage = TestData.WorkPackage(otherProject, _member);
 
-        Assert.Throws<DomainException>(() => _service.AddTask(project, workPackage, "Task", "", _member, 1m));
+        Assert.Throws<DomainValidationException>(() => _service.AddTask(project, workPackage, "Task", "", _member, 1m));
     }
 
     [Fact]
@@ -59,6 +59,6 @@ public class WorkPackageServiceTests
 
         TestData.Close(project);
 
-        Assert.Throws<DomainException>(() => _service.CreateWorkPackage(project, "Package", _member));
+        Assert.Throws<DomainRuleViolationException>(() => _service.CreateWorkPackage(project, "Package", _member));
     }
 }

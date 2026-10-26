@@ -6,14 +6,14 @@ namespace ProjectManagementSystem.Application.Abstractions;
 
 public static class RepositoryExtensions
 {
-    /// <exception cref="NotFoundException">The aggregate does not exist.</exception>
+    /// <exception cref="AggregateNotFoundException">The aggregate does not exist.</exception>
     public static async Task<TAggregate> GetAsync<TAggregate>(
         this IRepository<TAggregate> repository,
         Guid id,
         CancellationToken cancellationToken = default)
         where TAggregate : AggregateRoot<Guid> =>
         await repository.FindAsync(id, cancellationToken)
-        ?? throw new NotFoundException(typeof(TAggregate).Name, id);
+        ?? throw new AggregateNotFoundException(typeof(TAggregate).Name, id);
 
     public static async Task<IReadOnlyList<TAggregate>> GetManyAsync<TAggregate>(
         this IRepository<TAggregate> repository,

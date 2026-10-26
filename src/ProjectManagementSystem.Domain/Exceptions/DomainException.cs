@@ -1,11 +1,12 @@
 namespace ProjectManagementSystem.Domain.Exceptions;
 
 /// <summary>
-/// Thrown when an operation would break a business rule (invariant) of the domain.
+/// Base of all errors of the domain. Only its subclasses are thrown; the subclass says what kind of error
+/// it is, so the API layer can translate it without knowing the rule.
 /// </summary>
-public class DomainException : Exception
+public abstract class DomainException : Exception
 {
-    public DomainException(string message) : base(message)
+    protected DomainException(string message) : base(message)
     {
     }
 }

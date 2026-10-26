@@ -57,7 +57,7 @@ public sealed partial class Project : AggregateRoot<Guid>
     public void Start(DateTime startDate)
     {
         if (State != ProjectState.Created)
-            throw new DomainException($"Only a project in state {ProjectState.Created} can be started. Current state: {State}.");
+            throw new DomainRuleViolationException($"Only a project in state {ProjectState.Created} can be started. Current state: {State}.");
 
         SetStartDate(startDate);
         State = ProjectState.InProgress;
@@ -74,7 +74,7 @@ public sealed partial class Project : AggregateRoot<Guid>
         EnsureOpen("complete");
 
         if (State != ProjectState.InProgress)
-            throw new DomainException($"Only a project in state {ProjectState.InProgress} can be completed. Current state: {State}.");
+            throw new DomainRuleViolationException($"Only a project in state {ProjectState.InProgress} can be completed. Current state: {State}.");
 
         SetCompletionDate(completionDate);
         State = ProjectState.Completed;
@@ -85,13 +85,13 @@ public sealed partial class Project : AggregateRoot<Guid>
     private void EnsureOpen(string action)
     {
         if (!IsOpen)
-            throw new DomainException($"Cannot {action} a project that is {State}.");
+            throw new DomainRuleViolationException($"Cannot {action} a project that is {State}.");
     }
 
     private void SetStartDate(DateTime startDate)
     {
         if (StartDate is not null)
-            throw new DomainException("Start date of the project has already been set.");
+            throw new DomainRuleViolationException("Start date of the project has already been set.");
 
         StartDate = startDate;
     }
@@ -99,10 +99,10 @@ public sealed partial class Project : AggregateRoot<Guid>
     private void SetCompletionDate(DateTime completionDate)
     {
         if (CompletionDate is not null)
-            throw new DomainException("Completion date of the project has already been set.");
+            throw new DomainRuleViolationException("Completion date of the project has already been set.");
 
         if (StartDate is null || completionDate < StartDate)
-            throw new DomainException("Completion date must not be earlier than the start date.");
+            throw new DomainRuleViolationException("Completion date must not be earlier than the start date.");
 
         CompletionDate = completionDate;
     }

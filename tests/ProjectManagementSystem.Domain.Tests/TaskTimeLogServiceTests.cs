@@ -51,12 +51,12 @@ public class TaskTimeLogServiceTests
     [Fact]
     public void Time_is_logged_only_on_a_task_in_progress()
     {
-        Assert.Throws<DomainException>(() => LogTime(TestData.Today, 1m));
+        Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today, 1m));
 
         _workPackage.StartTask(_task.Id);
         _workPackage.CompleteTask(_task.Id);
 
-        Assert.Throws<DomainException>(() => LogTime(TestData.Today, 1m));
+        Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today, 1m));
     }
 
     [Fact]
@@ -64,9 +64,9 @@ public class TaskTimeLogServiceTests
     {
         _workPackage.StartTask(_task.Id);
 
-        Assert.Throws<DomainException>(() => LogTime(TestData.Today.AddDays(1), 1m));
-        Assert.Throws<DomainException>(() => LogTime(TestData.Today.AddDays(-31), 1m));
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainValidationException>(() => LogTime(TestData.Today.AddDays(1), 1m));
+        Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today.AddDays(-31), 1m));
+        Assert.Throws<DomainRuleViolationException>(() =>
             _service.LogTime(_project, _workPackage, _timeLog, Guid.NewGuid(), TestData.Today, 1m));
     }
 
@@ -77,7 +77,7 @@ public class TaskTimeLogServiceTests
         var yesterday = new FakeTimeProvider(new DateTimeOffset(TestData.Today.AddDays(-1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
         var service = new TaskTimeLogService(yesterday);
 
-        Assert.Throws<DomainException>(() =>
+        Assert.Throws<DomainValidationException>(() =>
             service.LogTime(_project, _workPackage, _timeLog, _employeeId, TestData.Today, 1m));
     }
 
@@ -94,7 +94,7 @@ public class TaskTimeLogServiceTests
         Assert.Contains(_timeLog.DomainEvents, e => e is TimeEntryRemoved removed && removed.EntryId == second.Id);
 
         _workPackage.CompleteTask(_task.Id);
-        Assert.Throws<DomainException>(() => _service.RemoveEntry(_workPackage, _timeLog, first.Id));
+        Assert.Throws<DomainRuleViolationException>(() => _service.RemoveEntry(_workPackage, _timeLog, first.Id));
     }
 
     private TimeEntry LogTime(DateOnly workDate, decimal hours) =>
