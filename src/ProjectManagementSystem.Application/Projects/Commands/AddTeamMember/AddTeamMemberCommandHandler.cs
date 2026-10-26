@@ -10,9 +10,9 @@ namespace ProjectManagementSystem.Application.Projects.Commands.AddTeamMember;
 /// The employee is only read, to reject an id of an employee that does not exist.
 /// </summary>
 public sealed class AddTeamMemberCommandHandler(IRepository<Project> projects, IRepository<Employee> employees)
-    : ICommandHandler<AddTeamMemberCommand, Guid>
+    : ICommandHandler<AddTeamMemberCommand, CreatedId>
 {
-    public async Task<Guid> Handle(AddTeamMemberCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(AddTeamMemberCommand command, CancellationToken cancellationToken)
     {
         var project = await projects.GetAsync(command.ProjectId, cancellationToken);
         var employee = await employees.GetAsync(command.EmployeeId, cancellationToken);
@@ -20,6 +20,6 @@ public sealed class AddTeamMemberCommandHandler(IRepository<Project> projects, I
         var teamMemberId = project.AddTeamMember(employee.Id, command.RoleId, command.From, command.HourlyRate, command.To);
 
         projects.Update(project);
-        return teamMemberId;
+        return new CreatedId(teamMemberId);
     }
 }

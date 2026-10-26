@@ -14,15 +14,15 @@ namespace ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPa
 public sealed class CreateWorkPackageCommandHandler(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
-    WorkPackageService workPackageService) : ICommandHandler<CreateWorkPackageCommand, Guid>
+    WorkPackageService workPackageService) : ICommandHandler<CreateWorkPackageCommand, CreatedId>
 {
-    public async Task<Guid> Handle(CreateWorkPackageCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(CreateWorkPackageCommand command, CancellationToken cancellationToken)
     {
         var project = await projects.GetAsync(command.ProjectId, cancellationToken);
 
         var workPackage = workPackageService.CreateWorkPackage(project, command.Description, command.ResponsiblePersonId);
 
         workPackages.Add(workPackage);
-        return workPackage.Id;
+        return new CreatedId(workPackage.Id);
     }
 }

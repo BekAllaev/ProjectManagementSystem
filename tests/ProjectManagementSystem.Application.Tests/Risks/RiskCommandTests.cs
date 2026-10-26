@@ -13,8 +13,8 @@ public class RiskCommandTests : CommandTestBase
     {
         var project = SeedProject();
 
-        var riskId = await App.SendAsync(
-            new RegisterRiskCommand(project.Id, "Key developer leaves", RiskLevel.Low, RiskLevel.High, Member));
+        var riskId = (await App.SendAsync(
+            new RegisterRiskCommand(project.Id, "Key developer leaves", RiskLevel.Low, RiskLevel.High, Member))).Id;
 
         var risk = Assert.Single(App.Risks.All);
         Assert.Equal(riskId, risk.Id);

@@ -6,12 +6,18 @@
 |---|---|---|
 | `Domain.Shared` | — | enums used by the domain and by the contracts (`ProjectState`, `WorkPackageStatus`, `ProjectTaskStatus`, `MilestoneStatus`, `DependencyType`, `RiskLevel`, `RiskStatus`) |
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
-| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery` and the command records: the public surface of the backend, the bodies of its HTTP requests |
+| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command records and `CreatedId`, the gRPC service interfaces (one per aggregate): the public surface of the backend |
 | `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
 
-The HTTP API (later) exposes every command and query: an endpoint deserializes the request body into the
-command record and sends it through MediatR. The contracts never reference the domain, so no domain type leaks
-into the API; a .NET client (for example Blazor WebAssembly) may share them for typed calls. Types keep their namespaces when they move between projects
+The API exposes every command and query over gRPC (code-first, protobuf-net.Grpc, with gRPC-Web for the browser).
+Commands, queries and their results are the gRPC messages themselves: `[DataContract]` with `[DataMember(Order = N)]`
+on every property. The orders are part of the wire format and never change; a new property gets the next free
+number. protobuf-net needs a parameterless constructor, so every positional record has a private one. A command
+without a result answers with an empty message, a command that creates something with `CreatedId`. Every aggregate
+has one service interface (`IProjectService`, `IWorkPackageService`, ...) with one method per command; the host
+implements a method by sending the command through MediatR, so the pipeline behaviors apply. The contracts never
+reference the domain, so no domain type leaks into the API; a .NET client (for example Blazor WebAssembly) shares
+them for typed calls. Types keep their namespaces when they move between projects
 (for example `DependencyType` stays in `ProjectManagementSystem.Domain.Schedule`). Enum values are explicit,
 because they are stored as numbers: a new value never shifts the existing ones.
 

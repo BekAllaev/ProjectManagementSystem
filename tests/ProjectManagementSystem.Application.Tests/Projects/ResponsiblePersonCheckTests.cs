@@ -28,7 +28,7 @@ public class ResponsiblePersonCheckTests : CommandTestBase
     public async Task Race_LeavingTheTeamBeforeNewWorkPackageIsRegistered_NotifiesManagement()
     {
         // ProjectService.EndTeamMembership sees only registered work packages, so leaving the team succeeds.
-        var workPackageId = await App.SendAsync(new CreateWorkPackageCommand(_project.Id, "Design", _leaving));
+        var workPackageId = (await App.SendAsync(new CreateWorkPackageCommand(_project.Id, "Design", _leaving))).Id;
         await App.SendAsync(new RemoveTeamMemberCommand(_project.Id, _leaving, Today));
 
         await App.DeliverEventsAsync();

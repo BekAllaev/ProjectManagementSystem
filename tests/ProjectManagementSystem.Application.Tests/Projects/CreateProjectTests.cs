@@ -13,7 +13,7 @@ public class CreateProjectTests
         using var app = new TestApplication();
         var handler = new CreateProjectCommandHandler(app.Projects, app.TimeProvider);
 
-        var projectId = await handler.Handle(new CreateProjectCommand("Website", "New website", "eur"), CancellationToken.None);
+        var projectId = (await handler.Handle(new CreateProjectCommand("Website", "New website", "eur"), CancellationToken.None)).Id;
 
         var project = Assert.Single(app.Projects.All);
         Assert.Equal(projectId, project.Id);
@@ -29,7 +29,7 @@ public class CreateProjectTests
     {
         using var app = new TestApplication();
 
-        var projectId = await app.SendAsync(new CreateProjectCommand("Website", null, "USD"));
+        var projectId = (await app.SendAsync(new CreateProjectCommand("Website", null, "USD"))).Id;
 
         Assert.Equal(1, app.UnitOfWork.SaveCount);
         var created = Assert.IsType<ProjectCreated>(Assert.Single(app.UnitOfWork.CollectedEvents));

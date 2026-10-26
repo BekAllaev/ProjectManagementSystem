@@ -13,9 +13,9 @@ namespace ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask;
 public sealed class CreateTaskCommandHandler(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
-    WorkPackageService workPackageService) : ICommandHandler<CreateTaskCommand, Guid>
+    WorkPackageService workPackageService) : ICommandHandler<CreateTaskCommand, CreatedId>
 {
-    public async Task<Guid> Handle(CreateTaskCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(CreateTaskCommand command, CancellationToken cancellationToken)
     {
         var workPackage = await workPackages.GetAsync(command.WorkPackageId, cancellationToken);
         var project = await projects.GetAsync(workPackage.ProjectId, cancellationToken);
@@ -29,6 +29,6 @@ public sealed class CreateTaskCommandHandler(
             command.EstimatedEffort);
 
         workPackages.Update(workPackage);
-        return task.Id;
+        return new CreatedId(task.Id);
     }
 }

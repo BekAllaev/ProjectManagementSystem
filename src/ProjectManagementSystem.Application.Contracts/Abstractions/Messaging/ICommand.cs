@@ -15,7 +15,8 @@ public interface ICommand : IRequest<Unit>, IBaseCommand
 }
 
 /// <summary>
-/// Command with a result, for example the id of a created aggregate.
+/// Command with a result, for example <see cref="CreatedId"/>. The result is a gRPC message (<c>[DataContract]</c>);
+/// a command without a result answers with an empty message.
 /// </summary>
 public interface ICommand<out TResult> : IRequest<TResult>, IBaseCommand
 {

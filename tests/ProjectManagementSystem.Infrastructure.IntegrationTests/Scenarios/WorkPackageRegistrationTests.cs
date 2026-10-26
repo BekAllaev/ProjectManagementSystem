@@ -22,7 +22,7 @@ public sealed class WorkPackageRegistrationTests(IntegrationTestDatabase databas
     {
         var (projectId, employeeId) = await StartedProjectWithMemberAsync();
 
-        var workPackageId = await SendAsync(new CreateWorkPackageCommand(projectId, "Design", employeeId));
+        var workPackageId = (await SendAsync(new CreateWorkPackageCommand(projectId, "Design", employeeId))).Id;
         Assert.DoesNotContain(workPackageId, (await LoadAsync<Project>(projectId)).WorkPackageIds);
 
         Assert.Null(await DrainOutboxAsync());
@@ -35,7 +35,7 @@ public sealed class WorkPackageRegistrationTests(IntegrationTestDatabase databas
     public async Task A_work_package_of_a_project_closed_before_the_registration_is_cancelled()
     {
         var (projectId, employeeId) = await StartedProjectWithMemberAsync();
-        var workPackageId = await SendAsync(new CreateWorkPackageCommand(projectId, "Design", employeeId));
+        var workPackageId = (await SendAsync(new CreateWorkPackageCommand(projectId, "Design", employeeId))).Id;
 
         await SendAsync(new CloseProjectCommand(projectId));
         Assert.Null(await DrainOutboxAsync());
@@ -50,9 +50,9 @@ public sealed class WorkPackageRegistrationTests(IntegrationTestDatabase databas
 
     private async Task<(Guid ProjectId, Guid EmployeeId)> StartedProjectWithMemberAsync()
     {
-        var employeeId = await SendAsync(new RegisterEmployeeCommand("Ada", "Lovelace", "ada@example.com"));
-        var projectId = await SendAsync(new CreateProjectCommand("Project", null, "USD"));
-        var roleId = await SendAsync(new CreateRoleCommand(projectId, "Developer", null));
+        var employeeId = (await SendAsync(new RegisterEmployeeCommand("Ada", "Lovelace", "ada@example.com"))).Id;
+        var projectId = (await SendAsync(new CreateProjectCommand("Project", null, "USD"))).Id;
+        var roleId = (await SendAsync(new CreateRoleCommand(projectId, "Developer", null))).Id;
         await SendAsync(new AddTeamMemberCommand(projectId, employeeId, roleId, Today, 50m));
         await SendAsync(new StartProjectCommand(projectId));
 

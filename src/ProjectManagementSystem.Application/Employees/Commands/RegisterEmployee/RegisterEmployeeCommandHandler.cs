@@ -9,14 +9,14 @@ namespace ProjectManagementSystem.Application.Employees.Commands.RegisterEmploye
 /// The domain service rejects an email already used by another employee.
 /// </summary>
 public sealed class RegisterEmployeeCommandHandler(IRepository<Employee> employees, EmployeeService employeeService)
-    : ICommandHandler<RegisterEmployeeCommand, Guid>
+    : ICommandHandler<RegisterEmployeeCommand, CreatedId>
 {
-    public async Task<Guid> Handle(RegisterEmployeeCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(RegisterEmployeeCommand command, CancellationToken cancellationToken)
     {
         var employee = await employeeService.RegisterAsync(
             command.FirstName, command.LastName, command.Email, command.PhotoPath, cancellationToken);
 
         employees.Add(employee);
-        return employee.Id;
+        return new CreatedId(employee.Id);
     }
 }

@@ -32,7 +32,7 @@ public class WorkPackageRegistrationTests : CommandTestBase
     public async Task Delivery_OpenProject_RegistersWorkPackageInProject()
     {
         var project = SeedProject();
-        var workPackageId = await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member));
+        var workPackageId = (await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member))).Id;
         Assert.Empty(project.WorkPackageIds);
 
         await App.DeliverEventsAsync();
@@ -57,8 +57,8 @@ public class WorkPackageRegistrationTests : CommandTestBase
     public async Task Delivery_ProjectClosedBeforeDelivery_CancelsWorkPackageAndProjectStaysClosed()
     {
         var project = SeedProject();
-        var workPackageId = await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member));
-        var taskId = await App.SendAsync(new CreateTaskCommand(workPackageId, "Mockups", null, Member, 8m));
+        var workPackageId = (await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member))).Id;
+        var taskId = (await App.SendAsync(new CreateTaskCommand(workPackageId, "Mockups", null, Member, 8m))).Id;
         await App.SendAsync(new StartProjectCommand(project.Id));
         await App.SendAsync(new CloseProjectCommand(project.Id));
 
@@ -78,7 +78,7 @@ public class WorkPackageRegistrationTests : CommandTestBase
     public async Task Redelivery_AfterRegistration_ChangesNothing()
     {
         var project = SeedProject();
-        var workPackageId = await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member));
+        var workPackageId = (await App.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", Member))).Id;
         var delivered = await App.DeliverEventsAsync();
         var eventCount = App.UnitOfWork.CollectedEvents.Count;
         var saveCount = App.UnitOfWork.SaveCount;

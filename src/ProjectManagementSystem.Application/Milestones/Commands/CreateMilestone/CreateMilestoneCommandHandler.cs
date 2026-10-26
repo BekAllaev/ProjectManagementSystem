@@ -13,15 +13,15 @@ namespace ProjectManagementSystem.Application.Milestones.Commands.CreateMileston
 public sealed class CreateMilestoneCommandHandler(
     IRepository<Project> projects,
     IRepository<Milestone> milestones,
-    MilestoneService milestoneService) : ICommandHandler<CreateMilestoneCommand, Guid>
+    MilestoneService milestoneService) : ICommandHandler<CreateMilestoneCommand, CreatedId>
 {
-    public async Task<Guid> Handle(CreateMilestoneCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(CreateMilestoneCommand command, CancellationToken cancellationToken)
     {
         var project = await projects.GetAsync(command.ProjectId, cancellationToken);
 
         var milestone = milestoneService.Create(project, command.Name, command.Description ?? string.Empty, command.TargetDate);
 
         milestones.Add(milestone);
-        return milestone.Id;
+        return new CreatedId(milestone.Id);
     }
 }

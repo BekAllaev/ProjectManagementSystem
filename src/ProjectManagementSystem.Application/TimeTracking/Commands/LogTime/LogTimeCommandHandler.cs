@@ -17,9 +17,9 @@ public sealed class LogTimeCommandHandler(
     IRepository<WorkPackage> workPackages,
     IRepository<TaskTimeLog> timeLogs,
     TaskTimeLogService taskTimeLogService,
-    ICurrentUser currentUser) : ICommandHandler<LogTimeCommand, Guid>
+    ICurrentUser currentUser) : ICommandHandler<LogTimeCommand, CreatedId>
 {
-    public async Task<Guid> Handle(LogTimeCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(LogTimeCommand command, CancellationToken cancellationToken)
     {
         var workPackage = await workPackages.GetAsync(command.WorkPackageId, cancellationToken);
         var project = await projects.GetAsync(workPackage.ProjectId, cancellationToken);
@@ -36,6 +36,6 @@ public sealed class LogTimeCommandHandler(
         else
             timeLogs.Update(timeLog);
 
-        return entry.Id;
+        return new CreatedId(entry.Id);
     }
 }
