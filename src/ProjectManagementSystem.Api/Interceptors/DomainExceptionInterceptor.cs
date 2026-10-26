@@ -1,3 +1,4 @@
+using FluentValidation;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using ProjectManagementSystem.Application.Exceptions;
@@ -6,9 +7,10 @@ using ProjectManagementSystem.Domain.Exceptions;
 namespace ProjectManagementSystem.Api.Interceptors;
 
 /// <summary>
-/// Translates the exceptions of a call into gRPC status codes, in one place for every service. A domain error keeps
-/// its message, which is meant for the caller and is already logged by the logging behavior of the application. Any
-/// other exception is a bug: it is logged here with its details, and the caller gets only a generic message.
+/// Translates the exceptions of a call into gRPC status codes, in one place for every service. A domain error, a failed
+/// validation of the command and a concurrency conflict keep their message, which is meant for the caller and is already
+/// logged by the logging behavior of the application. Any other exception is a bug: it is logged here with its details,
+/// and the caller gets only a generic message.
 /// </summary>
 public sealed class DomainExceptionInterceptor(ILogger<DomainExceptionInterceptor> logger) : Interceptor
 {
@@ -39,8 +41,11 @@ public sealed class DomainExceptionInterceptor(ILogger<DomainExceptionIntercepto
                 return new Status(StatusCode.FailedPrecondition, exception.Message);
             case AggregateNotFoundException or EntityNotFoundException:
                 return new Status(StatusCode.NotFound, exception.Message);
-            case DomainValidationException:
+            case DomainValidationException or ValidationException:
                 return new Status(StatusCode.InvalidArgument, exception.Message);
+            case ConcurrencyConflictException:
+                // Nothing was saved; the caller can repeat the command on fresh data.
+                return new Status(StatusCode.Aborted, exception.Message);
             case OperationCanceledException when context.CancellationToken.IsCancellationRequested:
                 // The caller cancelled or went away; nobody waits for the answer and nothing failed on the server.
                 return new Status(StatusCode.Cancelled, "The call was cancelled.");
