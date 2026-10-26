@@ -44,9 +44,9 @@ public class ProjectCommandTests : CommandTestBase
         project.Start(Now.AddDays(-1));
         project.ClearDomainEvents();
         var completed = SeedWorkPackage(project);
-        completed.Complete();
+        completed.Complete(completed.ResponsiblePersonId);
         var cancelled = SeedWorkPackage(project, taskCount: 1);
-        cancelled.Cancel("Out of scope");
+        cancelled.Cancel(cancelled.ResponsiblePersonId, "Out of scope");
         completed.ClearDomainEvents();
         cancelled.ClearDomainEvents();
 

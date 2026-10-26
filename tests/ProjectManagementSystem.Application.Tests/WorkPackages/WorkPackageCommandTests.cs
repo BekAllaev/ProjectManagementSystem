@@ -44,7 +44,7 @@ public class WorkPackageCommandTests : CommandTestBase
     public async Task CompleteWorkPackage_AllTasksFinished_CompletesIt()
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
-        workPackage.CancelTask(workPackage.Tasks.Single().Id);
+        workPackage.CancelTask(workPackage.Tasks.Single().Id, workPackage.ResponsiblePersonId);
         workPackage.ClearDomainEvents();
 
         await App.SendAsync(new CompleteWorkPackageCommand(workPackage.Id));
@@ -66,8 +66,8 @@ public class WorkPackageCommandTests : CommandTestBase
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 2);
         var completedTask = workPackage.Tasks.First();
-        workPackage.StartTask(completedTask.Id);
-        workPackage.CompleteTask(completedTask.Id);
+        workPackage.StartTask(completedTask.Id, workPackage.ResponsiblePersonId);
+        workPackage.CompleteTask(completedTask.Id, workPackage.ResponsiblePersonId);
         workPackage.ClearDomainEvents();
 
         await App.SendAsync(new CancelWorkPackageCommand(workPackage.Id, "Out of scope"));
@@ -84,7 +84,7 @@ public class WorkPackageCommandTests : CommandTestBase
     public async Task CancelWorkPackage_AlreadyCancelled_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
-        workPackage.Cancel("First");
+        workPackage.Cancel(workPackage.ResponsiblePersonId, "First");
         workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CancelWorkPackageCommand(workPackage.Id, "Second")));
@@ -119,7 +119,7 @@ public class WorkPackageCommandTests : CommandTestBase
     public async Task CreateTask_CancelledWorkPackage_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
-        workPackage.Cancel("Out of scope");
+        workPackage.Cancel(workPackage.ResponsiblePersonId, "Out of scope");
         workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() =>
@@ -179,7 +179,7 @@ public class WorkPackageCommandTests : CommandTestBase
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
         var task = workPackage.Tasks.Single();
-        workPackage.StartTask(task.Id);
+        workPackage.StartTask(task.Id, workPackage.ResponsiblePersonId);
         workPackage.ClearDomainEvents();
 
         await App.SendAsync(new CompleteTaskCommand(workPackage.Id, task.Id));
@@ -214,10 +214,56 @@ public class WorkPackageCommandTests : CommandTestBase
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
         var task = workPackage.Tasks.Single();
-        workPackage.StartTask(task.Id);
-        workPackage.CompleteTask(task.Id);
+        workPackage.StartTask(task.Id, workPackage.ResponsiblePersonId);
+        workPackage.CompleteTask(task.Id, workPackage.ResponsiblePersonId);
         workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CancelTaskCommand(workPackage.Id, task.Id)));
+    }
+
+    [Fact]
+    public async Task CompleteWorkPackage_CallerNotResponsible_ThrowsDomainForbiddenException()
+    {
+        var workPackage = SeedWorkPackage(SeedProject(_colleague));
+        App.CurrentUser.EmployeeId = _colleague;
+
+        await AssertRejectedAsync<DomainForbiddenException>(() => App.SendAsync(new CompleteWorkPackageCommand(workPackage.Id)));
+        Assert.Equal(WorkPackageStatus.Open, workPackage.Status);
+    }
+
+    [Fact]
+    public async Task CancelWorkPackage_CallerNotResponsible_ThrowsDomainForbiddenException()
+    {
+        var workPackage = SeedWorkPackage(SeedProject(_colleague));
+        App.CurrentUser.EmployeeId = _colleague;
+
+        await AssertRejectedAsync<DomainForbiddenException>(() => App.SendAsync(new CancelWorkPackageCommand(workPackage.Id, "Not mine")));
+        Assert.Equal(WorkPackageStatus.Open, workPackage.Status);
+    }
+
+    [Fact]
+    public async Task StartTask_CallerNotResponsible_ThrowsDomainForbiddenException()
+    {
+        var workPackage = SeedWorkPackage(SeedProject(_colleague), taskCount: 1);
+        var task = workPackage.Tasks.Single();
+        App.CurrentUser.EmployeeId = _colleague;
+
+        await AssertRejectedAsync<DomainForbiddenException>(() => App.SendAsync(new StartTaskCommand(workPackage.Id, task.Id)));
+        Assert.Equal(ProjectTaskStatus.Open, task.Status);
+    }
+
+    [Fact]
+    public async Task StartTask_CallerResponsibleForTaskOnly_StartsIt()
+    {
+        var project = SeedProject(_colleague);
+        var workPackage = SeedWorkPackage(project);
+        var task = Domain.Tests.Fakes.TestData.Task(project, workPackage, _colleague);
+        workPackage.ClearDomainEvents();
+        App.CurrentUser.EmployeeId = _colleague;
+
+        await App.SendAsync(new StartTaskCommand(workPackage.Id, task.Id));
+
+        Assert.Equal(ProjectTaskStatus.InProgress, task.Status);
+        AssertCommitted(workPackage, typeof(TaskStarted));
     }
 }

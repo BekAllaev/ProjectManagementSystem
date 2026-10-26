@@ -6,13 +6,13 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Application.WorkPackages.Commands.StartTask;
 
-public sealed class StartTaskCommandHandler(IRepository<WorkPackage> workPackages) : ICommandHandler<StartTaskCommand>
+public sealed class StartTaskCommandHandler(IRepository<WorkPackage> workPackages, ICurrentUser currentUser) : ICommandHandler<StartTaskCommand>
 {
     public async Task<Unit> Handle(StartTaskCommand command, CancellationToken cancellationToken)
     {
         var workPackage = await workPackages.GetAsync(command.WorkPackageId, cancellationToken);
 
-        workPackage.StartTask(command.TaskId);
+        workPackage.StartTask(command.TaskId, currentUser.EmployeeId);
 
         workPackages.Update(workPackage);
         return Unit.Value;

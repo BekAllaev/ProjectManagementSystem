@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectManagementSystem.Application;
+using ProjectManagementSystem.Application.Abstractions;
 
 namespace ProjectManagementSystem.Infrastructure.Tests;
 
@@ -21,9 +22,16 @@ public class DependencyInjectionTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddApplication();
         services.AddInfrastructure(configuration);
+        // Registered by the host from the authenticated caller.
+        services.AddScoped<ICurrentUser, AnonymousCurrentUser>();
 
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
 
         Assert.NotNull(provider);
+    }
+
+    private sealed class AnonymousCurrentUser : ICurrentUser
+    {
+        public Guid EmployeeId => Guid.Empty;
     }
 }

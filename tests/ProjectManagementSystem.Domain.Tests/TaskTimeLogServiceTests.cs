@@ -38,7 +38,7 @@ public class TaskTimeLogServiceTests
     [Fact]
     public void Entry_keeps_the_rate_valid_on_the_work_date()
     {
-        _workPackage.StartTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _employeeId);
         _project.ChangeHourlyRate(_employeeId, 70m, TestData.Today, TestData.Today);
 
         LogTime(TestData.Today.AddDays(-1), 2m);
@@ -53,27 +53,34 @@ public class TaskTimeLogServiceTests
     {
         Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today, 1m));
 
-        _workPackage.StartTask(_task.Id);
-        _workPackage.CompleteTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _employeeId);
+        _workPackage.CompleteTask(_task.Id, _employeeId);
 
         Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today, 1m));
     }
 
     [Fact]
-    public void Time_is_not_logged_for_a_future_date_or_outside_the_membership()
+    public void Time_is_not_logged_for_a_future_date()
     {
-        _workPackage.StartTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _employeeId);
 
         Assert.Throws<DomainValidationException>(() => LogTime(TestData.Today.AddDays(1), 1m));
-        Assert.Throws<DomainRuleViolationException>(() => LogTime(TestData.Today.AddDays(-31), 1m));
-        Assert.Throws<DomainRuleViolationException>(() =>
+    }
+
+    [Fact]
+    public void Only_a_member_of_the_team_on_the_work_date_logs_time()
+    {
+        _workPackage.StartTask(_task.Id, _employeeId);
+
+        Assert.Throws<DomainForbiddenException>(() => LogTime(TestData.Today.AddDays(-31), 1m));
+        Assert.Throws<DomainForbiddenException>(() =>
             _service.LogTime(_project, _workPackage, _timeLog, Guid.NewGuid(), TestData.Today, 1m));
     }
 
     [Fact]
     public void Today_comes_from_the_time_provider()
     {
-        _workPackage.StartTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _employeeId);
         var yesterday = new FakeTimeProvider(new DateTimeOffset(TestData.Today.AddDays(-1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
         var service = new TaskTimeLogService(yesterday);
 
@@ -84,17 +91,33 @@ public class TaskTimeLogServiceTests
     [Fact]
     public void Wrong_entry_is_removed_only_while_the_task_is_in_progress()
     {
-        _workPackage.StartTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _employeeId);
         var first = LogTime(TestData.Today, 2m);
         var second = LogTime(TestData.Today, 2m);
 
-        _service.RemoveEntry(_workPackage, _timeLog, second.Id);
+        _service.RemoveEntry(_workPackage, _timeLog, second.Id, _employeeId);
 
         Assert.Equal(first.Id, Assert.Single(_timeLog.Entries).Id);
         Assert.Contains(_timeLog.DomainEvents, e => e is TimeEntryRemoved removed && removed.EntryId == second.Id);
 
-        _workPackage.CompleteTask(_task.Id);
-        Assert.Throws<DomainRuleViolationException>(() => _service.RemoveEntry(_workPackage, _timeLog, first.Id));
+        _workPackage.CompleteTask(_task.Id, _employeeId);
+        Assert.Throws<DomainRuleViolationException>(() => _service.RemoveEntry(_workPackage, _timeLog, first.Id, _employeeId));
+    }
+
+    [Fact]
+    public void Entry_is_removed_only_by_the_employee_who_logged_it()
+    {
+        var colleague = Guid.NewGuid();
+        _project.AddTeamMember(colleague, _project.Roles.Single().Id, TestData.Today.AddDays(-30), hourlyRate: 40m);
+        _workPackage.StartTask(_task.Id, _employeeId);
+        var mine = LogTime(TestData.Today, 2m);
+
+        Assert.Throws<DomainForbiddenException>(() => _service.RemoveEntry(_workPackage, _timeLog, mine.Id, colleague));
+        Assert.Single(_timeLog.Entries);
+
+        _service.RemoveEntry(_workPackage, _timeLog, mine.Id, _employeeId);
+
+        Assert.Empty(_timeLog.Entries);
     }
 
     private TimeEntry LogTime(DateOnly workDate, decimal hours) =>

@@ -102,10 +102,10 @@ public sealed class AggregateRoundTripTests(IntegrationTestDatabase database) : 
         var open = service.CreateWorkPackage(project, "Open package", _member);
         var started = service.AddTask(project, open, "Started", "First task", _member, estimatedEffort: 8.25m);
         var cancelled = service.AddTask(project, open, "Cancelled", "", _member, estimatedEffort: 3m);
-        open.StartTask(started.Id);
-        open.CancelTask(cancelled.Id);
+        open.StartTask(started.Id, open.ResponsiblePersonId);
+        open.CancelTask(cancelled.Id, open.ResponsiblePersonId);
         var dropped = service.CreateWorkPackage(project, "Dropped package", _member);
-        dropped.Cancel("Not needed");
+        dropped.Cancel(dropped.ResponsiblePersonId, "Not needed");
 
         await AddAsync(open, dropped);
         var loadedOpen = await LoadAsync<WorkPackage>(open.Id);
@@ -209,7 +209,7 @@ public sealed class AggregateRoundTripTests(IntegrationTestDatabase database) : 
         var project = TestData.ProjectWithTeam(_member);
         var workPackage = TestData.WorkPackage(project, _member);
         var task = TestData.Task(project, workPackage, _member);
-        workPackage.StartTask(task.Id);
+        workPackage.StartTask(task.Id, workPackage.ResponsiblePersonId);
         var service = new TaskTimeLogService(Clock);
         var timeLog = service.CreateTimeLog(workPackage, task.Id);
         var today = service.LogTime(project, workPackage, timeLog, _member, Today, hours: 1.75m);
@@ -268,7 +268,7 @@ public sealed class AggregateRoundTripTests(IntegrationTestDatabase database) : 
         var project = TestData.ProjectWithTeam(_member);
         var workPackage = TestData.WorkPackage(project, _member);
         var task = TestData.Task(project, workPackage, _member);
-        workPackage.StartTask(task.Id);
+        workPackage.StartTask(task.Id, workPackage.ResponsiblePersonId);
         var milestone = new MilestoneService().Create(project, "Beta", "", Today);
         var funding = new FundingService().CreateFunding(project);
         new FundingService().AddFunding(project, funding, 10m, Today, "");

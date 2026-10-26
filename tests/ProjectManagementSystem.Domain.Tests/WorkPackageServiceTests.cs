@@ -1,5 +1,6 @@
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Services;
+using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 
@@ -60,5 +61,20 @@ public class WorkPackageServiceTests
         TestData.Close(project);
 
         Assert.Throws<DomainRuleViolationException>(() => _service.CreateWorkPackage(project, "Package", _member));
+    }
+
+    [Fact]
+    public void System_cancels_a_package_without_an_acting_person_only_in_a_closed_project()
+    {
+        var project = TestData.ProjectWithTeam(_member);
+        var workPackage = TestData.WorkPackage(project, _member);
+
+        Assert.Throws<DomainRuleViolationException>(() => _service.CancelInClosedProject(project, workPackage, "Closed"));
+
+        TestData.Close(project);
+        _service.CancelInClosedProject(project, workPackage, "Closed");
+
+        Assert.Equal(WorkPackageStatus.Cancelled, workPackage.Status);
+        Assert.Equal("Closed", workPackage.CancellationReason);
     }
 }

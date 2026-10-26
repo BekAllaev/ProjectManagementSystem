@@ -30,6 +30,11 @@ public abstract class IntegrationTestBase(IntegrationTestDatabase database) : IA
 
     protected DateTime Now => Clock.GetUtcNow().UtcDateTime;
 
+    /// <summary>
+    /// The caller of the requests, which the host takes from the authenticated user; a test sets it as needed.
+    /// </summary>
+    protected TestCurrentUser CurrentUser { get; } = new();
+
     protected static DateOnly Today => TestData.Today;
 
     protected IServiceProvider Services => _services!;
@@ -51,6 +56,7 @@ public abstract class IntegrationTestBase(IntegrationTestDatabase database) : IA
         services.AddSingleton<TimeProvider>(Clock);
         services.AddApplication();
         services.AddInfrastructure(configuration);
+        services.AddSingleton<ICurrentUser>(CurrentUser);
         ConfigureServices(services);
 
         _services = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
@@ -133,4 +139,9 @@ public abstract class IntegrationTestBase(IntegrationTestDatabase database) : IA
 
         return await scope.ServiceProvider.GetRequiredService<IRepository<TAggregate>>().GetAsync(id);
     }
+}
+
+public sealed class TestCurrentUser : ICurrentUser
+{
+    public Guid EmployeeId { get; set; }
 }

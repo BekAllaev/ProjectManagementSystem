@@ -45,10 +45,16 @@ public sealed class TaskTimeLog : AggregateRoot<Guid>
         return entry;
     }
 
-    internal void RemoveEntry(Guid entryId)
+    /// <summary>
+    /// Only the employee who logged the entry may remove it.
+    /// </summary>
+    internal void RemoveEntry(Guid entryId, Guid removedBy)
     {
         var entry = _entries.SingleOrDefault(e => e.Id == entryId)
             ?? throw new EntityNotFoundException(nameof(TimeEntry), entryId);
+
+        if (entry.EmployeeId != removedBy)
+            throw new DomainForbiddenException($"Time entry '{entryId}' can be removed only by the employee who logged it.");
 
         _entries.Remove(entry);
         RaiseDomainEvent(new TimeEntryRemoved(ProjectId, TaskId, entry.Id));

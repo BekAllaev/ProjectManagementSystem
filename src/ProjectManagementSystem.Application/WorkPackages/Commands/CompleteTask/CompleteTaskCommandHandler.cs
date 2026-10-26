@@ -6,13 +6,13 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask;
 
-public sealed class CompleteTaskCommandHandler(IRepository<WorkPackage> workPackages) : ICommandHandler<CompleteTaskCommand>
+public sealed class CompleteTaskCommandHandler(IRepository<WorkPackage> workPackages, ICurrentUser currentUser) : ICommandHandler<CompleteTaskCommand>
 {
     public async Task<Unit> Handle(CompleteTaskCommand command, CancellationToken cancellationToken)
     {
         var workPackage = await workPackages.GetAsync(command.WorkPackageId, cancellationToken);
 
-        workPackage.CompleteTask(command.TaskId);
+        workPackage.CompleteTask(command.TaskId, currentUser.EmployeeId);
 
         workPackages.Update(workPackage);
         return Unit.Value;

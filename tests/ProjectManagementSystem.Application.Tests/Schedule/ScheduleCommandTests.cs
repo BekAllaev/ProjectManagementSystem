@@ -64,7 +64,7 @@ public class ScheduleCommandTests : CommandTestBase
     [Fact]
     public async Task AddDependency_CancelledTask_ThrowsDomainRuleViolationException()
     {
-        _second.CancelTask(C);
+        _second.CancelTask(C, _second.ResponsiblePersonId);
         _second.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(Dependency(_first, A, _second, C)));

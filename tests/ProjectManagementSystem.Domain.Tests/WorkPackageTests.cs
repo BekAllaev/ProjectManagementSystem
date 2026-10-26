@@ -8,13 +8,14 @@ namespace ProjectManagementSystem.Domain.Tests;
 public class WorkPackageTests
 {
     private readonly Guid _employeeId = Guid.NewGuid();
+    private readonly Guid _otherEmployeeId = Guid.NewGuid();
 
     [Fact]
     public void Task_cannot_be_added_to_a_package_that_is_not_open()
     {
         var project = TestData.ProjectWithTeam(_employeeId);
         var workPackage = TestData.WorkPackage(project, _employeeId);
-        workPackage.Complete();
+        workPackage.Complete(_employeeId);
 
         Assert.Throws<DomainRuleViolationException>(() => TestData.Task(project, workPackage, _employeeId));
     }
@@ -27,12 +28,12 @@ public class WorkPackageTests
         var done = TestData.Task(project, workPackage, _employeeId);
         var dropped = TestData.Task(project, workPackage, _employeeId);
 
-        Assert.Throws<DomainRuleViolationException>(workPackage.Complete);
+        Assert.Throws<DomainRuleViolationException>(() => workPackage.Complete(_employeeId));
 
-        workPackage.StartTask(done.Id);
-        workPackage.CompleteTask(done.Id);
-        workPackage.CancelTask(dropped.Id);
-        workPackage.Complete();
+        workPackage.StartTask(done.Id, _employeeId);
+        workPackage.CompleteTask(done.Id, _employeeId);
+        workPackage.CancelTask(dropped.Id, _employeeId);
+        workPackage.Complete(_employeeId);
 
         Assert.Equal(WorkPackageStatus.Completed, workPackage.Status);
         Assert.Contains(workPackage.DomainEvents, e => e is WorkPackageCompleted);
@@ -46,11 +47,11 @@ public class WorkPackageTests
         var completed = TestData.Task(project, workPackage, _employeeId);
         var open = TestData.Task(project, workPackage, _employeeId);
         var inProgress = TestData.Task(project, workPackage, _employeeId);
-        workPackage.StartTask(completed.Id);
-        workPackage.CompleteTask(completed.Id);
-        workPackage.StartTask(inProgress.Id);
+        workPackage.StartTask(completed.Id, _employeeId);
+        workPackage.CompleteTask(completed.Id, _employeeId);
+        workPackage.StartTask(inProgress.Id, _employeeId);
 
-        workPackage.Cancel("Out of scope");
+        workPackage.Cancel(_employeeId, "Out of scope");
 
         Assert.Equal(WorkPackageStatus.Cancelled, workPackage.Status);
         Assert.Equal(ProjectTaskStatus.Completed, completed.Status);
@@ -68,12 +69,60 @@ public class WorkPackageTests
         var workPackage = TestData.WorkPackage(project, _employeeId);
         var task = TestData.Task(project, workPackage, _employeeId);
 
-        Assert.Throws<DomainRuleViolationException>(() => workPackage.CompleteTask(task.Id));
+        Assert.Throws<DomainRuleViolationException>(() => workPackage.CompleteTask(task.Id, _employeeId));
 
-        workPackage.StartTask(task.Id);
-        workPackage.CompleteTask(task.Id);
+        workPackage.StartTask(task.Id, _employeeId);
+        workPackage.CompleteTask(task.Id, _employeeId);
 
         Assert.Equal(ProjectTaskStatus.Completed, task.Status);
-        Assert.Throws<DomainRuleViolationException>(() => workPackage.CancelTask(task.Id));
+        Assert.Throws<DomainRuleViolationException>(() => workPackage.CancelTask(task.Id, _employeeId));
+    }
+
+    [Fact]
+    public void Only_the_responsible_person_completes_or_cancels_the_package()
+    {
+        var project = TestData.ProjectWithTeam(_employeeId, _otherEmployeeId);
+        var workPackage = TestData.WorkPackage(project, _employeeId);
+
+        Assert.Throws<DomainForbiddenException>(() => workPackage.Complete(_otherEmployeeId));
+        Assert.Throws<DomainForbiddenException>(() => workPackage.Cancel(_otherEmployeeId, "Not mine"));
+        Assert.Equal(WorkPackageStatus.Open, workPackage.Status);
+
+        workPackage.Cancel(_employeeId, "Out of scope");
+
+        Assert.Equal(WorkPackageStatus.Cancelled, workPackage.Status);
+    }
+
+    [Fact]
+    public void Responsible_person_of_the_package_completes_it()
+    {
+        var project = TestData.ProjectWithTeam(_employeeId);
+        var workPackage = TestData.WorkPackage(project, _employeeId);
+
+        workPackage.Complete(_employeeId);
+
+        Assert.Equal(WorkPackageStatus.Completed, workPackage.Status);
+    }
+
+    [Fact]
+    public void Status_of_a_task_is_changed_by_its_responsible_person_or_the_responsible_person_of_the_package()
+    {
+        var taskOwner = Guid.NewGuid();
+        var project = TestData.ProjectWithTeam(_employeeId, taskOwner, _otherEmployeeId);
+        var workPackage = TestData.WorkPackage(project, _employeeId);
+        var first = TestData.Task(project, workPackage, taskOwner);
+        var second = TestData.Task(project, workPackage, taskOwner);
+
+        Assert.Throws<DomainForbiddenException>(() => workPackage.StartTask(first.Id, _otherEmployeeId));
+        Assert.Throws<DomainForbiddenException>(() => workPackage.CancelTask(first.Id, _otherEmployeeId));
+        Assert.Equal(ProjectTaskStatus.Open, first.Status);
+
+        workPackage.StartTask(first.Id, taskOwner);
+        Assert.Throws<DomainForbiddenException>(() => workPackage.CompleteTask(first.Id, _otherEmployeeId));
+        workPackage.CompleteTask(first.Id, taskOwner);
+        workPackage.CancelTask(second.Id, _employeeId);
+
+        Assert.Equal(ProjectTaskStatus.Completed, first.Status);
+        Assert.Equal(ProjectTaskStatus.Cancelled, second.Status);
     }
 }

@@ -14,14 +14,15 @@ namespace ProjectManagementSystem.Application.TimeTracking.Commands.RemoveTimeEn
 public sealed class RemoveTimeEntryCommandHandler(
     IRepository<WorkPackage> workPackages,
     IRepository<TaskTimeLog> timeLogs,
-    TaskTimeLogService taskTimeLogService) : ICommandHandler<RemoveTimeEntryCommand>
+    TaskTimeLogService taskTimeLogService,
+    ICurrentUser currentUser) : ICommandHandler<RemoveTimeEntryCommand>
 {
     public async Task<Unit> Handle(RemoveTimeEntryCommand command, CancellationToken cancellationToken)
     {
         var timeLog = await timeLogs.GetAsync(command.TaskId, cancellationToken);
         var workPackage = await workPackages.GetAsync(timeLog.WorkPackageId, cancellationToken);
 
-        taskTimeLogService.RemoveEntry(workPackage, timeLog, command.EntryId);
+        taskTimeLogService.RemoveEntry(workPackage, timeLog, command.EntryId, currentUser.EmployeeId);
 
         timeLogs.Update(timeLog);
         return Unit.Value;

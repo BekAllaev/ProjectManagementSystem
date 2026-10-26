@@ -22,7 +22,7 @@ public class TimeTrackingCommandTests : CommandTestBase
         _project = SeedProject();
         _workPackage = SeedWorkPackage(_project, taskCount: 1);
         _task = _workPackage.Tasks.Single();
-        _workPackage.StartTask(_task.Id);
+        _workPackage.StartTask(_task.Id, _workPackage.ResponsiblePersonId);
         _workPackage.ClearDomainEvents();
     }
 
@@ -81,7 +81,7 @@ public class TimeTrackingCommandTests : CommandTestBase
     [Fact]
     public async Task LogTime_TaskNotInProgress_ThrowsDomainRuleViolationException()
     {
-        _workPackage.CompleteTask(_task.Id);
+        _workPackage.CompleteTask(_task.Id, _workPackage.ResponsiblePersonId);
         _workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(LogTime(Today, hours: 2m)));
@@ -89,17 +89,26 @@ public class TimeTrackingCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task LogTime_NotTeamMember_ThrowsDomainRuleViolationException()
+    public async Task LogTime_CallerNotTeamMember_ThrowsDomainForbiddenException()
     {
-        await AssertRejectedAsync<DomainRuleViolationException>(() =>
-            App.SendAsync(new LogTimeCommand(_workPackage.Id, _task.Id, Guid.NewGuid(), Today, 2m)));
+        App.CurrentUser.EmployeeId = Guid.NewGuid();
+
+        await AssertRejectedAsync<DomainForbiddenException>(() => App.SendAsync(LogTime(Today, hours: 2m)));
+    }
+
+    [Fact]
+    public async Task LogTime_LogsTimeOfTheCaller()
+    {
+        await App.SendAsync(LogTime(Today, hours: 2m));
+
+        Assert.Equal(Member, Assert.Single(Assert.Single(App.TimeLogs.All).Entries).EmployeeId);
     }
 
     [Fact]
     public async Task LogTime_UnknownWorkPackage_ThrowsAggregateNotFoundException()
     {
         await AssertRejectedAsync<AggregateNotFoundException>(() =>
-            App.SendAsync(new LogTimeCommand(Guid.NewGuid(), _task.Id, Member, Today, 2m)));
+            App.SendAsync(new LogTimeCommand(Guid.NewGuid(), _task.Id, Today, 2m)));
     }
 
     [Fact]
@@ -117,7 +126,7 @@ public class TimeTrackingCommandTests : CommandTestBase
     public async Task RemoveTimeEntry_TaskCompleted_ThrowsDomainRuleViolationException()
     {
         var timeLog = SeedTimeLogWithEntry(Today, hours: 1m);
-        _workPackage.CompleteTask(_task.Id);
+        _workPackage.CompleteTask(_task.Id, _workPackage.ResponsiblePersonId);
         _workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() =>
@@ -125,8 +134,19 @@ public class TimeTrackingCommandTests : CommandTestBase
         Assert.Single(timeLog.Entries);
     }
 
+    [Fact]
+    public async Task RemoveTimeEntry_EntryOfAnotherEmployee_ThrowsDomainForbiddenException()
+    {
+        var timeLog = SeedTimeLogWithEntry(Today, hours: 1m);
+        App.CurrentUser.EmployeeId = Guid.NewGuid();
+
+        await AssertRejectedAsync<DomainForbiddenException>(() =>
+            App.SendAsync(new RemoveTimeEntryCommand(_task.Id, timeLog.Entries.Single().Id)));
+        Assert.Single(timeLog.Entries);
+    }
+
     private LogTimeCommand LogTime(DateOnly workDate, decimal hours) =>
-        new(_workPackage.Id, _task.Id, Member, workDate, hours);
+        new(_workPackage.Id, _task.Id, workDate, hours);
 
     private TaskTimeLog SeedTimeLogWithEntry(DateOnly workDate, decimal hours)
     {

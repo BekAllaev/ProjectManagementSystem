@@ -38,7 +38,7 @@ public class ScheduleNetworkServiceTests
         var task = TestData.Task(project, workPackage, _employeeId);
         var cancelled = TestData.Task(project, workPackage, _employeeId);
         var foreign = TestData.Task(otherProject, foreignPackage, _employeeId);
-        workPackage.CancelTask(cancelled.Id);
+        workPackage.CancelTask(cancelled.Id, workPackage.ResponsiblePersonId);
 
         Assert.Throws<DomainRuleViolationException>(() =>
             _service.AddDependency(project, network, workPackage, task.Id, workPackage, cancelled.Id, DependencyType.FinishToStart));

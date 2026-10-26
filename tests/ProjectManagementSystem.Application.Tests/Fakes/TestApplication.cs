@@ -42,6 +42,7 @@ public sealed class TestApplication : IDisposable
         services.AddApplication();
         services.AddSingleton<IUnitOfWork>(UnitOfWork);
         services.AddSingleton<INotificationSender>(Notifications);
+        services.AddSingleton<ICurrentUser>(CurrentUser);
         services.AddSingleton<IRepository<Project>>(Projects);
         services.AddSingleton<IRepository<WorkPackage>>(WorkPackages);
         services.AddSingleton<IRepository<ScheduleNetwork>>(Networks);
@@ -63,6 +64,8 @@ public sealed class TestApplication : IDisposable
     public FakeUnitOfWork UnitOfWork { get; }
 
     public FakeNotificationSender Notifications { get; } = new();
+
+    public FakeCurrentUser CurrentUser { get; } = new();
 
     public FakeRepository<Project> Projects { get; }
 
