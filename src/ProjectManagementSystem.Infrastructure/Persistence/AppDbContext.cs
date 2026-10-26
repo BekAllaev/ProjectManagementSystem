@@ -1,14 +1,17 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Infrastructure.Identity;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence.Outbox;
 
 namespace ProjectManagementSystem.Infrastructure.Persistence;
 
 /// <summary>
-/// Write side: the aggregates (accessed through <see cref="DbContext.Set{TEntity}()"/> by the repositories), the outbox
-/// and the in-app notifications. Every aggregate is mapped by its own configuration in <c>Persistence/Configurations</c>.
+/// Write side: the aggregates (accessed through <see cref="DbContext.Set{TEntity}()"/> by the repositories), the outbox,
+/// the in-app notifications and the accounts of ASP.NET Core Identity. Every aggregate is mapped by its own
+/// configuration in <c>Persistence/Configurations</c>.
 /// </summary>
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
     public const string Schema = "dbo";
 
@@ -20,6 +23,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Identity maps its tables first; the configurations below extend them (ApplicationUser).
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }

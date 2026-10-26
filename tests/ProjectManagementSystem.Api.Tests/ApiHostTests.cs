@@ -1,17 +1,16 @@
+using System.Net;
 using System.Net.Http.Headers;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
+using System.Net.Http.Json;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
-using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ProjectManagementSystem.Api.Authentication;
 using ProjectManagementSystem.Application.Projects;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
 using ProjectManagementSystem.Application.WorkPackages;
@@ -20,26 +19,30 @@ using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 using ProjectManagementSystem.Domain.WorkPackages;
+using ProjectManagementSystem.Infrastructure.Identity;
+using ProjectManagementSystem.Infrastructure.Persistence;
 using ProtoBuf.Grpc;
 using ProtoBuf.Grpc.Client;
 
 namespace ProjectManagementSystem.Api.Tests;
 
 /// <summary>
-/// The real host over gRPC-Web, as the browser calls it. Authentication is not configured by the host yet, so the
-/// tests add a scheme that trusts a header; repositories are in memory and the outbox processor does not run.
-/// Only failing calls are made, so nothing reaches the database.
+/// The real host over gRPC-Web, as the browser calls it, with the bearer token of <c>/auth/login</c>. The accounts are in
+/// an in-memory database, the aggregates in in-memory repositories, and the outbox processor does not run. Only
+/// failing commands are sent, apart from one whose aggregate lives in a fake repository, so nothing is written.
 /// </summary>
 public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
 {
     private const string ClientOrigin = "https://localhost:7130";
+    private const string AuthPrefix = "/auth";
+    private const string Password = "Pa$$w0rd-for-tests";
 
     private readonly Factory _factory;
 
     public ApiHostTests(Factory factory) => _factory = factory;
 
     [Fact]
-    public async Task Unauthenticated_call_is_rejected()
+    public async Task Call_without_a_token_is_unauthenticated()
     {
         var exception = await Assert.ThrowsAsync<RpcException>(() =>
             Client<IProjectService>().StartProject(new StartProjectCommand(Guid.NewGuid())));
@@ -48,35 +51,71 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
     }
 
     [Fact]
-    public async Task Missing_aggregate_comes_back_as_not_found()
+    public async Task Call_with_a_forged_token_is_unauthenticated()
     {
         var exception = await Assert.ThrowsAsync<RpcException>(() =>
-            Client<IProjectService>().StartProject(new StartProjectCommand(Guid.NewGuid()), As(Guid.NewGuid().ToString())));
+            Client<IProjectService>().StartProject(new StartProjectCommand(Guid.NewGuid()), WithToken("forged")));
 
+        Assert.Equal(StatusCode.Unauthenticated, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task Token_of_login_authenticates_the_grpc_call()
+    {
+        var token = await LoginAsync(Guid.NewGuid());
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            Client<IProjectService>().StartProject(new StartProjectCommand(Guid.NewGuid()), WithToken(token)));
+
+        // Past authentication: the command ran and did not find the project.
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
 
     [Fact]
-    public async Task Rule_of_permission_comes_back_as_permission_denied()
+    public async Task Token_carries_the_employee_of_the_account_to_the_domain()
     {
-        var workPackage = SeedWorkPackage(responsiblePersonId: Guid.NewGuid());
+        var responsible = Guid.NewGuid();
+        var workPackage = SeedWorkPackage(responsible);
 
-        var exception = await Assert.ThrowsAsync<RpcException>(() =>
-            Client<IWorkPackageService>().CompleteWorkPackage(new CompleteWorkPackageCommand(workPackage.Id), As(Guid.NewGuid().ToString())));
+        var other = await Assert.ThrowsAsync<RpcException>(async () =>
+            await Client<IWorkPackageService>().CompleteWorkPackage(
+                new CompleteWorkPackageCommand(workPackage.Id), WithToken(await LoginAsync(Guid.NewGuid()))));
 
-        Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+        Assert.Equal(StatusCode.PermissionDenied, other.StatusCode);
+        Assert.Equal("Only the responsible person of the work package can complete it.", other.Status.Detail);
+        await Client<IWorkPackageService>().CompleteWorkPackage(
+            new CompleteWorkPackageCommand(workPackage.Id), WithToken(await LoginAsync(responsible)));
+        Assert.Equal(WorkPackageStatus.Completed, workPackage.Status);
     }
 
     [Fact]
-    public async Task Account_without_an_employee_is_forbidden_when_the_command_needs_the_caller()
+    public async Task Refreshed_token_still_carries_the_employee()
     {
+        var employeeId = Guid.NewGuid();
+        var login = await LoginResponseAsync(employeeId);
+        using var http = _factory.CreateClient();
+
+        using var response = await http.PostAsJsonAsync($"{AuthPrefix}/refresh", new { refreshToken = login.RefreshToken });
+        response.EnsureSuccessStatusCode();
+        var refreshed = await response.Content.ReadFromJsonAsync<TokenResponse>();
+
         var workPackage = SeedWorkPackage(responsiblePersonId: Guid.NewGuid());
-
         var exception = await Assert.ThrowsAsync<RpcException>(() =>
-            Client<IWorkPackageService>().CompleteWorkPackage(new CompleteWorkPackageCommand(workPackage.Id), As(TestAuthenticationHandler.AccountOnly)));
-
+            Client<IWorkPackageService>().CompleteWorkPackage(new CompleteWorkPackageCommand(workPackage.Id), WithToken(refreshed!.AccessToken)));
         Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
-        Assert.Equal("The caller is not linked to an employee.", exception.Status.Detail);
+        Assert.Equal("Only the responsible person of the work package can complete it.", exception.Status.Detail);
+    }
+
+    [Fact]
+    public async Task Register_is_not_published()
+    {
+        using var http = _factory.CreateClient();
+
+        using var response = await http.PostAsJsonAsync($"{AuthPrefix}/register", new { email = "new@example.com", password = Password });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Null(await _factory.Services.CreateScope().ServiceProvider
+            .GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync("new@example.com"));
     }
 
     [Fact]
@@ -120,13 +159,37 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
         return workPackage;
     }
 
-    private static CallContext As(string caller) =>
-        new(new CallOptions(new Metadata { { TestAuthenticationHandler.Header, caller } }));
+    private async Task<string> LoginAsync(Guid employeeId) => (await LoginResponseAsync(employeeId)).AccessToken;
+
+    /// <summary>
+    /// Creates an account of the employee and signs in with it through <c>/auth/login</c>.
+    /// </summary>
+    private async Task<TokenResponse> LoginResponseAsync(Guid employeeId)
+    {
+        var email = $"{employeeId}@example.com";
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var created = await users.CreateAsync(new ApplicationUser { UserName = email, Email = email, EmployeeId = employeeId }, Password);
+            Assert.True(created.Succeeded, string.Join(", ", created.Errors.Select(e => e.Description)));
+        }
+
+        using var http = _factory.CreateClient();
+        using var response = await http.PostAsJsonAsync($"{AuthPrefix}/login", new { email, password = Password });
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<TokenResponse>())!;
+    }
+
+    private static CallContext WithToken(string token) =>
+        new(new CallOptions(new Metadata { { "Authorization", $"Bearer {token}" } }));
 
     private TService Client<TService>() where TService : class
     {
-        var handler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, _factory.Server.CreateHandler()) { HttpVersion = new Version(1, 1) };
-        var channel = GrpcChannel.ForAddress(_factory.Server.BaseAddress, new GrpcChannelOptions { HttpHandler = handler });
+        var handler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, _factory.Server.CreateHandler());
+        var channel = GrpcChannel.ForAddress(
+            _factory.Server.BaseAddress,
+            new GrpcChannelOptions { HttpHandler = handler, HttpVersion = HttpVersion.Version11 });
 
         return channel.CreateGrpcService<TService>();
     }
@@ -140,8 +203,11 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder) =>
             builder.ConfigureTestServices(services =>
             {
-                services.AddAuthentication(TestAuthenticationHandler.Scheme)
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, null);
+                foreach (var options in services.Where(d =>
+                             d.ServiceType == typeof(DbContextOptions<AppDbContext>) ||
+                             d.ServiceType == typeof(IDbContextOptionsConfiguration<AppDbContext>)).ToList())
+                    services.Remove(options);
+                services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
 
                 services.AddSingleton<IRepository<Project>>(Projects);
                 services.AddSingleton<IRepository<WorkPackage>>(WorkPackages);
@@ -149,32 +215,9 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
                 foreach (var outbox in services.Where(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType?.Name == "OutboxProcessor").ToList())
                     services.Remove(outbox);
             });
+
+        private readonly string _databaseName = Guid.NewGuid().ToString();
     }
 
-    /// <summary>
-    /// Authenticates a call that carries <see cref="Header"/>: a Guid becomes the employee of the caller,
-    /// <see cref="AccountOnly"/> an account without an employee.
-    /// </summary>
-    private sealed class TestAuthenticationHandler(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
-    {
-        public const string Scheme = "Test";
-        public const string Header = "x-test-caller";
-        public const string AccountOnly = "account-only";
-
-        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-        {
-            if (!Request.Headers.TryGetValue(Header, out var caller))
-                return Task.FromResult(AuthenticateResult.NoResult());
-
-            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
-            if (caller != AccountOnly)
-                claims.Add(new Claim(EmployeeClaimTypes.EmployeeId, caller.ToString()));
-
-            var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme));
-            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme)));
-        }
-    }
+    private sealed record TokenResponse(string AccessToken, string RefreshToken);
 }

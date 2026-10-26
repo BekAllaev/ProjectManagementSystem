@@ -8,7 +8,7 @@
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
 | `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command records and `CreatedId`, the gRPC service interfaces (one per aggregate): the public surface of the backend |
 | `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
-| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per aggregate (each method only sends the command through MediatR), the interceptor that maps domain exceptions to gRPC status codes, `ICurrentUser` from the `employee_id` claim, CORS for the client |
+| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per aggregate (each method only sends the command through MediatR), the interceptor that maps domain exceptions to gRPC status codes, `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`, without `/register`), whose bearer token authenticates the gRPC calls |
 
 The API exposes every command and query over gRPC (code-first, protobuf-net.Grpc, with gRPC-Web for the browser).
 Commands, queries and their results are the gRPC messages themselves: `[DataContract]` with `[DataMember(Order = N)]`
@@ -276,6 +276,11 @@ invariant culture). `Email` keeps the email as entered. An employee is created b
 and `ChangeEmail` are internal); both reject an email used by another employee. The check is the
 precondition; the last line of defence against two concurrent registrations is a unique index on
 `NormalizedEmail` in the database, whose violation the infrastructure translates into a `DomainRuleViolationException`.
+
+An employee signs in with an account (`ApplicationUser` of ASP.NET Core Identity, in the infrastructure). The account and
+the employee are different records: `ApplicationUser.EmployeeId` is required, unique and a foreign key to `Employee.Id`,
+so an employee has at most one account. The domain knows nothing of accounts; the API puts the employee into the
+`employee_id` claim of the token, and handlers receive it as `ICurrentUser.EmployeeId`.
 
 ## Cross-aggregate rules
 
