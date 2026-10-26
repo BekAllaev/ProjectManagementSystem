@@ -1,6 +1,7 @@
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
+using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
 
@@ -16,6 +17,7 @@ namespace ProjectManagementSystem.Application.Projects.EventHandlers;
 public sealed class RegisterWorkPackageInProject(
     IRepository<Project> projects,
     IRepository<WorkPackage> workPackages,
+    WorkPackageService workPackageService,
     IUnitOfWork unitOfWork) : IDomainEventHandler<WorkPackageCreated>
 {
     public const string ProjectClosedReason = "Project was closed before the work package was registered in it.";
@@ -38,7 +40,7 @@ public sealed class RegisterWorkPackageInProject(
             if (workPackage.Status != WorkPackageStatus.Open)
                 return;
 
-            workPackage.Cancel(ProjectClosedReason);
+            workPackageService.CancelInClosedProject(project, workPackage, ProjectClosedReason);
             workPackages.Update(workPackage);
         }
 

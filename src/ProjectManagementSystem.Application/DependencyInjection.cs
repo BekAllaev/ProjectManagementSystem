@@ -12,7 +12,8 @@ public static class DependencyInjection
 {
     /// <summary>
     /// Registers command handlers, validators, pipeline behaviors, domain event handlers and domain
-    /// services. The infrastructure registers <see cref="IUnitOfWork"/> and the repositories.
+    /// services. The infrastructure registers <see cref="IUnitOfWork"/> and the repositories, the host registers
+    /// <see cref="ICurrentUser"/>.
     /// </summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {

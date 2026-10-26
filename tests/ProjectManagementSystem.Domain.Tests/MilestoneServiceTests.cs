@@ -38,9 +38,9 @@ public class MilestoneServiceTests
         var open = TestData.Task(_project, _workPackage, _employeeId);
         var completed = TestData.Task(_project, _workPackage, _employeeId);
         var cancelled = TestData.Task(_project, _workPackage, _employeeId);
-        _workPackage.StartTask(completed.Id);
-        _workPackage.CompleteTask(completed.Id);
-        _workPackage.CancelTask(cancelled.Id);
+        _workPackage.StartTask(completed.Id, _workPackage.ResponsiblePersonId);
+        _workPackage.CompleteTask(completed.Id, _workPackage.ResponsiblePersonId);
+        _workPackage.CancelTask(cancelled.Id, _workPackage.ResponsiblePersonId);
 
         _service.AddTask(_project, milestone, _workPackage, open.Id);
         _service.AddTask(_project, milestone, _workPackage, completed.Id);
@@ -71,9 +71,9 @@ public class MilestoneServiceTests
     {
         var milestone = _service.Create(_project, "Release", "", TestData.Today);
         var task = TestData.Task(_project, _workPackage, _employeeId);
-        _workPackage.StartTask(task.Id);
-        _workPackage.CompleteTask(task.Id);
-        _workPackage.Complete();
+        _workPackage.StartTask(task.Id, _workPackage.ResponsiblePersonId);
+        _workPackage.CompleteTask(task.Id, _workPackage.ResponsiblePersonId);
+        _workPackage.Complete(_workPackage.ResponsiblePersonId);
 
         TestData.Close(_project);
 

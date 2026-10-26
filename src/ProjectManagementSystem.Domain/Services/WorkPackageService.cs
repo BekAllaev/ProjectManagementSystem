@@ -61,6 +61,22 @@ public sealed class WorkPackageService(TimeProvider timeProvider)
         workPackage.ChangeTaskResponsiblePerson(taskId, employeeId);
     }
 
+    /// <summary>
+    /// Compensation of the handler of <see cref="WorkPackages.Events.WorkPackageCreated"/>: a package created
+    /// in a project that was closed before the package was registered is cancelled by the system, so no acting
+    /// person is checked. Allowed only while the project is closed.
+    /// </summary>
+    public void CancelInClosedProject(Project project, WorkPackage workPackage, string reason)
+    {
+        EnsureBelongsToProject(workPackage, project);
+
+        if (project.IsOpen)
+            throw new DomainRuleViolationException(
+                $"Work package '{workPackage.Id}' can be cancelled without an acting person only in a closed project.");
+
+        workPackage.CancelInClosedProject(reason);
+    }
+
     private void EnsureIsCurrentTeamMember(Project project, Guid employeeId)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

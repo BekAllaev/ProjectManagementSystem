@@ -8,8 +8,9 @@ namespace ProjectManagementSystem.Domain.Services;
 
 /// <summary>
 /// Operations on <see cref="TaskTimeLog"/> whose rules need the project and the work package: logging
-/// and removing time on tasks. Time is logged and removed only while the task is InProgress, by a member of
-/// the project team on the work date. The entry gets the hourly rate valid on the work date; rates are
+/// and removing time on tasks. Time is logged and removed only while the task is InProgress. An employee
+/// logs only their own time, and only on a work date when they are a member of the project team; an entry
+/// is removed only by the employee who logged it. The entry gets the hourly rate valid on the work date; rates are
 /// never changed retroactively, so the rate read here cannot be replaced later. A race with completing
 /// the task is accepted. Only <see cref="TaskTimeLog"/> is changed.
 /// </summary>
@@ -30,7 +31,7 @@ public sealed class TaskTimeLogService(TimeProvider timeProvider)
         Project project,
         WorkPackage workPackage,
         TaskTimeLog timeLog,
-        Guid employeeId,
+        Guid loggedBy,
         DateOnly workDate,
         decimal hours)
     {
@@ -42,19 +43,19 @@ public sealed class TaskTimeLogService(TimeProvider timeProvider)
         if (workDate > DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime))
             throw new DomainValidationException("Time cannot be logged for a future date.");
 
-        if (!new IsTeamMemberOnSpecification(employeeId, workDate).IsSatisfiedBy(project))
-            throw new DomainRuleViolationException($"Employee '{employeeId}' is not a member of the project team on {workDate}.");
+        if (!new IsTeamMemberOnSpecification(loggedBy, workDate).IsSatisfiedBy(project))
+            throw new DomainForbiddenException($"Employee '{loggedBy}' is not a member of the project team on {workDate} and cannot log time.");
 
-        var hourlyRate = project.GetHourlyRateOn(employeeId, workDate);
+        var hourlyRate = project.GetHourlyRateOn(loggedBy, workDate);
 
-        return timeLog.LogTime(employeeId, workDate, hours, hourlyRate.Amount);
+        return timeLog.LogTime(loggedBy, workDate, hours, hourlyRate.Amount);
     }
 
-    public void RemoveEntry(WorkPackage workPackage, TaskTimeLog timeLog, Guid entryId)
+    public void RemoveEntry(WorkPackage workPackage, TaskTimeLog timeLog, Guid entryId, Guid removedBy)
     {
         EnsureTaskIsInProgress(workPackage, timeLog);
 
-        timeLog.RemoveEntry(entryId);
+        timeLog.RemoveEntry(entryId, removedBy);
     }
 
     private static void EnsureTaskIsInProgress(WorkPackage workPackage, TaskTimeLog timeLog)

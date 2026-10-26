@@ -72,26 +72,48 @@ public sealed class WorkPackage : AggregateRoot<Guid>
         RaiseDomainEvent(new ResponsiblePersonChanged(ProjectId, Id, taskId, employeeId));
     }
 
-    public void StartTask(Guid taskId)
+    /// <summary>
+    /// <paramref name="startedBy"/> must be responsible for the task or for this work package.
+    /// </summary>
+    public void StartTask(Guid taskId, Guid startedBy)
     {
-        GetTask(taskId).Start();
+        var task = GetTask(taskId);
+        EnsureMayChangeStatusOf(task, startedBy, "start");
+
+        task.Start();
         RaiseDomainEvent(new TaskStarted(ProjectId, Id, taskId));
     }
 
-    public void CompleteTask(Guid taskId)
+    /// <summary>
+    /// <paramref name="completedBy"/> must be responsible for the task or for this work package.
+    /// </summary>
+    public void CompleteTask(Guid taskId, Guid completedBy)
     {
-        GetTask(taskId).Complete();
+        var task = GetTask(taskId);
+        EnsureMayChangeStatusOf(task, completedBy, "complete");
+
+        task.Complete();
         RaiseDomainEvent(new TaskCompleted(ProjectId, Id, taskId));
     }
 
-    public void CancelTask(Guid taskId)
+    /// <summary>
+    /// <paramref name="cancelledBy"/> must be responsible for the task or for this work package.
+    /// </summary>
+    public void CancelTask(Guid taskId, Guid cancelledBy)
     {
-        GetTask(taskId).Cancel();
+        var task = GetTask(taskId);
+        EnsureMayChangeStatusOf(task, cancelledBy, "cancel");
+
+        task.Cancel();
         RaiseDomainEvent(new TaskCancelled(ProjectId, Id, taskId));
     }
 
-    public void Complete()
+    /// <summary>
+    /// Only the responsible person of the work package may complete it.
+    /// </summary>
+    public void Complete(Guid completedBy)
     {
+        EnsureIsResponsible(completedBy, "complete");
         EnsureOpen("complete");
 
         if (_tasks.Any(t => !t.IsFinished))
@@ -104,7 +126,22 @@ public sealed class WorkPackage : AggregateRoot<Guid>
     /// <summary>
     /// Cancels the package and all its unfinished tasks. Completed tasks stay completed.
     /// </summary>
-    public void Cancel(string reason)
+    /// <summary>
+    /// Only the responsible person of the work package may cancel it.
+    /// </summary>
+    public void Cancel(Guid cancelledBy, string reason)
+    {
+        EnsureIsResponsible(cancelledBy, "cancel");
+        CancelOpenWork(reason);
+    }
+
+    /// <summary>
+    /// Cancellation by the system, without an acting person: goes through
+    /// <see cref="Services.WorkPackageService.CancelInClosedProject"/>, which allows it only in a closed project.
+    /// </summary>
+    internal void CancelInClosedProject(string reason) => CancelOpenWork(reason);
+
+    private void CancelOpenWork(string reason)
     {
         EnsureOpen("cancel");
         reason = Guard.NotEmpty(reason, nameof(CancellationReason));
@@ -119,6 +156,19 @@ public sealed class WorkPackage : AggregateRoot<Guid>
         Status = WorkPackageStatus.Cancelled;
         CancellationReason = reason;
         RaiseDomainEvent(new WorkPackageCancelled(ProjectId, Id, reason, cancelledTaskIds));
+    }
+
+    private void EnsureIsResponsible(Guid employeeId, string action)
+    {
+        if (employeeId != ResponsiblePersonId)
+            throw new DomainForbiddenException($"Only the responsible person of the work package can {action} it.");
+    }
+
+    private void EnsureMayChangeStatusOf(ProjectTask task, Guid employeeId, string action)
+    {
+        if (employeeId != task.ResponsiblePersonId && employeeId != ResponsiblePersonId)
+            throw new DomainForbiddenException(
+                $"Only the responsible person of task '{task.Name}' or of its work package can {action} it.");
     }
 
     private void EnsureOpen(string action)

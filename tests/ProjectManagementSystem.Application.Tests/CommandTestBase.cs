@@ -21,6 +21,11 @@ public abstract class CommandTestBase : IDisposable
     /// </summary>
     protected Guid Member { get; } = Guid.NewGuid();
 
+    /// <summary>
+    /// <see cref="Member"/> is the caller of every request unless a test changes <c>App.CurrentUser</c>.
+    /// </summary>
+    protected CommandTestBase() => App.CurrentUser.EmployeeId = Member;
+
     protected DateTime Now => App.TimeProvider.GetUtcNow().UtcDateTime;
 
     protected DateOnly Today => DateOnly.FromDateTime(Now);

@@ -137,10 +137,16 @@ it is registered in the project after the commit (see [Project](#1-project)).
 
 **Invariants:**
 - `AddTask` only in an Open package;
-- `Complete()` only if every task is Completed or Cancelled;
-- `Cancel()` cancels every unfinished task, Completed tasks stay Completed;
+- `Complete(completedBy)` only if every task is Completed or Cancelled;
+- `Cancel(cancelledBy, reason)` cancels every unfinished task, Completed tasks stay Completed;
 - task status transitions: `Start` (Open → InProgress), `Complete` (InProgress → Completed),
   `Cancel` (any unfinished → Cancelled).
+
+**Permissions** (`DomainForbiddenException`; the acting employee comes from `ICurrentUser`, never from the command):
+- only the responsible person of the package completes or cancels it;
+- the status of a task is changed only by the responsible person of the task or of its package;
+- the system cancels a package without an acting person only through `WorkPackageService.CancelInClosedProject`
+  (compensation of the handler of `WorkPackageCreated`), which allows it only in a closed project.
 
 **Events:** `WorkPackageCompleted`, `WorkPackageCancelled` (with the ids of the tasks it cancelled),
 `TaskCancelled`, `ResponsiblePersonChanged` (`TaskId` is empty for the package itself); also
@@ -185,8 +191,12 @@ of 2 hours).
 
 **Methods:**
 - `LogTime(employeeId, workDate, hours, hourlyRate)` adds an entry;
-- `RemoveEntry(entryId)` removes an entry. A mistake is fixed by removing the wrong entry and logging
+- `RemoveEntry(entryId, removedBy)` removes an entry. A mistake is fixed by removing the wrong entry and logging
   the right one.
+
+**Permissions** (`DomainForbiddenException`): an employee logs only their own time (the employee of the entry is
+the current user) and only on a work date when they are a member of the project team; an entry is removed only
+by the employee who logged it.
 
 **Invariants:**
 - `Hours > 0`, `HourlyRate > 0`;
@@ -272,7 +282,7 @@ precondition; the last line of defence against two concurrent registrations is a
 | Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
 | A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `ScheduleNetworkService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
 | `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TaskTimeLogService`; a race with `CompleteTask` is accepted |
-| `LogTime`: the employee is a team member on `WorkDate`, `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TaskTimeLogService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
+| `LogTime`: the employee (the current user) is a team member on `WorkDate` (otherwise `DomainForbiddenException`), `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TaskTimeLogService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | A task added to a milestone exists in a work package of the project and is not cancelled | Milestone ↔ WorkPackage | `MilestoneService.AddTask`; a concurrent cancellation is accepted without compensation, cancelled tasks are ignored on the read side |
 

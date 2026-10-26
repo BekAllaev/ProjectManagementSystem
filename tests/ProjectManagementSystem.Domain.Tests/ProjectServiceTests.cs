@@ -28,8 +28,8 @@ public class ProjectServiceTests
     {
         var completed = TestData.WorkPackage(_project, _employeeId);
         var cancelled = TestData.WorkPackage(_project, _employeeId);
-        completed.Complete();
-        cancelled.Cancel("Not needed");
+        completed.Complete(completed.ResponsiblePersonId);
+        cancelled.Cancel(cancelled.ResponsiblePersonId, "Not needed");
 
         _service.Complete(_project, [completed, cancelled]);
 
@@ -52,10 +52,10 @@ public class ProjectServiceTests
     {
         var open = TestData.WorkPackage(_project, _employeeId);
         var completed = TestData.WorkPackage(_project, _employeeId);
-        completed.Complete();
+        completed.Complete(completed.ResponsiblePersonId);
         var otherProject = TestData.ProjectWithTeam(_employeeId);
         var foreign = TestData.WorkPackage(otherProject, _employeeId);
-        foreign.Complete();
+        foreign.Complete(foreign.ResponsiblePersonId);
 
         Assert.Throws<DomainValidationException>(() => _service.Complete(_project, [completed]));
         Assert.Throws<DomainValidationException>(() => _service.Complete(_project, [open, completed, foreign]));
@@ -87,7 +87,7 @@ public class ProjectServiceTests
         var project = TestData.ProjectWithTeam(_lead, _developer);
         var workPackage = TestData.WorkPackage(project, _lead);
         var task = TestData.Task(project, workPackage, _developer);
-        workPackage.CancelTask(task.Id);
+        workPackage.CancelTask(task.Id, workPackage.ResponsiblePersonId);
 
         _service.EndTeamMembership(project, [workPackage], _developer, TestData.Today);
 

@@ -86,7 +86,7 @@ public class ScheduleEventHandlerTests : CommandTestBase
         await App.SendAsync(Dependency(_first, A, _second, C));
         var added = App.UnitOfWork.CollectedEvents.OfType<DependencyAdded>().Single();
         // The cancellation is committed, but its event is not delivered yet.
-        _first.CancelTask(A);
+        _first.CancelTask(A, _first.ResponsiblePersonId);
         _first.ClearDomainEvents();
 
         await App.DispatchAsync(added);

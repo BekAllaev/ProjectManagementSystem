@@ -66,7 +66,7 @@ public class MilestoneCommandTests : CommandTestBase
     public async Task AddTaskToMilestone_CancelledTask_ThrowsDomainRuleViolationException()
     {
         var milestone = SeedMilestone();
-        _workPackage.CancelTask(TaskId);
+        _workPackage.CancelTask(TaskId, _workPackage.ResponsiblePersonId);
         _workPackage.ClearDomainEvents();
 
         await AssertRejectedAsync<DomainRuleViolationException>(() =>
