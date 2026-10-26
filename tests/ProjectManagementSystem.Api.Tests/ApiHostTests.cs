@@ -72,6 +72,18 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
     }
 
     [Fact]
+    public async Task Invalid_command_comes_back_as_invalid_argument_with_the_failures()
+    {
+        var token = await LoginAsync(Guid.NewGuid());
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            Client<IProjectService>().StartProject(new StartProjectCommand(Guid.Empty), WithToken(token)));
+
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+        Assert.Contains("Project Id", exception.Status.Detail);
+    }
+
+    [Fact]
     public async Task Token_carries_the_employee_of_the_account_to_the_domain()
     {
         var responsible = Guid.NewGuid();

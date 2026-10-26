@@ -1,3 +1,5 @@
+using FluentValidation;
+using FluentValidation.Results;
 using Grpc.Core;
 using Microsoft.Extensions.Logging.Abstractions;
 using ProjectManagementSystem.Api.Interceptors;
@@ -10,18 +12,20 @@ public class DomainExceptionInterceptorTests
 {
     private readonly DomainExceptionInterceptor _interceptor = new(NullLogger<DomainExceptionInterceptor>.Instance);
 
-    public static TheoryData<Exception, StatusCode> DomainErrors() => new()
+    public static TheoryData<Exception, StatusCode> ErrorsForTheCaller() => new()
     {
         { new DomainForbiddenException("Not yours."), StatusCode.PermissionDenied },
         { new DomainRuleViolationException("Already closed."), StatusCode.FailedPrecondition },
         { new AggregateNotFoundException("Project", Guid.NewGuid()), StatusCode.NotFound },
         { new EntityNotFoundException("Task", Guid.NewGuid()), StatusCode.NotFound },
         { new DomainValidationException("Name must not be empty."), StatusCode.InvalidArgument },
+        { new ValidationException([new ValidationFailure("Hours", "Hours must be greater than 0.")]), StatusCode.InvalidArgument },
+        { new ConcurrencyConflictException("Project", Guid.NewGuid()), StatusCode.Aborted },
     };
 
     [Theory]
-    [MemberData(nameof(DomainErrors))]
-    public async Task Domain_error_becomes_its_status_with_its_message(Exception error, StatusCode expected)
+    [MemberData(nameof(ErrorsForTheCaller))]
+    public async Task Error_meant_for_the_caller_becomes_its_status_with_its_message(Exception error, StatusCode expected)
     {
         var exception = await Assert.ThrowsAsync<RpcException>(() => CallFailingWith(error));
 
