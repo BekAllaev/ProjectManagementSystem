@@ -4,6 +4,8 @@ using ProjectManagementSystem.Api.Services;
 using ProjectManagementSystem.Application;
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Infrastructure;
+using ProjectManagementSystem.Infrastructure.Identity;
+using ProjectManagementSystem.Infrastructure.Persistence;
 using ProtoBuf.Grpc.Server;
 
 // Backend of the Blazor client: every command is a gRPC call (code-first, gRPC-Web for the browser).
@@ -17,6 +19,11 @@ builder.Services.AddCodeFirstGrpc(options => options.Interceptors.Add<DomainExce
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, ClaimsCurrentUser>();
 
+// Login and refresh go over HTTP (/auth/login, /auth/refresh); the bearer token they issue authenticates the gRPC
+// calls. AddIdentityApiEndpoints makes the bearer-or-cookie scheme of Identity the default one.
+builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddClaimsPrincipalFactory<EmployeeClaimsPrincipalFactory>();
 builder.Services.AddAuthorization();
 
 // The client runs on another origin. A browser lets it read the gRPC status only if these headers are exposed.
@@ -31,7 +38,10 @@ var app = builder.Build();
 
 app.UseGrpcWeb();
 app.UseCors();
+app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapAuthEndpoints();
 
 app.MapGrpcService<EmployeeGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<FundingGrpcService>().EnableGrpcWeb();
