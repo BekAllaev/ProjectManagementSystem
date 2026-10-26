@@ -38,6 +38,7 @@ var app = builder.Build();
 
 app.UseGrpcWeb();
 app.UseCors();
+app.UseAuthEndpointsAllowList();
 app.UseAuthentication();
 app.UseAuthorization();
 

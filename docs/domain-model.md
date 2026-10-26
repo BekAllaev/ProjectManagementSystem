@@ -8,7 +8,7 @@
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
 | `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command records and `CreatedId`, the gRPC service interfaces (one per aggregate): the public surface of the backend |
 | `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
-| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per aggregate (each method only sends the command through MediatR), the interceptor that maps domain exceptions to gRPC status codes, `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`, without `/register`), whose bearer token authenticates the gRPC calls |
+| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per aggregate (each method only sends the command through MediatR), the interceptor that maps domain exceptions to gRPC status codes, `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`; only `POST /login`, `POST /refresh` and `GET /manage/info` are open, the rest answers 404), whose bearer token authenticates the gRPC calls |
 
 The API exposes every command and query over gRPC (code-first, protobuf-net.Grpc, with gRPC-Web for the browser).
 Commands, queries and their results are the gRPC messages themselves: `[DataContract]` with `[DataMember(Order = N)]`

@@ -118,6 +118,40 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
             .GetRequiredService<UserManager<ApplicationUser>>().FindByEmailAsync("new@example.com"));
     }
 
+    [Theory]
+    [InlineData("GET", "/confirmEmail?userId=x&code=y")]
+    [InlineData("POST", "/resendConfirmationEmail")]
+    [InlineData("POST", "/forgotPassword")]
+    [InlineData("POST", "/resetPassword")]
+    [InlineData("POST", "/manage/2fa")]
+    [InlineData("POST", "/manage/info")]
+    [InlineData("POST", "/Register/")]
+    public async Task Other_identity_endpoints_are_not_published(string method, string path)
+    {
+        using var http = _factory.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await LoginAsync(Guid.NewGuid()));
+        using var request = new HttpRequestMessage(new HttpMethod(method), AuthPrefix + path);
+        if (method == "POST")
+            request.Content = JsonContent.Create(new { email = "someone@example.com" });
+
+        using var response = await http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Signed_in_account_reads_its_info()
+    {
+        var employeeId = Guid.NewGuid();
+        using var http = _factory.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await LoginAsync(employeeId));
+
+        using var response = await http.GetAsync($"{AuthPrefix}/manage/info");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Contains($"{employeeId}@example.com", await response.Content.ReadAsStringAsync());
+    }
+
     [Fact]
     public async Task Response_to_the_client_origin_exposes_the_grpc_headers()
     {
