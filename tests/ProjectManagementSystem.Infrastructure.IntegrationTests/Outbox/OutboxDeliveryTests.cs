@@ -27,7 +27,7 @@ public sealed class OutboxDeliveryTests(IntegrationTestDatabase database) : Inte
     [SqlServerFact]
     public async Task Messages_are_delivered_in_the_order_of_saving_and_marked_processed()
     {
-        var projectId = await SendAsync(new CreateProjectCommand("Project", null, "USD"));
+        var projectId = (await SendAsync(new CreateProjectCommand("Project", null, "USD"))).Id;
         await SendAsync(new CreateRoleCommand(projectId, "Developer", null));
         await SendAsync(new CreateRoleCommand(projectId, "Tester", null));
 
@@ -44,7 +44,7 @@ public sealed class OutboxDeliveryTests(IntegrationTestDatabase database) : Inte
     {
         _log.FailingType = typeof(RoleCreated);
         _log.FailuresLeft = 1;
-        var projectId = await SendAsync(new CreateProjectCommand("Project", null, "USD"));
+        var projectId = (await SendAsync(new CreateProjectCommand("Project", null, "USD"))).Id;
         await SendAsync(new CreateRoleCommand(projectId, "Developer", null));
         await SendAsync(new CreateRoleCommand(projectId, "Tester", null));
 
@@ -74,9 +74,9 @@ public sealed class OutboxDeliveryTests(IntegrationTestDatabase database) : Inte
     public async Task After_the_last_attempt_the_event_type_is_parked_and_the_rest_of_the_queue_goes_on()
     {
         _log.FailingType = typeof(RoleCreated);
-        var projectId = await SendAsync(new CreateProjectCommand("Project", null, "USD"));
+        var projectId = (await SendAsync(new CreateProjectCommand("Project", null, "USD"))).Id;
         await SendAsync(new CreateRoleCommand(projectId, "Developer", null));
-        var otherProjectId = await SendAsync(new CreateProjectCommand("Other", null, "EUR"));
+        var otherProjectId = (await SendAsync(new CreateProjectCommand("Other", null, "EUR"))).Id;
         await SendAsync(new CreateRoleCommand(projectId, "Tester", null));
 
         var nextAttemptAt = await DrainOutboxAsync();
@@ -108,7 +108,7 @@ public sealed class OutboxDeliveryTests(IntegrationTestDatabase database) : Inte
         await processor.StartAsync(CancellationToken.None);
         try
         {
-            var projectId = await SendAsync(new CreateProjectCommand("Project", null, "USD"));
+            var projectId = (await SendAsync(new CreateProjectCommand("Project", null, "USD"))).Id;
 
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             while (!_log.Delivered.OfType<ProjectCreated>().Any(e => e.ProjectId == projectId))

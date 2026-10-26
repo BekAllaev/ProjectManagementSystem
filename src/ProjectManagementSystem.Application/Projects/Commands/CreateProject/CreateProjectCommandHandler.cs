@@ -5,9 +5,9 @@ using ProjectManagementSystem.Domain.Projects;
 namespace ProjectManagementSystem.Application.Projects.Commands.CreateProject;
 
 public sealed class CreateProjectCommandHandler(IRepository<Project> projects, TimeProvider timeProvider)
-    : ICommandHandler<CreateProjectCommand, Guid>
+    : ICommandHandler<CreateProjectCommand, CreatedId>
 {
-    public Task<Guid> Handle(CreateProjectCommand command, CancellationToken cancellationToken)
+    public Task<CreatedId> Handle(CreateProjectCommand command, CancellationToken cancellationToken)
     {
         var project = new Project(
             Guid.NewGuid(),
@@ -18,6 +18,6 @@ public sealed class CreateProjectCommandHandler(IRepository<Project> projects, T
 
         projects.Add(project);
 
-        return Task.FromResult(project.Id);
+        return Task.FromResult(new CreatedId(project.Id));
     }
 }

@@ -96,7 +96,7 @@ public class WorkPackageCommandTests : CommandTestBase
         var project = SeedProject(_colleague);
         var workPackage = SeedWorkPackage(project);
 
-        var taskId = await App.SendAsync(new CreateTaskCommand(workPackage.Id, "Mockups", null, _colleague, EstimatedEffort: 8m));
+        var taskId = (await App.SendAsync(new CreateTaskCommand(workPackage.Id, "Mockups", null, _colleague, EstimatedEffort: 8m))).Id;
 
         var task = workPackage.GetTask(taskId);
         Assert.Equal(ProjectTaskStatus.Open, task.Status);

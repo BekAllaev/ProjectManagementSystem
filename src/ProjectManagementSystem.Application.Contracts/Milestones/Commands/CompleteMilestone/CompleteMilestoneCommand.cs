@@ -1,3 +1,4 @@
+using System.Runtime.Serialization;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 
 namespace ProjectManagementSystem.Application.Milestones.Commands.CompleteMilestone;
@@ -5,4 +6,14 @@ namespace ProjectManagementSystem.Application.Milestones.Commands.CompleteMilest
 /// <summary>
 /// Completes the milestone, even if not all its tasks are done; afterwards it is frozen.
 /// </summary>
-public sealed record CompleteMilestoneCommand(Guid MilestoneId) : ICommand;
+[DataContract]
+public sealed record CompleteMilestoneCommand(
+    [property: DataMember(Order = 1)] Guid MilestoneId) : ICommand
+{
+    /// <summary>
+    /// For the serializer of gRPC only.
+    /// </summary>
+    private CompleteMilestoneCommand() : this(Guid.Empty)
+    {
+    }
+}

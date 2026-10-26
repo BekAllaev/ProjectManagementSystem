@@ -12,7 +12,7 @@ public class EmployeeCommandTests : CommandTestBase
     [Fact]
     public async Task RegisterEmployee_UnusedEmail_AddsEmployee()
     {
-        var employeeId = await App.SendAsync(new RegisterEmployeeCommand("Grace", "Hopper", "Grace@Example.com"));
+        var employeeId = (await App.SendAsync(new RegisterEmployeeCommand("Grace", "Hopper", "Grace@Example.com"))).Id;
 
         var employee = Assert.Single(App.Employees.All);
         Assert.Equal(employeeId, employee.Id);

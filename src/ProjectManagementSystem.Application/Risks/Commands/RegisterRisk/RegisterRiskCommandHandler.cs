@@ -10,9 +10,9 @@ namespace ProjectManagementSystem.Application.Risks.Commands.RegisterRisk;
 /// Risk is a plain register record without domain rules; the project is only read to reject an unknown id.
 /// </summary>
 public sealed class RegisterRiskCommandHandler(IRepository<Project> projects, IRepository<Risk> risks)
-    : ICommandHandler<RegisterRiskCommand, Guid>
+    : ICommandHandler<RegisterRiskCommand, CreatedId>
 {
-    public async Task<Guid> Handle(RegisterRiskCommand command, CancellationToken cancellationToken)
+    public async Task<CreatedId> Handle(RegisterRiskCommand command, CancellationToken cancellationToken)
     {
         var project = await projects.GetAsync(command.ProjectId, cancellationToken);
 
@@ -20,6 +20,6 @@ public sealed class RegisterRiskCommandHandler(IRepository<Project> projects, IR
             Guid.NewGuid(), project.Id, command.Description, command.Probability, command.Impact, command.OwnerId, RiskStatus.Open);
 
         risks.Add(risk);
-        return risk.Id;
+        return new CreatedId(risk.Id);
     }
 }

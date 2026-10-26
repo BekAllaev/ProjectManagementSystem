@@ -19,8 +19,8 @@ public class CreateWorkPackageTests
     {
         var project = _app.Projects.Seed(TestData.ProjectWithTeam(_member));
 
-        var workPackageId = await CreateHandler().Handle(
-            new CreateWorkPackageCommand(project.Id, "Design", _member), CancellationToken.None);
+        var workPackageId = (await CreateHandler().Handle(
+            new CreateWorkPackageCommand(project.Id, "Design", _member), CancellationToken.None)).Id;
 
         var workPackage = Assert.Single(_app.WorkPackages.All);
         Assert.Equal(workPackageId, workPackage.Id);
@@ -37,7 +37,7 @@ public class CreateWorkPackageTests
     {
         var project = _app.Projects.Seed(TestData.ProjectWithTeam(_member));
 
-        var workPackageId = await _app.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", _member));
+        var workPackageId = (await _app.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", _member))).Id;
 
         Assert.Equal(1, _app.UnitOfWork.SaveCount);
         Assert.Same(_app.WorkPackages.All.Single(), Assert.Single(_app.UnitOfWork.ChangedAggregates));

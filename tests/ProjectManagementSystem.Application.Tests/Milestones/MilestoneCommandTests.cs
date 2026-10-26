@@ -31,7 +31,7 @@ public class MilestoneCommandTests : CommandTestBase
     [Fact]
     public async Task CreateMilestone_OpenProject_AddsOpenMilestone()
     {
-        var milestoneId = await App.SendAsync(new CreateMilestoneCommand(_project.Id, "Beta", null, Today.AddDays(30)));
+        var milestoneId = (await App.SendAsync(new CreateMilestoneCommand(_project.Id, "Beta", null, Today.AddDays(30)))).Id;
 
         var milestone = Assert.Single(App.Milestones.All);
         Assert.Equal(milestoneId, milestone.Id);

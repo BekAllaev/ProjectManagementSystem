@@ -1,5 +1,17 @@
+using System.Runtime.Serialization;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 
 namespace ProjectManagementSystem.Application.Employees.Commands.ChangeEmployeeEmail;
 
-public sealed record ChangeEmployeeEmailCommand(Guid EmployeeId, string Email) : ICommand;
+[DataContract]
+public sealed record ChangeEmployeeEmailCommand(
+    [property: DataMember(Order = 1)] Guid EmployeeId,
+    [property: DataMember(Order = 2)] string Email) : ICommand
+{
+    /// <summary>
+    /// For the serializer of gRPC only.
+    /// </summary>
+    private ChangeEmployeeEmailCommand() : this(default, default!)
+    {
+    }
+}

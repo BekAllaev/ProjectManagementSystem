@@ -29,7 +29,7 @@ public class TimeTrackingCommandTests : CommandTestBase
     [Fact]
     public async Task LogTime_FirstEntry_CreatesTimeLogWithRateSnapshot()
     {
-        var entryId = await App.SendAsync(LogTime(Today, hours: 2m));
+        var entryId = (await App.SendAsync(LogTime(Today, hours: 2m))).Id;
 
         var timeLog = Assert.Single(App.TimeLogs.All);
         Assert.Equal(_task.Id, timeLog.TaskId);

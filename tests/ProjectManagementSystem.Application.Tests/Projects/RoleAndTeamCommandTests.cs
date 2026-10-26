@@ -19,7 +19,7 @@ public class RoleAndTeamCommandTests : CommandTestBase
     {
         var project = SeedProject();
 
-        var roleId = await App.SendAsync(new CreateRoleCommand(project.Id, "Tester", null));
+        var roleId = (await App.SendAsync(new CreateRoleCommand(project.Id, "Tester", null))).Id;
 
         Assert.Contains(project.Roles, r => r.Id == roleId && r.Name == "Tester");
         AssertCommitted(project, typeof(RoleCreated));
@@ -92,8 +92,8 @@ public class RoleAndTeamCommandTests : CommandTestBase
         var project = SeedProject();
         var employee = await SeedEmployeeAsync("ada@example.com");
 
-        var teamMemberId = await App.SendAsync(
-            new AddTeamMemberCommand(project.Id, employee.Id, AssignedRole(project), Today, HourlyRate: 60m));
+        var teamMemberId = (await App.SendAsync(
+            new AddTeamMemberCommand(project.Id, employee.Id, AssignedRole(project), Today, HourlyRate: 60m))).Id;
 
         var teamMember = project.TeamMembers.Single(m => m.Id == teamMemberId);
         Assert.Equal(employee.Id, teamMember.EmployeeId);
