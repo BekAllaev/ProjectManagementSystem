@@ -16,7 +16,7 @@ public class WorkPackageTests
         var workPackage = TestData.WorkPackage(project, _employeeId);
         workPackage.Complete();
 
-        Assert.Throws<DomainException>(() => TestData.Task(project, workPackage, _employeeId));
+        Assert.Throws<DomainRuleViolationException>(() => TestData.Task(project, workPackage, _employeeId));
     }
 
     [Fact]
@@ -27,7 +27,7 @@ public class WorkPackageTests
         var done = TestData.Task(project, workPackage, _employeeId);
         var dropped = TestData.Task(project, workPackage, _employeeId);
 
-        Assert.Throws<DomainException>(workPackage.Complete);
+        Assert.Throws<DomainRuleViolationException>(workPackage.Complete);
 
         workPackage.StartTask(done.Id);
         workPackage.CompleteTask(done.Id);
@@ -68,12 +68,12 @@ public class WorkPackageTests
         var workPackage = TestData.WorkPackage(project, _employeeId);
         var task = TestData.Task(project, workPackage, _employeeId);
 
-        Assert.Throws<DomainException>(() => workPackage.CompleteTask(task.Id));
+        Assert.Throws<DomainRuleViolationException>(() => workPackage.CompleteTask(task.Id));
 
         workPackage.StartTask(task.Id);
         workPackage.CompleteTask(task.Id);
 
         Assert.Equal(ProjectTaskStatus.Completed, task.Status);
-        Assert.Throws<DomainException>(() => workPackage.CancelTask(task.Id));
+        Assert.Throws<DomainRuleViolationException>(() => workPackage.CancelTask(task.Id));
     }
 }

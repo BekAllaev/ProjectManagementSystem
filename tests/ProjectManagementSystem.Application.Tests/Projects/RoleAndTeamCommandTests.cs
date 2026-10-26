@@ -26,11 +26,11 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CreateRole_DuplicateName_ThrowsDomainException()
+    public async Task CreateRole_DuplicateName_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new CreateRoleCommand(project.Id, "developer", null)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CreateRoleCommand(project.Id, "developer", null)));
     }
 
     [Fact]
@@ -46,11 +46,11 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RenameRole_AssignedRole_ThrowsDomainException()
+    public async Task RenameRole_AssignedRole_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new RenameRoleCommand(project.Id, AssignedRole(project), "Engineer")));
     }
 
@@ -79,11 +79,11 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task DeleteRole_AssignedRole_ThrowsDomainException()
+    public async Task DeleteRole_AssignedRole_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new DeleteRoleCommand(project.Id, AssignedRole(project))));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new DeleteRoleCommand(project.Id, AssignedRole(project))));
     }
 
     [Fact]
@@ -102,23 +102,23 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task AddTeamMember_UnknownEmployee_ThrowsNotFoundException()
+    public async Task AddTeamMember_UnknownEmployee_ThrowsAggregateNotFoundException()
     {
         var project = SeedProject();
 
-        await AssertRejectedAsync<NotFoundException>(() =>
+        await AssertRejectedAsync<AggregateNotFoundException>(() =>
             App.SendAsync(new AddTeamMemberCommand(project.Id, Guid.NewGuid(), AssignedRole(project), Today, 60m)));
     }
 
     [Fact]
-    public async Task AddTeamMember_OverlappingPeriod_ThrowsDomainException()
+    public async Task AddTeamMember_OverlappingPeriod_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
         var employee = await SeedEmployeeAsync("ada@example.com");
         project.AddTeamMember(employee.Id, AssignedRole(project), Today.AddDays(-10), 50m);
         project.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new AddTeamMemberCommand(project.Id, employee.Id, AssignedRole(project), Today, 60m)));
     }
 
@@ -136,12 +136,12 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RemoveTeamMember_ResponsibleForOpenWorkPackage_ThrowsDomainException()
+    public async Task RemoveTeamMember_ResponsibleForOpenWorkPackage_ThrowsDomainRuleViolationException()
     {
         var project = SeedProject();
         SeedWorkPackage(project);
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new RemoveTeamMemberCommand(project.Id, Member, Today)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new RemoveTeamMemberCommand(project.Id, Member, Today)));
         Assert.True(project.IsTeamMemberOn(Member, Today.AddDays(1)));
     }
 
@@ -157,12 +157,12 @@ public class RoleAndTeamCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ChangeHourlyRate_BeforeTodayOfTimeProvider_ThrowsDomainException()
+    public async Task ChangeHourlyRate_BeforeTodayOfTimeProvider_ThrowsDomainValidationException()
     {
         var project = SeedProject();
         App.TimeProvider.Advance(TimeSpan.FromDays(10));
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainValidationException>(() =>
             App.SendAsync(new ChangeHourlyRateCommand(project.Id, Member, 70m, Today.AddDays(-5))));
     }
 

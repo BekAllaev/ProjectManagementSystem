@@ -258,7 +258,7 @@ invariant culture). `Email` keeps the email as entered. An employee is created b
 `EmployeeService.RegisterAsync` and its email is changed by `EmployeeService.ChangeEmailAsync` (the constructor
 and `ChangeEmail` are internal); both reject an email used by another employee. The check is the
 precondition; the last line of defence against two concurrent registrations is a unique index on
-`NormalizedEmail` in the database, whose violation the infrastructure translates into a `DomainException`.
+`NormalizedEmail` in the database, whose violation the infrastructure translates into a `DomainRuleViolationException`.
 
 ## Cross-aggregate rules
 
@@ -307,7 +307,7 @@ Persistence and the composition root do not exist yet. When they are added:
 - map `Project.WorkPackageIds` so that a change of only this list updates the version of `Project`
   (for example as a primitive collection stored in the row of the project);
 - implement `IRepository<TAggregate>.ExistsAsync` (translated to a query), add a unique index on `Employee.NormalizedEmail` and translate its
-  violation into a `DomainException`.
+  violation into a `DomainRuleViolationException`.
 
 ## Read side (computed, not stored)
 

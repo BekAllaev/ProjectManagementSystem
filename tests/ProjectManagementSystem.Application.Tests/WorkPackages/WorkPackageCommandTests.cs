@@ -31,11 +31,11 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ChangeWorkPackageResponsible_NotTeamMember_ThrowsDomainException()
+    public async Task ChangeWorkPackageResponsible_NotTeamMember_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new ChangeWorkPackageResponsibleCommand(workPackage.Id, _outsider)));
         Assert.Equal(Member, workPackage.ResponsiblePersonId);
     }
@@ -54,11 +54,11 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CompleteWorkPackage_UnfinishedTask_ThrowsDomainException()
+    public async Task CompleteWorkPackage_UnfinishedTask_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new CompleteWorkPackageCommand(workPackage.Id)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CompleteWorkPackageCommand(workPackage.Id)));
     }
 
     [Fact]
@@ -81,13 +81,13 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CancelWorkPackage_AlreadyCancelled_ThrowsDomainException()
+    public async Task CancelWorkPackage_AlreadyCancelled_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
         workPackage.Cancel("First");
         workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new CancelWorkPackageCommand(workPackage.Id, "Second")));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CancelWorkPackageCommand(workPackage.Id, "Second")));
     }
 
     [Fact]
@@ -106,30 +106,30 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CreateTask_NotTeamMember_ThrowsDomainException()
+    public async Task CreateTask_NotTeamMember_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new CreateTaskCommand(workPackage.Id, "Mockups", null, _outsider, 8m)));
         Assert.Empty(workPackage.Tasks);
     }
 
     [Fact]
-    public async Task CreateTask_CancelledWorkPackage_ThrowsDomainException()
+    public async Task CreateTask_CancelledWorkPackage_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject());
         workPackage.Cancel("Out of scope");
         workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new CreateTaskCommand(workPackage.Id, "Mockups", null, Member, 8m)));
     }
 
     [Fact]
-    public async Task CreateTask_UnknownWorkPackage_ThrowsNotFoundException()
+    public async Task CreateTask_UnknownWorkPackage_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() =>
+        await AssertRejectedAsync<AggregateNotFoundException>(() =>
             App.SendAsync(new CreateTaskCommand(Guid.NewGuid(), "Mockups", null, Member, 8m)));
     }
 
@@ -146,11 +146,11 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ChangeTaskResponsible_NotTeamMember_ThrowsDomainException()
+    public async Task ChangeTaskResponsible_NotTeamMember_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new ChangeTaskResponsibleCommand(workPackage.Id, workPackage.Tasks.Single().Id, _outsider)));
     }
 
@@ -189,11 +189,11 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CompleteTask_OpenTask_ThrowsDomainException()
+    public async Task CompleteTask_OpenTask_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new CompleteTaskCommand(workPackage.Id, workPackage.Tasks.Single().Id)));
     }
 
@@ -210,7 +210,7 @@ public class WorkPackageCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task CancelTask_CompletedTask_ThrowsDomainException()
+    public async Task CancelTask_CompletedTask_ThrowsDomainRuleViolationException()
     {
         var workPackage = SeedWorkPackage(SeedProject(), taskCount: 1);
         var task = workPackage.Tasks.Single();
@@ -218,6 +218,6 @@ public class WorkPackageCommandTests : CommandTestBase
         workPackage.CompleteTask(task.Id);
         workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new CancelTaskCommand(workPackage.Id, task.Id)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new CancelTaskCommand(workPackage.Id, task.Id)));
     }
 }

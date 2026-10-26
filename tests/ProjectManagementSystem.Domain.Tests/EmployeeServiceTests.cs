@@ -20,7 +20,7 @@ public class EmployeeServiceTests
 
         Assert.Equal("Ada@Example.com", employee.Email);
         Assert.Equal("ada@example.com", employee.NormalizedEmail);
-        await Assert.ThrowsAsync<DomainException>(() => _service.RegisterAsync("Other", "Person", "ADA@example.COM"));
+        await Assert.ThrowsAsync<DomainRuleViolationException>(() => _service.RegisterAsync("Other", "Person", "ADA@example.COM"));
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class EmployeeServiceTests
         _employees.Add(ada);
         _employees.Add(alan);
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.ChangeEmailAsync(alan, "Ada@Example.com"));
+        await Assert.ThrowsAsync<DomainRuleViolationException>(() => _service.ChangeEmailAsync(alan, "Ada@Example.com"));
         Assert.Equal("alan@example.com", alan.Email);
 
         await _service.ChangeEmailAsync(ada, "ADA@example.com");

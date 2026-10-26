@@ -17,7 +17,7 @@ public class ScheduleNetworkTests
         _network.AddDependency(Link(_a, _b));
         _network.AddDependency(Link(_b, _c));
 
-        Assert.Throws<DomainException>(() => _network.AddDependency(Link(_c, _a)));
+        Assert.Throws<DomainRuleViolationException>(() => _network.AddDependency(Link(_c, _a)));
         Assert.Equal(2, _network.Dependencies.Count);
     }
 

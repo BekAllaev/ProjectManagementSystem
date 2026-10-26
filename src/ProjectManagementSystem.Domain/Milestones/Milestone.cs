@@ -59,7 +59,7 @@ public sealed class Milestone : AggregateRoot<Guid>
         EnsureOpen("add a task to");
 
         if (_taskIds.Contains(taskId))
-            throw new DomainException($"Task '{taskId}' is already in milestone '{Name}'.");
+            throw new DomainRuleViolationException($"Task '{taskId}' is already in milestone '{Name}'.");
 
         _taskIds.Add(taskId);
 
@@ -71,7 +71,7 @@ public sealed class Milestone : AggregateRoot<Guid>
         EnsureOpen("remove a task from");
 
         if (!_taskIds.Remove(taskId))
-            throw new DomainException($"Task '{taskId}' is not in milestone '{Name}'.");
+            throw new DomainRuleViolationException($"Task '{taskId}' is not in milestone '{Name}'.");
 
         RaiseDomainEvent(new MilestoneTaskRemoved(ProjectId, Id, taskId));
     }
@@ -113,6 +113,6 @@ public sealed class Milestone : AggregateRoot<Guid>
     private void EnsureOpen(string action)
     {
         if (Status != MilestoneStatus.Open)
-            throw new DomainException($"Cannot {action} milestone '{Name}' because it is already completed.");
+            throw new DomainRuleViolationException($"Cannot {action} milestone '{Name}' because it is already completed.");
     }
 }

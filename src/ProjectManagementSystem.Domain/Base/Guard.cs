@@ -7,7 +7,7 @@ internal static class Guard
     public static string NotEmpty(string? value, string name)
     {
         if (string.IsNullOrWhiteSpace(value))
-            throw new DomainException($"{name} must not be empty.");
+            throw new DomainValidationException($"{name} must not be empty.");
 
         return value.Trim();
     }
@@ -15,7 +15,7 @@ internal static class Guard
     public static decimal Positive(decimal value, string name)
     {
         if (value <= 0)
-            throw new DomainException($"{name} must be greater than zero.");
+            throw new DomainValidationException($"{name} must be greater than zero.");
 
         return value;
     }

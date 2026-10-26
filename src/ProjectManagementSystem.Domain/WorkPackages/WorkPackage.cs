@@ -95,7 +95,7 @@ public sealed class WorkPackage : AggregateRoot<Guid>
         EnsureOpen("complete");
 
         if (_tasks.Any(t => !t.IsFinished))
-            throw new DomainException("Work package can be completed only when all its tasks are completed or cancelled.");
+            throw new DomainRuleViolationException("Work package can be completed only when all its tasks are completed or cancelled.");
 
         Status = WorkPackageStatus.Completed;
         RaiseDomainEvent(new WorkPackageCompleted(ProjectId, Id));
@@ -124,6 +124,6 @@ public sealed class WorkPackage : AggregateRoot<Guid>
     private void EnsureOpen(string action)
     {
         if (Status != WorkPackageStatus.Open)
-            throw new DomainException($"Cannot {action} a work package that is {Status}.");
+            throw new DomainRuleViolationException($"Cannot {action} a work package that is {Status}.");
     }
 }

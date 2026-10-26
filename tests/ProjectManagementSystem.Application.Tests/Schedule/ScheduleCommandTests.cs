@@ -53,31 +53,31 @@ public class ScheduleCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task AddDependency_Cycle_ThrowsDomainException()
+    public async Task AddDependency_Cycle_ThrowsDomainRuleViolationException()
     {
         var network = SeedNetworkWith(A, B);
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(Dependency(_first, B, _first, A)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(Dependency(_first, B, _first, A)));
         Assert.Single(network.Dependencies);
     }
 
     [Fact]
-    public async Task AddDependency_CancelledTask_ThrowsDomainException()
+    public async Task AddDependency_CancelledTask_ThrowsDomainRuleViolationException()
     {
         _second.CancelTask(C);
         _second.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(Dependency(_first, A, _second, C)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(Dependency(_first, A, _second, C)));
         Assert.Empty(App.Networks.All);
     }
 
     [Fact]
-    public async Task AddDependency_ClosedProject_ThrowsDomainException()
+    public async Task AddDependency_ClosedProject_ThrowsDomainRuleViolationException()
     {
         TestData.Close(_project);
         _project.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(Dependency(_first, A, _second, C)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(Dependency(_first, A, _second, C)));
     }
 
     [Fact]
@@ -98,17 +98,17 @@ public class ScheduleCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RemoveDependency_MissingDependency_ThrowsDomainException()
+    public async Task RemoveDependency_MissingDependency_ThrowsDomainRuleViolationException()
     {
         SeedNetworkWith(A, B);
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(new RemoveDependencyCommand(_project.Id, B, A)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(new RemoveDependencyCommand(_project.Id, B, A)));
     }
 
     [Fact]
-    public async Task RemoveDependency_ProjectWithoutNetwork_ThrowsNotFoundException()
+    public async Task RemoveDependency_ProjectWithoutNetwork_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() => App.SendAsync(new RemoveDependencyCommand(_project.Id, A, B)));
+        await AssertRejectedAsync<AggregateNotFoundException>(() => App.SendAsync(new RemoveDependencyCommand(_project.Id, A, B)));
     }
 
     private AddDependencyCommand Dependency(WorkPackage predecessorPackage, Guid predecessor, WorkPackage successorPackage, Guid successor) =>

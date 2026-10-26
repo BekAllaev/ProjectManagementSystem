@@ -12,6 +12,6 @@ internal static class WorkPackagesOfProject
     public static void EnsureComplete(Project project, IReadOnlyCollection<WorkPackage> workPackages)
     {
         if (!project.WorkPackageIds.ToHashSet().SetEquals(workPackages.Select(wp => wp.Id)))
-            throw new DomainException($"The given work packages are not exactly the work packages of project '{project.Id}'.");
+            throw new DomainValidationException($"The given work packages are not exactly the work packages of project '{project.Id}'.");
     }
 }

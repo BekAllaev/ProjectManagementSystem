@@ -24,9 +24,9 @@ public class RiskCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RegisterRisk_UnknownProject_ThrowsNotFoundException()
+    public async Task RegisterRisk_UnknownProject_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() =>
+        await AssertRejectedAsync<AggregateNotFoundException>(() =>
             App.SendAsync(new RegisterRiskCommand(Guid.NewGuid(), "Key developer leaves", RiskLevel.Low, RiskLevel.High, Member)));
     }
 

@@ -57,7 +57,7 @@ public sealed class TransactionalOutboxTests(IntegrationTestDatabase database) :
             scope.ServiceProvider.GetRequiredService<IRepository<Project>>().Add(project);
             scope.ServiceProvider.GetRequiredService<IRepository<Employee>>().Add(twin);
 
-            await Assert.ThrowsAsync<DomainException>(() => scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync());
+            await Assert.ThrowsAsync<DomainRuleViolationException>(() => scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync());
         }
 
         Assert.False(await QueryAsync(db => db.Set<Project>().AnyAsync(p => p.Id == project.Id)));

@@ -12,7 +12,7 @@ public sealed record Currency
     public Currency(string code)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Trim().Length != 3 || !code.Trim().All(char.IsLetter))
-            throw new DomainException($"'{code}' is not a valid currency code.");
+            throw new DomainValidationException($"'{code}' is not a valid currency code.");
 
         Code = code.Trim().ToUpperInvariant();
     }

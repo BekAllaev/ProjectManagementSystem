@@ -47,13 +47,13 @@ public class CreateWorkPackageTests
     }
 
     [Fact]
-    public async Task Pipeline_ClosedProject_ThrowsDomainExceptionAndSavesNothing()
+    public async Task Pipeline_ClosedProject_ThrowsDomainRuleViolationExceptionAndSavesNothing()
     {
         var project = TestData.ProjectWithTeam(_member);
         TestData.Close(project);
         _app.Projects.Seed(project);
 
-        await Assert.ThrowsAsync<DomainException>(() =>
+        await Assert.ThrowsAsync<DomainRuleViolationException>(() =>
             _app.SendAsync(new CreateWorkPackageCommand(project.Id, "Design", _member)));
 
         Assert.Empty(_app.WorkPackages.All);
@@ -62,11 +62,11 @@ public class CreateWorkPackageTests
     }
 
     [Fact]
-    public async Task Pipeline_UnknownProject_ThrowsNotFoundExceptionAndSavesNothing()
+    public async Task Pipeline_UnknownProject_ThrowsAggregateNotFoundExceptionAndSavesNothing()
     {
         var projectId = Guid.NewGuid();
 
-        var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
+        var exception = await Assert.ThrowsAsync<AggregateNotFoundException>(() =>
             _app.SendAsync(new CreateWorkPackageCommand(projectId, "Design", _member)));
 
         Assert.Equal(projectId, exception.Id);

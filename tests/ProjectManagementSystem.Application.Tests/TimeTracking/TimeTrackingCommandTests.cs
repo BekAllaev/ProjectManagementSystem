@@ -62,9 +62,9 @@ public class TimeTrackingCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task LogTime_DateAfterTodayOfTimeProvider_ThrowsDomainException()
+    public async Task LogTime_DateAfterTodayOfTimeProvider_ThrowsDomainValidationException()
     {
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(LogTime(Today.AddDays(1), hours: 2m)));
+        await AssertRejectedAsync<DomainValidationException>(() => App.SendAsync(LogTime(Today.AddDays(1), hours: 2m)));
         Assert.Empty(App.TimeLogs.All);
     }
 
@@ -79,26 +79,26 @@ public class TimeTrackingCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task LogTime_TaskNotInProgress_ThrowsDomainException()
+    public async Task LogTime_TaskNotInProgress_ThrowsDomainRuleViolationException()
     {
         _workPackage.CompleteTask(_task.Id);
         _workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() => App.SendAsync(LogTime(Today, hours: 2m)));
+        await AssertRejectedAsync<DomainRuleViolationException>(() => App.SendAsync(LogTime(Today, hours: 2m)));
         Assert.Empty(App.TimeLogs.All);
     }
 
     [Fact]
-    public async Task LogTime_NotTeamMember_ThrowsDomainException()
+    public async Task LogTime_NotTeamMember_ThrowsDomainRuleViolationException()
     {
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new LogTimeCommand(_workPackage.Id, _task.Id, Guid.NewGuid(), Today, 2m)));
     }
 
     [Fact]
-    public async Task LogTime_UnknownWorkPackage_ThrowsNotFoundException()
+    public async Task LogTime_UnknownWorkPackage_ThrowsAggregateNotFoundException()
     {
-        await AssertRejectedAsync<NotFoundException>(() =>
+        await AssertRejectedAsync<AggregateNotFoundException>(() =>
             App.SendAsync(new LogTimeCommand(Guid.NewGuid(), _task.Id, Member, Today, 2m)));
     }
 
@@ -114,13 +114,13 @@ public class TimeTrackingCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task RemoveTimeEntry_TaskCompleted_ThrowsDomainException()
+    public async Task RemoveTimeEntry_TaskCompleted_ThrowsDomainRuleViolationException()
     {
         var timeLog = SeedTimeLogWithEntry(Today, hours: 1m);
         _workPackage.CompleteTask(_task.Id);
         _workPackage.ClearDomainEvents();
 
-        await AssertRejectedAsync<DomainException>(() =>
+        await AssertRejectedAsync<DomainRuleViolationException>(() =>
             App.SendAsync(new RemoveTimeEntryCommand(_task.Id, timeLog.Entries.Single().Id)));
         Assert.Single(timeLog.Entries);
     }

@@ -44,6 +44,6 @@ public sealed class EmployeeService(IRepository<Employee> employees)
     /// Error of a taken email. Also thrown by the persistence when the unique index stops a concurrent registration
     /// or change of the email, so the caller sees the same error either way.
     /// </summary>
-    public static DomainException EmailIsTaken(string normalizedEmail) =>
+    public static DomainRuleViolationException EmailIsTaken(string normalizedEmail) =>
         new($"Email '{normalizedEmail}' is already used by another employee.");
 }

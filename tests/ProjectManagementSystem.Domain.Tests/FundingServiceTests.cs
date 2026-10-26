@@ -29,7 +29,7 @@ public class FundingServiceTests
         var funding = _service.CreateFunding(project);
         TestData.Close(project);
 
-        Assert.Throws<DomainException>(() => _service.AddFunding(project, funding, 1000m, TestData.Today, "Late"));
+        Assert.Throws<DomainRuleViolationException>(() => _service.AddFunding(project, funding, 1000m, TestData.Today, "Late"));
         Assert.Empty(funding.Tranches);
     }
 
@@ -39,6 +39,6 @@ public class FundingServiceTests
         var project = TestData.ProjectWithTeam();
         var foreign = _service.CreateFunding(TestData.ProjectWithTeam());
 
-        Assert.Throws<DomainException>(() => _service.AddFunding(project, foreign, 1000m, TestData.Today, "Wrong"));
+        Assert.Throws<DomainValidationException>(() => _service.AddFunding(project, foreign, 1000m, TestData.Today, "Wrong"));
     }
 }

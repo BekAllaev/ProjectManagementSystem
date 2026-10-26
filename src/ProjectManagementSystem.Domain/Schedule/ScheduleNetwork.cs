@@ -32,13 +32,13 @@ public sealed class ScheduleNetwork : AggregateRoot<Guid>
     internal void AddDependency(Dependency dependency)
     {
         if (dependency.PredecessorTaskId == dependency.SuccessorTaskId)
-            throw new DomainException("Task cannot depend on itself.");
+            throw new DomainValidationException("Task cannot depend on itself.");
 
         if (FindDependency(dependency.PredecessorTaskId, dependency.SuccessorTaskId) is not null)
-            throw new DomainException("Dependency between these tasks already exists.");
+            throw new DomainRuleViolationException("Dependency between these tasks already exists.");
 
         if (IsReachable(from: dependency.SuccessorTaskId, to: dependency.PredecessorTaskId))
-            throw new DomainException("Dependency would create a cycle in the schedule network.");
+            throw new DomainRuleViolationException("Dependency would create a cycle in the schedule network.");
 
         _dependencies.Add(dependency);
         RaiseDomainEvent(new DependencyAdded(ProjectId, dependency));
@@ -47,7 +47,7 @@ public sealed class ScheduleNetwork : AggregateRoot<Guid>
     public void RemoveDependency(Guid predecessorTaskId, Guid successorTaskId)
     {
         var dependency = FindDependency(predecessorTaskId, successorTaskId)
-            ?? throw new DomainException("Dependency between these tasks does not exist.");
+            ?? throw new DomainRuleViolationException("Dependency between these tasks does not exist.");
 
         _dependencies.Remove(dependency);
         RaiseDomainEvent(new DependencyRemoved(ProjectId, dependency));

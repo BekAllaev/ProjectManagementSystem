@@ -25,10 +25,10 @@ public sealed class ScheduleNetworkService
         DependencyType type)
     {
         if (network.ProjectId != project.Id)
-            throw new DomainException($"Schedule network '{network.Id}' does not belong to project '{project.Id}'.");
+            throw new DomainValidationException($"Schedule network '{network.Id}' does not belong to project '{project.Id}'.");
 
         if (!project.IsOpen)
-            throw new DomainException($"Project '{project.Id}' is {project.State}; it gets no new dependencies.");
+            throw new DomainRuleViolationException($"Project '{project.Id}' is {project.State}; it gets no new dependencies.");
 
         EnsureCanTakePart(network, predecessorWorkPackage, predecessorTaskId);
         EnsureCanTakePart(network, successorWorkPackage, successorTaskId);
@@ -40,10 +40,10 @@ public sealed class ScheduleNetworkService
     private static void EnsureCanTakePart(ScheduleNetwork network, WorkPackage workPackage, Guid taskId)
     {
         if (workPackage.ProjectId != network.ProjectId)
-            throw new DomainException($"Work package '{workPackage.Id}' does not belong to project '{network.ProjectId}'.");
+            throw new DomainValidationException($"Work package '{workPackage.Id}' does not belong to project '{network.ProjectId}'.");
 
         var task = workPackage.GetTask(taskId);
         if (task.Status == ProjectTaskStatus.Cancelled)
-            throw new DomainException($"Cancelled task '{task.Name}' cannot take part in a dependency.");
+            throw new DomainRuleViolationException($"Cancelled task '{task.Name}' cannot take part in a dependency.");
     }
 }
