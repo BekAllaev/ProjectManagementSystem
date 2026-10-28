@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Behaviors;
 using ProjectManagementSystem.Application.Events;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Services;
 
 namespace ProjectManagementSystem.Application;
@@ -12,7 +13,8 @@ public static class DependencyInjection
 {
     /// <summary>
     /// Registers command handlers, validators, pipeline behaviors, domain event handlers and domain
-    /// services. The infrastructure registers <see cref="IUnitOfWork"/> and the repositories, the host registers
+    /// services. The infrastructure registers <see cref="IUnitOfWork"/>, the repositories and the repositories of the read
+    /// models, the host registers
     /// <see cref="ICurrentUser"/>.
     /// </summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
@@ -42,6 +44,8 @@ public static class DependencyInjection
         services.AddScoped<MilestoneService>();
         services.AddScoped<FundingService>();
         services.AddScoped<EmployeeService>();
+
+        services.AddScoped<ProjectReadModelRefresher>();
 
         return services;
     }

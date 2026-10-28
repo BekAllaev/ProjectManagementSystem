@@ -44,7 +44,6 @@ public static class DependencyInjection
         services.AddScoped<INotificationSender, NotificationSender>();
 
         services.AddScoped<ReadModelStore>();
-        services.AddScoped<ProjectReadModelRefresher>();
         AddProjections(services);
 
         return services;

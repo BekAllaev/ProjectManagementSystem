@@ -51,6 +51,7 @@ public sealed class TestApplication : IDisposable
         services.AddSingleton<IRepository<ProjectFunding>>(Fundings);
         services.AddSingleton<IRepository<Risk>>(Risks);
         services.AddSingleton<IRepository<Employee>>(Employees);
+        services.AddSingleton(typeof(IReadModelRepository<>), typeof(FakeReadModelRepository<>));
         configure?.Invoke(services);
 
         _services = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });

@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.WorkPackages.Queries.GetTask;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
 

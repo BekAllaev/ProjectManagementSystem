@@ -13,6 +13,7 @@ using ProjectManagementSystem.Domain.TimeTracking.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.Persistence.Repositories;
 using ProjectManagementSystem.Infrastructure.ReadModels.Projections;
 
 namespace ProjectManagementSystem.Infrastructure.ReadModels;
@@ -63,7 +64,10 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext)
     private async Task RebuildProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
         var store = new ReadModelStore(dbContext);
-        var refresher = new ProjectReadModelRefresher(store);
+        var refresher = new ProjectReadModelRefresher(
+            Rows<ProjectItemView>(), Rows<TaskItemView>(), Rows<TimeEntryItemView>(), Rows<WorkPackageItemView>(), Rows<DependencyItemView>(),
+            Rows<MilestoneTaskItemView>(), Rows<MilestoneItemView>(), Rows<FundingTrancheItemView>(), Rows<MemberCostItemView>(),
+            Rows<WorkPackageCostItemView>());
         var projects = new ProjectProjection(store);
         var workPackageProjection = new WorkPackageProjection(store, refresher);
         var schedule = new ScheduleProjection(store, refresher);
@@ -139,6 +143,8 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext)
         foreach (var milestone in await dbContext.Set<Milestone>().AsNoTracking().Where(m => m.ProjectId == projectId).ToListAsync(cancellationToken))
             await RebuildMilestoneAsync(milestoneProjection, milestone, cancellationToken);
     }
+
+    private EfReadModelRepository<TRow> Rows<TRow>() where TRow : class => new(dbContext);
 
     private static async Task RebuildWorkPackageAsync(
         WorkPackageProjection projection, WorkPackage workPackage, Func<DateTime> next, CancellationToken cancellationToken)

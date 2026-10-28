@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Milestones;
 using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones;
 using ProjectManagementSystem.Infrastructure.Persistence;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Milestones;
 
