@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the time log of a task (<c>TimeEntryItem</c>).

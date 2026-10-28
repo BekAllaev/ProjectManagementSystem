@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Milestones;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the list of milestones (<c>MilestoneItem</c>); its tasks are in <see cref="MilestoneTaskItemView"/>.

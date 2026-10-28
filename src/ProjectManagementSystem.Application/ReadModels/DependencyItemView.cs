@@ -1,7 +1,7 @@
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the list of dependencies (<c>DependencyItem</c>) and of the dependencies of a task

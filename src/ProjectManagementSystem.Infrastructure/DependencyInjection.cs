@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<EfUnitOfWork>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<EfUnitOfWork>());
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+        services.AddScoped(typeof(IReadModelRepository<>), typeof(EfReadModelRepository<>));
         services.AddScoped<INotificationSender, NotificationSender>();
 
         services.AddScoped<ReadModelStore>();

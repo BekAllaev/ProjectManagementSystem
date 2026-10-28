@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the team of a project, one per employee (<c>TeamMemberItem</c>); its periods and rates are in

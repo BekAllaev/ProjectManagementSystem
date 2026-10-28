@@ -1,4 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Funding.Events;
 
 namespace ProjectManagementSystem.Infrastructure.ReadModels.Projections;
