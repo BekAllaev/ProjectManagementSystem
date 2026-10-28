@@ -11,7 +11,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 
-public sealed class WorkPackageQueryTests : QueryTestBase
+public sealed class WorkPackageQueryTests : SqliteTestBase
 {
     private readonly Guid _colleague = Guid.NewGuid();
     private readonly Project _project;

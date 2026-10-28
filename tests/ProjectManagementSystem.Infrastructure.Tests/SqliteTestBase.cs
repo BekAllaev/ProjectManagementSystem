@@ -15,22 +15,22 @@ using ProjectManagementSystem.Domain.Tests.Fakes;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
 
-namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
+namespace ProjectManagementSystem.Infrastructure.Tests;
 
 /// <summary>
-/// Queries go through the real <c>AddApplication()</c> and <c>AddInfrastructure()</c> (validation, the handlers of the
+/// Requests go through the real <c>AddApplication()</c> and <c>AddInfrastructure()</c> (validation, the handlers of the
 /// infrastructure) against SQLite in memory: a relational provider, so the LINQ of the handlers is translated to SQL as
 /// in production (the EF in-memory provider cannot store the complex property of <c>Project</c>). Aggregates are
 /// arranged with domain methods and stored directly. Every request runs in its own scope, like a web request.
 /// </summary>
-public abstract class QueryTestBase : IDisposable
+public abstract class SqliteTestBase : IDisposable
 {
     private readonly ServiceProvider _services;
 
     // The in-memory database lives as long as its connection is open.
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
-    protected QueryTestBase()
+    protected SqliteTestBase()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "Server=localhost;Database=NotUsed" })

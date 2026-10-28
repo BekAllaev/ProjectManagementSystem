@@ -323,6 +323,8 @@ the kind existed), a short `Title`, the `Message` and optionally the work packag
 - **Eventual consistency** between aggregates through a **Transactional Outbox** with a single sequential
   processor, so the order of events is preserved.
 - **EventId** = `Guid.CreateVersion7()`.
+- **AggregateVersion** of an event = the version its aggregate is saved with (0 for a new aggregate), set by the
+  unit of work like `EventId`; the read side keeps it as the version of a read model.
 
 Restoring state from events (event sourcing) is not implemented yet.
 
