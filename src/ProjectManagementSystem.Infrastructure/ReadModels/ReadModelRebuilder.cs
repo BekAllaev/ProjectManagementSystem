@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectManagementSystem.Application.Funding.EventHandlers;
 using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.Schedule.EventHandlers;
 using ProjectManagementSystem.Application.TimeTracking.EventHandlers;
@@ -74,7 +75,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var workPackageHandler = ActivatorUtilities.CreateInstance<WorkPackageEventHandler>(services);
         var schedule = ActivatorUtilities.CreateInstance<ScheduleNetworkEventHandler>(services);
         var time = ActivatorUtilities.CreateInstance<TaskTimeLogEventHandler>(services);
-        var fundingProjection = new FundingProjection(store, refresher);
+        var fundingProjection = ActivatorUtilities.CreateInstance<ProjectFundingEventHandler>(services);
         var milestoneProjection = new MilestoneProjection(store, refresher);
 
         var project = await dbContext.Set<Project>().AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
