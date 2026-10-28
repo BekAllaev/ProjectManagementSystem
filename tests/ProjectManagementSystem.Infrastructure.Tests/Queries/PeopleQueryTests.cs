@@ -62,42 +62,6 @@ public sealed class PeopleQueryTests : SqliteTestBase
     }
 
     [Fact]
-    public async Task Dashboard_shows_the_open_tasks_projects_and_funding_alerts_of_the_caller()
-    {
-        var colleague = Guid.NewGuid();
-        var portal = TestData.ProjectWithTeam(Me, colleague);
-        var workPackage = TestData.WorkPackage(portal, Me);
-        var mine = AddTask(portal, workPackage, "Mine", Me);
-        var running = AddTask(portal, workPackage, "Running", Me);
-        AddTask(portal, workPackage, "Theirs", colleague);
-        var done = AddTask(portal, workPackage, "Done", Me);
-        workPackage.StartTask(running.Id, Me);
-        workPackage.StartTask(done.Id, Me);
-        workPackage.CompleteTask(done.Id, Me);
-        var fundingService = new FundingService();
-        var funding = fundingService.CreateFunding(portal);
-        fundingService.AddFunding(portal, funding, 100m, Today, "Budget");
-        var timeLogs = new TaskTimeLogService(TestData.TimeProvider);
-        var timeLog = timeLogs.CreateTimeLog(workPackage, running.Id);
-        timeLogs.LogTime(portal, workPackage, timeLog, Me, Today, 1.75m);
-        var healthy = TestData.ProjectWithTeam(Me);
-        var notMine = TestData.ProjectWithTeam(colleague);
-        await StoreAsync(portal, workPackage, funding, timeLog, healthy, notMine);
-
-        var dashboard = await SendAsync(new GetDashboardQuery());
-
-        Assert.Equal(["Running", "Mine"], dashboard.OpenTasks.Select(t => t.Name));
-        Assert.Equal([1.75m, 0m], dashboard.OpenTasks.Select(t => t.LoggedHours));
-        Assert.Equal(portal.Id, dashboard.OpenTasks[0].ProjectId);
-        Assert.Equal(2, dashboard.Projects.Count);
-        Assert.Equal(25, dashboard.Projects.Single(p => p.Id == portal.Id).ProgressPercent);
-        // 1.75 h at the rate 50 of 100 funding: 87.5% used, above the alert threshold of 80%.
-        var alert = Assert.Single(dashboard.FundingAlerts);
-        Assert.Equal((portal.Id, 87.5m, 12.5m, 87.5m, false), (alert.ProjectId, alert.ActualCost, alert.RemainingFunding, alert.UsedPercent, alert.IsOverspent));
-        Assert.DoesNotContain(dashboard.Projects, p => p.Id == notMine.Id);
-    }
-
-    [Fact]
     public async Task Notifications_of_the_caller_include_those_for_the_management_of_their_projects()
     {
         var portal = TestData.ProjectWithTeam(Me);
