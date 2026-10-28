@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectManagementSystem.Application.Projects.EventHandlers;
+using ProjectManagementSystem.Application.WorkPackages.EventHandlers;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Funding;
 using ProjectManagementSystem.Domain.Funding.Events;
@@ -68,7 +69,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var store = new ReadModelStore(dbContext);
         var refresher = services.GetRequiredService<ProjectReadModelRefresher>();
         var projects = ActivatorUtilities.CreateInstance<ProjectEventHandler>(services);
-        var workPackageProjection = new WorkPackageProjection(store, refresher);
+        var workPackageHandler = ActivatorUtilities.CreateInstance<WorkPackageEventHandler>(services);
         var schedule = new ScheduleProjection(store, refresher);
         var time = new TimeTrackingProjection(store, refresher);
         var fundingProjection = new FundingProjection(store, refresher);
@@ -110,7 +111,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var registered = project.WorkPackageIds.ToList();
         foreach (var workPackage in workPackages.OrderBy(w => registered.IndexOf(w.Id) is var i and >= 0 ? i : int.MaxValue))
         {
-            await RebuildWorkPackageAsync(workPackageProjection, workPackage, Next, cancellationToken);
+            await RebuildWorkPackageAsync(workPackageHandler, workPackage, Next, cancellationToken);
 
             if (registered.Contains(workPackage.Id))
                 await projects.HandleAsync(
@@ -144,38 +145,38 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
     }
 
     private static async Task RebuildWorkPackageAsync(
-        WorkPackageProjection projection, WorkPackage workPackage, Func<DateTime> next, CancellationToken cancellationToken)
+        WorkPackageEventHandler handler, WorkPackage workPackage, Func<DateTime> next, CancellationToken cancellationToken)
     {
         var version = workPackage.Version;
 
-        await projection.HandleAsync(
+        await handler.ProjectAsync(
             new WorkPackageCreated(workPackage.ProjectId, workPackage.Id, workPackage.Description, workPackage.ResponsiblePersonId)
             { AggregateVersion = version, OccurredAt = next() }, cancellationToken);
 
         foreach (var task in workPackage.Tasks)
         {
-            await projection.HandleAsync(
+            await handler.ProjectAsync(
                 new TaskAdded(workPackage.ProjectId, workPackage.Id, task.Id, task.Name, task.Description, task.ResponsiblePersonId, task.EstimatedEffort)
                 { AggregateVersion = version }, cancellationToken);
 
             switch (task.Status)
             {
                 case ProjectTaskStatus.InProgress:
-                    await projection.HandleAsync(new TaskStarted(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
+                    await handler.HandleAsync(new TaskStarted(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
                     break;
                 case ProjectTaskStatus.Completed:
-                    await projection.HandleAsync(new TaskCompleted(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
+                    await handler.HandleAsync(new TaskCompleted(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
                     break;
                 case ProjectTaskStatus.Cancelled:
-                    await projection.HandleAsync(new TaskCancelled(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
+                    await handler.ProjectAsync(new TaskCancelled(workPackage.ProjectId, workPackage.Id, task.Id) { AggregateVersion = version }, cancellationToken);
                     break;
             }
         }
 
         if (workPackage.Status == WorkPackageStatus.Completed)
-            await projection.HandleAsync(new WorkPackageCompleted(workPackage.ProjectId, workPackage.Id) { AggregateVersion = version }, cancellationToken);
+            await handler.HandleAsync(new WorkPackageCompleted(workPackage.ProjectId, workPackage.Id) { AggregateVersion = version }, cancellationToken);
         else if (workPackage.Status == WorkPackageStatus.Cancelled)
-            await projection.HandleAsync(
+            await handler.ProjectAsync(
                 new WorkPackageCancelled(workPackage.ProjectId, workPackage.Id, workPackage.CancellationReason ?? string.Empty, [])
                 { AggregateVersion = version }, cancellationToken);
     }
