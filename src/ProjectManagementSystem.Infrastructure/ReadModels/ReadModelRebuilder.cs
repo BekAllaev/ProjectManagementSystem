@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectManagementSystem.Application.Funding.EventHandlers;
+using ProjectManagementSystem.Application.Milestones.EventHandlers;
 using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.Schedule.EventHandlers;
 using ProjectManagementSystem.Application.TimeTracking.EventHandlers;
@@ -76,7 +77,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var schedule = ActivatorUtilities.CreateInstance<ScheduleNetworkEventHandler>(services);
         var time = ActivatorUtilities.CreateInstance<TaskTimeLogEventHandler>(services);
         var fundingProjection = ActivatorUtilities.CreateInstance<ProjectFundingEventHandler>(services);
-        var milestoneProjection = new MilestoneProjection(store, refresher);
+        var milestoneProjection = ActivatorUtilities.CreateInstance<MilestoneEventHandler>(services);
 
         var project = await dbContext.Set<Project>().AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
         var version = project.Version;
@@ -184,7 +185,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
                 { AggregateVersion = version }, cancellationToken);
     }
 
-    private static async Task RebuildMilestoneAsync(MilestoneProjection projection, Milestone milestone, CancellationToken cancellationToken)
+    private static async Task RebuildMilestoneAsync(MilestoneEventHandler projection, Milestone milestone, CancellationToken cancellationToken)
     {
         var version = milestone.Version;
 
