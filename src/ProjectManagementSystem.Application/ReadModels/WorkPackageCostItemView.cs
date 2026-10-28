@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Actual cost of one work package (<c>WorkPackageCostItem</c>).

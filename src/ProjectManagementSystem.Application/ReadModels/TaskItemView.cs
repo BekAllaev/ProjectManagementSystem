@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the list of tasks and header of a task (<c>TaskListItem</c>, <c>TaskDetails</c>, <c>MyTaskItem</c>).

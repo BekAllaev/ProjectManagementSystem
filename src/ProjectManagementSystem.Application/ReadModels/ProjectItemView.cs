@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.Projects;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the list of projects and header of a project (<c>ProjectListItem</c>, <c>ProjectDetails</c>), with the

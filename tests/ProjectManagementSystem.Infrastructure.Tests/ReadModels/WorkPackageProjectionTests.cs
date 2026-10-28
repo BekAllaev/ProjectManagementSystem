@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelWorkPackage;
 using ProjectManagementSystem.Application.WorkPackages.Commands.ChangeTaskResponsible;
@@ -5,7 +6,6 @@ using ProjectManagementSystem.Application.WorkPackages.Commands.ChangeWorkPackag
 using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask;
 using ProjectManagementSystem.Domain.WorkPackages;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 

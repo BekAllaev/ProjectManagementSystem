@@ -7,8 +7,8 @@ using ProjectManagementSystem.Application.Projects.Commands.DeleteRole;
 using ProjectManagementSystem.Application.Projects.Commands.RemoveTeamMember;
 using ProjectManagementSystem.Application.Projects.Commands.RenameRole;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Projects;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 

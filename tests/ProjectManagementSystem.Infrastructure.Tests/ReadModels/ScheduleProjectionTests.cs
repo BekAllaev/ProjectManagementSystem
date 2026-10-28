@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.Schedule.Commands.AddDependency;
 using ProjectManagementSystem.Application.Schedule.Commands.RemoveDependency;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelTask;
@@ -5,7 +6,6 @@ using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 

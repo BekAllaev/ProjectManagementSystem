@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.ReadModels.Projections;

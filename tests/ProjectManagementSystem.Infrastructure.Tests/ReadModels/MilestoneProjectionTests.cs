@@ -5,12 +5,12 @@ using ProjectManagementSystem.Application.Milestones.Commands.CreateMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.DeleteMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RemoveTaskFromMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RenameMilestone;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask;
 using ProjectManagementSystem.Domain.Milestones;
 using ProjectManagementSystem.Domain.WorkPackages;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 

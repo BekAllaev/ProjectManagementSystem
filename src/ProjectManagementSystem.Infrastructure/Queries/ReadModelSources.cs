@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Employees;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Risks;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries;
 

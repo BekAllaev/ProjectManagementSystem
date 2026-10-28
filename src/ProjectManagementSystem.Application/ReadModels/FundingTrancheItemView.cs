@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// A funding tranche (<c>FundingTrancheItem</c>). Tranches have no id of their own, so the row is keyed by the

@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// A task of a milestone (<c>MilestoneTaskItem</c>).

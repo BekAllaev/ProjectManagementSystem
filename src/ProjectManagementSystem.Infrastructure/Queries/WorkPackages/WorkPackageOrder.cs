@@ -1,4 +1,4 @@
-using ProjectManagementSystem.Infrastructure.ReadModels;
+using ProjectManagementSystem.Application.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
 

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProjectManagementSystem.Infrastructure.ReadModels;
+using ProjectManagementSystem.Application.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Persistence.Configurations;
 

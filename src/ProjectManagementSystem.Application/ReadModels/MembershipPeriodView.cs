@@ -1,4 +1,4 @@
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// A membership period of a team member (<c>MembershipPeriod</c>).

@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Row of the list of work packages (<c>WorkPackageListItem</c>); its tasks are the <see cref="TaskItemView"/> of the

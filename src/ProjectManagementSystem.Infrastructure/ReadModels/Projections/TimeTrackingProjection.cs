@@ -1,4 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.TimeTracking.Events;
 
