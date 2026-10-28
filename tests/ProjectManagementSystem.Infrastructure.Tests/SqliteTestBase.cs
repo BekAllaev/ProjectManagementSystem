@@ -13,7 +13,9 @@ using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 using ProjectManagementSystem.Domain.WorkPackages;
+using ProjectManagementSystem.Infrastructure.Outbox;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.Persistence.Outbox;
 
 namespace ProjectManagementSystem.Infrastructure.Tests;
 
@@ -91,6 +93,67 @@ public abstract class SqliteTestBase : IDisposable
 
         dbContext.AddRange(aggregates);
         await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Stands in for the outbox processor: delivers every saved event to its handlers and projections, in order, and
+    /// fails if a delivery failed.
+    /// </summary>
+    protected async Task DeliverEventsAsync()
+    {
+        await _services.GetRequiredService<IOutboxDrainer>().DrainAsync(CancellationToken.None);
+
+        await InScopeAsync(async services =>
+        {
+            var failed = await services.GetRequiredService<AppDbContext>().OutboxMessages
+                .Where(m => m.ProcessedAt == null)
+                .Select(m => m.EventType + ": " + m.LastError)
+                .ToListAsync();
+            Assert.True(failed.Count == 0, string.Join(Environment.NewLine, failed));
+        });
+    }
+
+    /// <summary>
+    /// Delivers every event saved so far once more, each in its own scope, as the outbox does after a crash before
+    /// marking a message processed.
+    /// </summary>
+    protected async Task RedeliverAllEventsAsync()
+    {
+        List<OutboxMessage> messages = [];
+        await InScopeAsync(async services =>
+            messages = await services.GetRequiredService<AppDbContext>().OutboxMessages.AsNoTracking().OrderBy(m => m.Sequence).ToListAsync());
+
+        foreach (var message in messages)
+        {
+            await InScopeAsync(async services =>
+            {
+                var domainEvent = services.GetRequiredService<DomainEventSerializer>().Deserialize(message.EventType, message.Payload);
+                await services.GetRequiredService<IDomainEventDispatcher>().DispatchAsync(domainEvent);
+                await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+            });
+        }
+    }
+
+    /// <summary>
+    /// Every row of a table of the read models, as stored.
+    /// </summary>
+    protected async Task<List<T>> RowsAsync<T>() where T : class
+    {
+        List<T> rows = [];
+        await InScopeAsync(async services => rows = await services.GetRequiredService<AppDbContext>().Set<T>().AsNoTracking().ToListAsync());
+
+        return rows;
+    }
+
+    /// <summary>
+    /// Sends a command through the pipeline and delivers the events it saved.
+    /// </summary>
+    protected async Task<TResponse> SendAndDeliverAsync<TResponse>(IRequest<TResponse> request)
+    {
+        var response = await SendAsync(request);
+        await DeliverEventsAsync();
+
+        return response;
     }
 
     protected async Task InScopeAsync(Func<IServiceProvider, Task> action)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
 

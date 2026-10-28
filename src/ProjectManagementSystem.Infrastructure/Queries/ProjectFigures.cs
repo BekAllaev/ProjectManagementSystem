@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Exceptions;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries;
 

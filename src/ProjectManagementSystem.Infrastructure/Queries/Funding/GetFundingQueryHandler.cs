@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Funding.Queries.GetFunding;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Funding;
 

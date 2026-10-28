@@ -6,6 +6,7 @@ using ProjectManagementSystem.Application.WorkPackages.Queries.GetTask;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
 
