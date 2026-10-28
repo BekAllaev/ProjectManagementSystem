@@ -13,7 +13,7 @@ using ProjectManagementSystem.Infrastructure.Persistence;
 namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261028135009_AddReadModels")]
+    [Migration("20261028141151_AddReadModels")]
     partial class AddReadModels
     {
         /// <inheritdoc />
@@ -674,15 +674,15 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uniqueidentifier");
@@ -825,9 +825,6 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<bool>("IsCounted")
                         .HasColumnType("bit");
 
@@ -835,6 +832,9 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uniqueidentifier");
@@ -1163,8 +1163,8 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("RegisteredAt")
-                        .HasColumnType("datetime2");
+                    b.Property<int?>("RegistrationPosition")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("ResponsiblePersonId")
                         .HasColumnType("uniqueidentifier");

@@ -27,7 +27,7 @@ public sealed class MilestoneTaskItemView
     public bool IsCounted { get; set; }
 
     /// <summary>
-    /// Tasks are listed in the order they were added.
+    /// 1 for the first task added to the milestone, then one more for every task added; tasks are listed in this order.
     /// </summary>
-    public DateTime AddedAt { get; set; }
+    public int Position { get; set; }
 }

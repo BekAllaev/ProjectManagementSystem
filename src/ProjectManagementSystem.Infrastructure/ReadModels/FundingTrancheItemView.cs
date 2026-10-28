@@ -16,5 +16,8 @@ public sealed class FundingTrancheItemView
 
     public string Reason { get; set; } = string.Empty;
 
-    public DateTime AddedAt { get; set; }
+    /// <summary>
+    /// 1 for the first tranche of the project, then one more for every tranche added.
+    /// </summary>
+    public int Position { get; set; }
 }

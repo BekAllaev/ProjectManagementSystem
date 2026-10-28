@@ -33,7 +33,7 @@ internal sealed class GetMilestonesQueryHandler(AppDbContext dbContext, TimeProv
                     health == MilestoneHealth.Late ? today.DayNumber - m.TargetDate.DayNumber : 0,
                     m.CompletedTasks, m.CountedTasks, m.ProgressPercent,
                     tasks[m.Id]
-                        .OrderBy(t => t.AddedAt)
+                        .OrderBy(t => t.Position)
                         .Select(t => new MilestoneTaskItem(t.TaskId, t.WorkPackageId, t.Name, t.WorkPackageDescription, t.Status, t.IsCounted))
                         .ToList(),
                     m.Version);
