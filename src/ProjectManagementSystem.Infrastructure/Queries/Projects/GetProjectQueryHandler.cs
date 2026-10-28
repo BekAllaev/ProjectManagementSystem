@@ -1,8 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Projects.Queries.GetProject;
+using ProjectManagementSystem.Application.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
-using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Projects;
 
@@ -10,13 +9,11 @@ internal sealed class GetProjectQueryHandler(AppDbContext dbContext) : IQueryHan
 {
     public async Task<ProjectDetails> Handle(GetProjectQuery query, CancellationToken cancellationToken)
     {
-        var project = await dbContext.GetProjectAsync(query.ProjectId, cancellationToken);
-        var statuses = await dbContext.TaskStatusesOf([project.Id]).Select(s => s.Status).ToListAsync(cancellationToken);
-        var progress = TaskProgress.Of(statuses);
+        var p = await dbContext.GetProjectItemAsync(query.ProjectId, cancellationToken);
 
         return new ProjectDetails(
-            project.Id, project.Title, project.Description, project.State, project.IsOpen, project.Currency.Code,
-            project.CreationDate, project.StartDate, project.CompletionDate,
-            ReadModelRules.CountStatuses(statuses), progress.Counted, progress.Percent, project.Version);
+            p.Id, p.Title, p.Description, p.State, p.IsOpen, p.Currency, p.CreationDate, p.StartDate, p.CompletionDate,
+            new TaskStatusCounts(p.OpenTasks, p.InProgressTasks, p.CompletedTasks, p.CancelledTasks),
+            p.CountedTasks, p.ProgressPercent, p.Version);
     }
 }

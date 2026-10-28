@@ -124,28 +124,6 @@ internal static class ReadSources
     public static IQueryable<Milestone> MilestonesOf(this AppDbContext dbContext, Guid projectId) =>
         dbContext.Set<Milestone>().AsNoTracking().Where(m => m.ProjectId == projectId);
 
-    public static IQueryable<Risk> RisksOf(this AppDbContext dbContext, Guid projectId, RiskStatus? status)
-    {
-        var risks = dbContext.Set<Risk>().AsNoTracking().Where(r => r.ProjectId == projectId);
-
-        return status is { } wanted ? risks.Where(r => r.Status == wanted) : risks;
-    }
-
-    public static IQueryable<Employee> Employees(this AppDbContext dbContext, string? search)
-    {
-        var employees = dbContext.Set<Employee>().AsNoTracking();
-
-        if (string.IsNullOrWhiteSpace(search))
-            return employees;
-
-        var text = search.Trim().ToLower();
-        return employees.Where(e =>
-            e.FirstName.ToLower().Contains(text) || e.LastName.ToLower().Contains(text) || e.NormalizedEmail.Contains(text));
-    }
-
-    public static IQueryable<Employee> Employees(this AppDbContext dbContext, IReadOnlyCollection<Guid> employeeIds) =>
-        dbContext.Set<Employee>().AsNoTracking().Where(e => employeeIds.Contains(e.Id));
-
     /// <summary>
     /// Memberships in force on <paramref name="date"/>, of one employee or of everybody.
     /// </summary>
@@ -155,13 +133,4 @@ internal static class ReadSources
             .Where(x => x.Member.From <= date && (x.Member.To == null || x.Member.To >= date))
             .Where(x => employeeId == null || x.Member.EmployeeId == employeeId)
             .Select(x => new MembershipRow(x.Project.Id, x.Project.Title, x.Member.EmployeeId));
-
-    /// <summary>
-    /// Notifications addressed to the employee, and those for the management of <paramref name="managedProjectIds"/>.
-    /// </summary>
-    public static IQueryable<NotificationRecord> NotificationsOf(
-        this AppDbContext dbContext, Guid employeeId, IReadOnlyCollection<Guid> managedProjectIds) =>
-        dbContext.Notifications.Where(n =>
-            n.RecipientEmployeeId == employeeId ||
-            (n.RecipientEmployeeId == null && managedProjectIds.Contains(n.ProjectId)));
 }

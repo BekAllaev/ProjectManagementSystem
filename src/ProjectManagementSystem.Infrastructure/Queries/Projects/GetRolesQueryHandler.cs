@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Projects.Queries.GetRoles;
 using ProjectManagementSystem.Infrastructure.Persistence;
@@ -8,14 +9,13 @@ internal sealed class GetRolesQueryHandler(AppDbContext dbContext) : IQueryHandl
 {
     public async Task<RoleList> Handle(GetRolesQuery query, CancellationToken cancellationToken)
     {
-        var project = await dbContext.GetProjectAsync(query.ProjectId, cancellationToken);
-        var assigned = project.TeamMembers.Select(m => m.RoleId).ToHashSet();
+        var project = await dbContext.GetProjectItemAsync(query.ProjectId, cancellationToken);
+        var roles = await dbContext.RoleItemsOf(project.Id).ToListAsync(cancellationToken);
 
-        var items = project.Roles
-            .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(r => new RoleItem(r.Id, r.Name, r.Description, assigned.Contains(r.Id)))
-            .ToList();
-
-        return new RoleList(items, project.Version);
+        return new RoleList(
+            roles.OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(r => new RoleItem(r.Id, r.Name, r.Description, r.IsAssigned))
+                .ToList(),
+            project.Version);
     }
 }

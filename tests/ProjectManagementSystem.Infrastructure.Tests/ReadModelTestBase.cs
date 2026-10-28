@@ -5,7 +5,7 @@ using ProjectManagementSystem.Application.Projects.Commands.CreateRole;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPackage;
 
-namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
+namespace ProjectManagementSystem.Infrastructure.Tests;
 
 /// <summary>
 /// Arranges a project through commands, with the caller as a registered employee on its team, and delivers every event,

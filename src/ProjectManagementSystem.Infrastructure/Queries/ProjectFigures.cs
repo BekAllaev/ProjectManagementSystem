@@ -44,7 +44,4 @@ internal static class ProjectFigures
                 tranches.Where(t => t.ProjectId == id).Sum(t => t.Amount),
                 entries.Where(e => e.ProjectId == id).Sum(e => e.Hours * e.HourlyRate)));
     }
-
-    public static DateOnly Today(this TimeProvider timeProvider) =>
-        DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 }
