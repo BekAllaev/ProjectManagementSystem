@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectManagementSystem.Application.Dashboard.Queries.GetDashboard;
 using ProjectManagementSystem.Application.Employees.Queries.GetCurrentEmployee;
 using ProjectManagementSystem.Application.Employees.Queries.GetEmployees;
 using ProjectManagementSystem.Application.Exceptions;
@@ -8,55 +7,54 @@ using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Application.Notifications.Commands.MarkAllNotificationsRead;
 using ProjectManagementSystem.Application.Notifications.Commands.MarkNotificationRead;
 using ProjectManagementSystem.Application.Notifications.Queries.GetNotifications;
-using ProjectManagementSystem.Domain.Projects;
-using ProjectManagementSystem.Domain.Services;
+using ProjectManagementSystem.Application.Projects.Commands.AddTeamMember;
+using ProjectManagementSystem.Application.Projects.Commands.CreateProject;
+using ProjectManagementSystem.Application.Projects.Commands.CreateRole;
 using ProjectManagementSystem.Domain.Tests.Fakes;
-using ProjectManagementSystem.Domain.TimeTracking;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 
 /// <summary>
-/// Read models of people: employees, the dashboard and the notifications of the caller.
+/// Read models of people: employees and the notifications of the caller.
 /// </summary>
-public sealed class PeopleQueryTests : SqliteTestBase
+public sealed class PeopleQueryTests : ReadModelTestBase
 {
     [Fact]
     public async Task Employees_are_ordered_by_name_with_the_projects_they_are_on_today()
     {
-        var amira = await EmployeeAsync("Amira", "Haddad");
-        var tomas = await EmployeeAsync("Tomas", "Silva");
-        var lena = await EmployeeAsync("Lena", "Ortiz");
-        var portal = new Project(Guid.NewGuid(), "Portal", "", new Currency("EUR"), TestData.Now);
-        var role = portal.CreateRole("Developer", "");
-        portal.AddTeamMember(amira.Id, role, Today.AddDays(-5), 50m);
-        portal.AddTeamMember(lena.Id, role, Today.AddDays(-50), 50m, to: Today.AddDays(-1));
-        portal.AddTeamMember(tomas.Id, role, Today.AddDays(3), 50m);
-        var billing = new Project(Guid.NewGuid(), "Billing", "", new Currency("EUR"), TestData.Now);
-        billing.AddTeamMember(amira.Id, billing.CreateRole("Analyst", ""), Today, 50m);
-        await StoreAsync(amira, tomas, lena, portal, billing);
+        await CreateProjectAsync("Portal");
+        var amira = await RegisterEmployeeAsync("Amira", "Haddad");
+        var tomas = await RegisterEmployeeAsync("Tomas", "Silva");
+        var lena = await RegisterEmployeeAsync("Lena", "Ortiz");
+        await SendAndDeliverAsync(new AddTeamMemberCommand(ProjectId, amira, RoleId, Today.AddDays(-5), 50m));
+        await SendAndDeliverAsync(new AddTeamMemberCommand(ProjectId, lena, RoleId, Today.AddDays(-50), 50m, Today.AddDays(-1)));
+        await SendAndDeliverAsync(new AddTeamMemberCommand(ProjectId, tomas, RoleId, Today.AddDays(3), 50m));
+        var billing = (await SendAndDeliverAsync(new CreateProjectCommand("Billing", null, "EUR"))).Id;
+        var analyst = (await SendAndDeliverAsync(new CreateRoleCommand(billing, "Analyst", null))).Id;
+        await SendAndDeliverAsync(new AddTeamMemberCommand(billing, amira, analyst, Today, 50m));
 
         var all = await SendAsync(new GetEmployeesQuery(null));
         var found = await SendAsync(new GetEmployeesQuery("SILVA"));
 
-        Assert.Equal(["Haddad", "Ortiz", "Silva"], all.Items.Select(e => e.LastName));
+        Assert.Equal(["Haddad", "Ortiz", "Silva", "Weber"], all.Items.Select(e => e.LastName));
         Assert.Equal(["Billing", "Portal"], all.Items[0].CurrentProjects.Select(p => p.Title));
         Assert.Empty(all.Items[1].CurrentProjects);
         Assert.Empty(all.Items[2].CurrentProjects);
+        Assert.Equal(["Portal"], all.Items[3].CurrentProjects.Select(p => p.Title));
         Assert.Equal(["tomas.silva@example.com"], found.Items.Select(e => e.Email));
     }
 
     [Fact]
     public async Task Current_employee_is_the_employee_of_the_caller()
     {
-        var jonas = await EmployeeAsync("Jonas", "Weber");
-        await StoreAsync(jonas);
+        var jonas = await RegisterEmployeeAsync("Jonas", "Weber");
 
-        CurrentUser.EmployeeId = jonas.Id;
+        CurrentUser.EmployeeId = jonas;
         var current = await SendAsync(new GetCurrentEmployeeQuery());
 
-        Assert.Equal((jonas.Id, "Jonas", "Weber", "jonas.weber@example.com"), (current.Id, current.FirstName, current.LastName, current.Email));
+        Assert.Equal((jonas, "Jonas", "Weber", "jonas.weber@example.com"), (current.Id, current.FirstName, current.LastName, current.Email));
         CurrentUser.EmployeeId = Guid.NewGuid();
         await Assert.ThrowsAsync<AggregateNotFoundException>(() => SendAsync(new GetCurrentEmployeeQuery()));
     }
@@ -64,23 +62,22 @@ public sealed class PeopleQueryTests : SqliteTestBase
     [Fact]
     public async Task Notifications_of_the_caller_include_those_for_the_management_of_their_projects()
     {
-        var portal = TestData.ProjectWithTeam(Me);
-        var workPackage = TestData.WorkPackage(portal, Me);
-        var task = AddTask(portal, workPackage, "Pentest", Me);
-        var foreign = TestData.ProjectWithTeam(Guid.NewGuid());
-        await StoreAsync(portal, workPackage, foreign);
+        await CreateProjectAsync("Portal");
+        var workPackage = await CreateWorkPackageAsync("Auth");
+        var task = await CreateTaskAsync(workPackage, "Pentest");
+        var foreign = (await SendAndDeliverAsync(new CreateProjectCommand("Elsewhere", null, "EUR"))).Id;
         await NotifyAsync(
-            Record(portal.Id, Me, NotificationKind.PredecessorCancelled, minutesAgo: 30, workPackage.Id, task.Id),
-            Record(portal.Id, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 10, workPackage.Id),
-            Record(portal.Id, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 5),
-            Record(foreign.Id, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 1));
+            Record(ProjectId, Caller, NotificationKind.PredecessorCancelled, minutesAgo: 30, workPackage, task),
+            Record(ProjectId, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 10, workPackage),
+            Record(ProjectId, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 5),
+            Record(foreign, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 1));
 
         var all = await SendAsync(new GetNotificationsQuery(UnreadOnly: false, Take: null));
         var latest = await SendAsync(new GetNotificationsQuery(UnreadOnly: false, Take: 1));
 
         Assert.Equal([NotificationKind.ResponsibleOutsideTeam, NotificationKind.PredecessorCancelled], all.Items.Select(n => n.Kind));
         Assert.Equal([true, false], all.Items.Select(n => n.IsForProjectManagement));
-        Assert.Equal(("Pentest", "Project"), (all.Items[1].TaskName, all.Items[1].ProjectTitle));
+        Assert.Equal(("Pentest", "Portal"), (all.Items[1].TaskName, all.Items[1].ProjectTitle));
         Assert.Null(all.Items[0].TaskName);
         Assert.Equal(2, all.UnreadCount);
         Assert.Single(latest.Items);
@@ -90,10 +87,9 @@ public sealed class PeopleQueryTests : SqliteTestBase
     [Fact]
     public async Task Marking_a_notification_read_changes_only_that_one_and_only_once()
     {
-        var portal = TestData.ProjectWithTeam(Me);
-        await StoreAsync(portal);
-        var first = Record(portal.Id, Me, NotificationKind.PredecessorCancelled, minutesAgo: 20);
-        var second = Record(portal.Id, Me, NotificationKind.PredecessorCancelled, minutesAgo: 10);
+        await CreateProjectAsync();
+        var first = Record(ProjectId, Caller, NotificationKind.PredecessorCancelled, minutesAgo: 20);
+        var second = Record(ProjectId, Caller, NotificationKind.PredecessorCancelled, minutesAgo: 10);
         await NotifyAsync(first, second);
 
         await SendAsync(new MarkNotificationReadCommand(first.Id));
@@ -109,9 +105,8 @@ public sealed class PeopleQueryTests : SqliteTestBase
     [Fact]
     public async Task Notification_of_someone_else_is_not_found_and_stays_unread()
     {
-        var portal = TestData.ProjectWithTeam(Me);
-        await StoreAsync(portal);
-        var foreign = Record(portal.Id, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 1);
+        await CreateProjectAsync();
+        var foreign = Record(ProjectId, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 1);
         await NotifyAsync(foreign);
 
         await Assert.ThrowsAsync<AggregateNotFoundException>(() => SendAsync(new MarkNotificationReadCommand(foreign.Id)));
@@ -122,11 +117,10 @@ public sealed class PeopleQueryTests : SqliteTestBase
     [Fact]
     public async Task Marking_all_read_leaves_the_notifications_of_others_unread()
     {
-        var portal = TestData.ProjectWithTeam(Me);
-        await StoreAsync(portal);
-        var mine = Record(portal.Id, Me, NotificationKind.PredecessorCancelled, minutesAgo: 3);
-        var management = Record(portal.Id, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 2);
-        var theirs = Record(portal.Id, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 1);
+        await CreateProjectAsync();
+        var mine = Record(ProjectId, Caller, NotificationKind.PredecessorCancelled, minutesAgo: 3);
+        var management = Record(ProjectId, null, NotificationKind.ResponsibleOutsideTeam, minutesAgo: 2);
+        var theirs = Record(ProjectId, Guid.NewGuid(), NotificationKind.PredecessorCancelled, minutesAgo: 1);
         await NotifyAsync(mine, management, theirs);
 
         await SendAsync(new MarkAllNotificationsReadCommand());

@@ -7,12 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using ProjectManagementSystem.Application;
 using ProjectManagementSystem.Application.Abstractions;
-using ProjectManagementSystem.Domain.Base;
-using ProjectManagementSystem.Domain.Employees;
-using ProjectManagementSystem.Domain.Projects;
-using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.Tests.Fakes;
-using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Outbox;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Outbox;
@@ -22,8 +17,8 @@ namespace ProjectManagementSystem.Infrastructure.Tests;
 /// <summary>
 /// Requests go through the real <c>AddApplication()</c> and <c>AddInfrastructure()</c> (validation, the handlers of the
 /// infrastructure) against SQLite in memory: a relational provider, so the LINQ of the handlers is translated to SQL as
-/// in production (the EF in-memory provider cannot store the complex property of <c>Project</c>). Aggregates are
-/// arranged with domain methods and stored directly. Every request runs in its own scope, like a web request.
+/// in production (the EF in-memory provider cannot store the complex property of <c>Project</c>). Every request runs
+/// in its own scope, like a web request; events are delivered by the outbox when a test asks for it.
 /// </summary>
 public abstract class SqliteTestBase : IDisposable
 {
@@ -74,25 +69,11 @@ public abstract class SqliteTestBase : IDisposable
 
     protected static DateOnly Today => TestData.Today;
 
-    protected static WorkPackageService WorkPackageService { get; } = new(TestData.TimeProvider);
-
     protected async Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request)
     {
         await using var scope = _services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ISender>().Send(request);
-    }
-
-    /// <summary>
-    /// Stores new aggregates as they are, without the unit of work: their version stays 0.
-    /// </summary>
-    protected async Task StoreAsync(params AggregateRoot<Guid>[] aggregates)
-    {
-        await using var scope = _services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        dbContext.AddRange(aggregates);
-        await dbContext.SaveChangesAsync();
     }
 
     /// <summary>
@@ -162,13 +143,6 @@ public abstract class SqliteTestBase : IDisposable
 
         await action(scope.ServiceProvider);
     }
-
-    protected static async Task<Employee> EmployeeAsync(string firstName, string lastName) =>
-        await new EmployeeService(new InMemoryRepository<Employee>())
-            .RegisterAsync(firstName, lastName, $"{firstName}.{lastName}@example.com".ToLowerInvariant());
-
-    protected static ProjectTask AddTask(Project project, WorkPackage workPackage, string name, Guid responsiblePersonId, decimal effort = 8m) =>
-        WorkPackageService.AddTask(project, workPackage, name, "Description", responsiblePersonId, effort);
 
     public void Dispose()
     {

@@ -9,17 +9,17 @@ namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 
 /// <summary>
 /// The query handlers run against SQLite in the other tests; production runs on SQL Server. Every read of the handlers
-/// is in <see cref="ReadSources"/>, so translating each of them for SQL Server, which needs no connection, catches a
-/// query that only SQL Server would reject.
+/// is in <see cref="ReadModelSources"/>, so translating each of them for SQL Server, which needs no connection, catches
+/// a query that only SQL Server would reject.
 /// </summary>
-public sealed class ReadSourcesTranslationTests : IDisposable
+public sealed class ReadModelSourcesTranslationTests : IDisposable
 {
     private readonly AppDbContext _dbContext = new(new DbContextOptionsBuilder<AppDbContext>()
         .UseSqlServer("Server=localhost;Database=NotUsed")
         .Options);
 
     public static TheoryData<string> Sources() =>
-        new(typeof(ReadSources).GetMethods(BindingFlags.Public | BindingFlags.Static)
+        new(typeof(ReadModelSources).GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(m => m.ReturnType.IsGenericType && m.ReturnType.GetGenericTypeDefinition() == typeof(IQueryable<>))
             .Select(Describe));
 
@@ -27,7 +27,7 @@ public sealed class ReadSourcesTranslationTests : IDisposable
     [MemberData(nameof(Sources))]
     public void Source_translates_to_sql_server(string source)
     {
-        var method = typeof(ReadSources).GetMethods(BindingFlags.Public | BindingFlags.Static).Single(m => Describe(m) == source);
+        var method = typeof(ReadModelSources).GetMethods(BindingFlags.Public | BindingFlags.Static).Single(m => Describe(m) == source);
         var arguments = method.GetParameters().Select(p => p.Position == 0 ? _dbContext : Sample(p.ParameterType)).ToArray();
 
         var query = (IQueryable)method.Invoke(null, arguments)!;
