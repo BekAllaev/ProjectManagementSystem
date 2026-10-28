@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.Schedule.EventHandlers;
+using ProjectManagementSystem.Application.TimeTracking.EventHandlers;
 using ProjectManagementSystem.Application.WorkPackages.EventHandlers;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Funding;
@@ -72,7 +73,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var projects = ActivatorUtilities.CreateInstance<ProjectEventHandler>(services);
         var workPackageHandler = ActivatorUtilities.CreateInstance<WorkPackageEventHandler>(services);
         var schedule = ActivatorUtilities.CreateInstance<ScheduleNetworkEventHandler>(services);
-        var time = new TimeTrackingProjection(store, refresher);
+        var time = ActivatorUtilities.CreateInstance<TaskTimeLogEventHandler>(services);
         var fundingProjection = new FundingProjection(store, refresher);
         var milestoneProjection = new MilestoneProjection(store, refresher);
 
