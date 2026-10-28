@@ -123,7 +123,7 @@ internal static class ReadModelSources
     /// Notifications addressed to the employee, and those for the management of <paramref name="managedProjectIds"/>.
     /// Tracked, so the commands that mark them read can change them.
     /// </summary>
-    public static IQueryable<NotificationRecord> NotificationsOf(
+    public static IQueryable<NotificationItemView> NotificationsOf(
         this AppDbContext dbContext, Guid employeeId, IReadOnlyCollection<Guid> managedProjectIds) =>
         dbContext.Notifications.Where(n =>
             n.RecipientEmployeeId == employeeId ||

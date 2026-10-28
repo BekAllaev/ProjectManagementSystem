@@ -10,6 +10,7 @@ using ProjectManagementSystem.Application.Notifications.Queries.GetNotifications
 using ProjectManagementSystem.Application.Projects.Commands.AddTeamMember;
 using ProjectManagementSystem.Application.Projects.Commands.CreateProject;
 using ProjectManagementSystem.Application.Projects.Commands.CreateRole;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
@@ -130,7 +131,7 @@ public sealed class PeopleQueryTests : ReadModelTestBase
         Assert.Null((await StoredAsync(theirs.Id)).ReadAt);
     }
 
-    private NotificationRecord Record(
+    private NotificationItemView Record(
         Guid projectId, Guid? recipientId, NotificationKind kind, int minutesAgo, Guid? workPackageId = null, Guid? taskId = null) =>
         new()
         {
@@ -146,7 +147,7 @@ public sealed class PeopleQueryTests : ReadModelTestBase
             CreatedAt = TestData.Now.AddMinutes(-minutesAgo),
         };
 
-    private Task NotifyAsync(params NotificationRecord[] notifications) =>
+    private Task NotifyAsync(params NotificationItemView[] notifications) =>
         InScopeAsync(async services =>
         {
             var dbContext = services.GetRequiredService<AppDbContext>();
@@ -154,9 +155,9 @@ public sealed class PeopleQueryTests : ReadModelTestBase
             await dbContext.SaveChangesAsync();
         });
 
-    private async Task<NotificationRecord> StoredAsync(Guid id)
+    private async Task<NotificationItemView> StoredAsync(Guid id)
     {
-        NotificationRecord? stored = null;
+        NotificationItemView? stored = null;
         await InScopeAsync(async services =>
             stored = await services.GetRequiredService<AppDbContext>().Notifications.AsNoTracking().SingleAsync(n => n.Id == id));
 

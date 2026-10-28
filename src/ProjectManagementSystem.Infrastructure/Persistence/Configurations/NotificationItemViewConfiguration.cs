@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 
 namespace ProjectManagementSystem.Infrastructure.Persistence.Configurations;
 
-internal sealed class NotificationRecordConfiguration : IEntityTypeConfiguration<NotificationRecord>
+internal sealed class NotificationItemViewConfiguration : IEntityTypeConfiguration<NotificationItemView>
 {
-    public void Configure(EntityTypeBuilder<NotificationRecord> builder)
+    public void Configure(EntityTypeBuilder<NotificationItemView> builder)
     {
         builder.ToTable("Notifications");
 

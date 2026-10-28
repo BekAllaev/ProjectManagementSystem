@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Infrastructure.Identity;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence.Outbox;
@@ -25,7 +26,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
 
     public DbSet<ParkedEventType> ParkedEventTypes => Set<ParkedEventType>();
 
-    public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();
+    public DbSet<NotificationItemView> Notifications => Set<NotificationItemView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
