@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Behaviors;
 using ProjectManagementSystem.Application.Events;
+using ProjectManagementSystem.Application.Projects;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Services;
 
@@ -46,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<EmployeeService>();
 
         services.AddScoped<ProjectReadModelRefresher>();
+        services.AddScoped<ResponsiblePersonCheck>();
 
         return services;
     }

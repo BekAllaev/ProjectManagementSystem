@@ -26,7 +26,6 @@ using ProjectManagementSystem.Application.WorkPackages.Queries.GetTask;
 using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks;
 using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages;
 using ProjectManagementSystem.Domain.Schedule;
-using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
@@ -39,7 +38,7 @@ public sealed class ReadModelRebuilderTests : ReadModelTestBase
         await ArrangeAsync();
         var projected = await AnswersAsync();
 
-        await InScopeAsync(services => new ReadModelRebuilder(services.GetRequiredService<AppDbContext>()).RebuildAsync());
+        await InScopeAsync(services => services.GetRequiredService<ReadModelRebuilder>().RebuildAsync());
 
         var rebuilt = await AnswersAsync();
         Assert.Equal(projected.Count, rebuilt.Count);
