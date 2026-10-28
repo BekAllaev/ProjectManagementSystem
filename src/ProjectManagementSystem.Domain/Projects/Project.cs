@@ -51,7 +51,7 @@ public sealed partial class Project : AggregateRoot<Guid>
         State = ProjectState.Created;
         CreationDate = creationDate;
 
-        RaiseDomainEvent(new ProjectCreated(Id, Title, Currency.Code, CreationDate));
+        RaiseDomainEvent(new ProjectCreated(Id, Title, Description, Currency.Code, CreationDate));
     }
 
     public void Start(DateTime startDate)

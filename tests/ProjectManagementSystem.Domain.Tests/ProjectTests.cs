@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Domain.Projects.Events;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 
@@ -38,8 +39,23 @@ public class ProjectTests
         project.Start(TestData.Now);
         project.Complete(TestData.Now);
 
+        project.ClearDomainEvents();
+
         project.RegisterWorkPackage(workPackageId);
 
         Assert.Equal([workPackageId], project.WorkPackageIds);
+        Assert.Empty(project.DomainEvents);
+    }
+
+    [Fact]
+    public void Registering_a_work_package_raises_an_event()
+    {
+        var project = TestData.ProjectWithTeam();
+        project.ClearDomainEvents();
+        var workPackageId = Guid.NewGuid();
+
+        project.RegisterWorkPackage(workPackageId);
+
+        Assert.Equal(new WorkPackageRegistered(project.Id, workPackageId), Assert.Single(project.DomainEvents));
     }
 }

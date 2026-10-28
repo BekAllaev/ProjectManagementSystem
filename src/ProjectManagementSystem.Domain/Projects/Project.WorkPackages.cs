@@ -1,3 +1,5 @@
+using ProjectManagementSystem.Domain.Projects.Events;
+
 namespace ProjectManagementSystem.Domain.Projects;
 
 public sealed partial class Project
@@ -26,5 +28,6 @@ public sealed partial class Project
         EnsureOpen("add a work package to");
 
         _workPackageIds.Add(workPackageId);
+        RaiseDomainEvent(new WorkPackageRegistered(Id, workPackageId));
     }
 }
