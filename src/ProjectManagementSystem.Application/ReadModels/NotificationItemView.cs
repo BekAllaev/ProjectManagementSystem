@@ -1,12 +1,13 @@
 using ProjectManagementSystem.Application.Notifications;
 
-namespace ProjectManagementSystem.Infrastructure.Persistence.Notifications;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
-/// In-app notification. <see cref="IdempotencyKey"/> is unique, so a repeated delivery of an event does not
-/// notify twice.
+/// In-app notification (<c>NotificationItem</c>), written by the infrastructure behind
+/// <see cref="Abstractions.INotificationSender"/>. <see cref="IdempotencyKey"/> is unique, so a repeated delivery of an
+/// event does not notify twice.
 /// </summary>
-public sealed class NotificationRecord
+public sealed class NotificationItemView
 {
     public Guid Id { get; init; }
 

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 
@@ -21,7 +22,7 @@ internal sealed class NotificationSender(AppDbContext dbContext, TimeProvider ti
 
         var now = timeProvider.GetUtcNow();
 
-        dbContext.Notifications.Add(new NotificationRecord
+        dbContext.Notifications.Add(new NotificationItemView
         {
             Id = Guid.CreateVersion7(now),
             IdempotencyKey = key,
