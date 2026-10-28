@@ -61,6 +61,12 @@ internal static class ReadModelRules
             list.Count(s => s == ProjectTaskStatus.Cancelled));
     }
 
+    /// <summary>
+    /// The domain lets the responsible person of the task or of its package change the status of an unfinished task.
+    /// </summary>
+    public static bool CanChangeStatus(TaskItemView task, Guid employeeId) =>
+        !IsFinished(task.Status) && (task.ResponsiblePersonId == employeeId || task.WorkPackageResponsiblePersonId == employeeId);
+
     public static bool IsFinished(ProjectTaskStatus status) =>
         status is ProjectTaskStatus.Completed or ProjectTaskStatus.Cancelled;
 
