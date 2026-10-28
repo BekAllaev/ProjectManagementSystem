@@ -13,9 +13,9 @@ using ProjectManagementSystem.Domain.Projects;
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 
 /// <summary>
-/// Commands go through the pipeline, their events through the outbox to the projections.
+/// Commands go through the pipeline, their events through the outbox to the event handlers.
 /// </summary>
-public sealed class ProjectProjectionTests : SqliteTestBase
+public sealed class ProjectEventHandlerTests : SqliteTestBase
 {
     [Fact]
     public async Task Row_of_the_project_follows_its_events_with_the_version()

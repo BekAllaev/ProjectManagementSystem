@@ -9,7 +9,7 @@ namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 /// <summary>
 /// Time entries and funding, and the figures summed from them.
 /// </summary>
-public sealed class CostProjectionTests : ReadModelTestBase
+public sealed class CostEventHandlerTests : ReadModelTestBase
 {
     [Fact]
     public async Task Logged_time_is_summed_on_the_task_the_project_and_by_member_and_package()

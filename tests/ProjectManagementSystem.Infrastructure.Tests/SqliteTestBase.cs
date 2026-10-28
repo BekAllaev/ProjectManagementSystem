@@ -77,7 +77,7 @@ public abstract class SqliteTestBase : IDisposable
     }
 
     /// <summary>
-    /// Stands in for the outbox processor: delivers every saved event to its handlers and projections, in order, and
+    /// Stands in for the outbox processor: delivers every saved event to its handlers, in order, and
     /// fails if a delivery failed.
     /// </summary>
     protected async Task DeliverEventsAsync()

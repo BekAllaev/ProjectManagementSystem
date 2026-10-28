@@ -9,7 +9,6 @@ using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence.Repositories;
 using ProjectManagementSystem.Infrastructure.ReadModels;
-using ProjectManagementSystem.Infrastructure.ReadModels.Projections;
 
 namespace ProjectManagementSystem.Infrastructure;
 
@@ -19,8 +18,8 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers everything the application needs from the infrastructure: persistence, repositories, the unit of
-    /// work, the outbox with its processor, the in-app notifications, the projections of the read models and the query
-    /// handlers, which read them. The processor dispatches events through the application and the handlers run in its pipeline, so the
+    /// work, the outbox with its processor, the in-app notifications, the repositories of the read models with their
+    /// rebuild, and the query handlers. The processor dispatches events through the application and the handlers run in its pipeline, so the
     /// host also calls <c>AddApplication</c>.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
@@ -44,27 +43,9 @@ public static class DependencyInjection
         services.AddScoped(typeof(IReadModelRepository<>), typeof(EfReadModelRepository<>));
         services.AddScoped<INotificationSender, NotificationSender>();
 
-        services.AddScoped<ReadModelStore>();
         services.AddScoped<ReadModelRebuilder>();
-        AddProjections(services);
 
         return services;
-    }
-
-    /// <summary>
-    /// The projections of the read models are domain event handlers of this assembly; the outbox delivers events to
-    /// them like to the handlers of the application.
-    /// </summary>
-    private static void AddProjections(IServiceCollection services)
-    {
-        var handlers = typeof(DependencyInjection).Assembly.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false })
-            .SelectMany(type => type.GetInterfaces()
-                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDomainEventHandler<>))
-                .Select(serviceType => (serviceType, implementationType: type)));
-
-        foreach (var (serviceType, implementationType) in handlers)
-            services.AddScoped(serviceType, implementationType);
     }
 
     internal static IServiceCollection AddOutboxOptions(this IServiceCollection services)
