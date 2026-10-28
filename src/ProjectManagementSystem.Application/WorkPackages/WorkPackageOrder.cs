@@ -1,6 +1,6 @@
 using ProjectManagementSystem.Application.ReadModels;
 
-namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
+namespace ProjectManagementSystem.Application.WorkPackages;
 
 internal static class WorkPackageOrder
 {
