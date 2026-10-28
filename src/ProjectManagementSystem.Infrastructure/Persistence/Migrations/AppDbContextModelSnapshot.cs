@@ -501,6 +501,9 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -515,10 +518,23 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("RecipientEmployeeId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("WorkPackageId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique();
+
+                    b.HasIndex("RecipientEmployeeId");
 
                     b.HasIndex("ProjectId", "RecipientEmployeeId");
 

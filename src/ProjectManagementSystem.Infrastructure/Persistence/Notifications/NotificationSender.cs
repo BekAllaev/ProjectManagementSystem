@@ -27,7 +27,11 @@ internal sealed class NotificationSender(AppDbContext dbContext, TimeProvider ti
             IdempotencyKey = key,
             ProjectId = notification.ProjectId,
             RecipientEmployeeId = notification.RecipientEmployeeId,
+            Kind = notification.Kind,
+            Title = notification.Title,
             Message = notification.Message,
+            WorkPackageId = notification.WorkPackageId,
+            TaskId = notification.TaskId,
             CreatedAt = now.UtcDateTime,
         });
     }

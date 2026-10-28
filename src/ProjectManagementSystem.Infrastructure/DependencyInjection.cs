@@ -17,12 +17,16 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers everything the application needs from the infrastructure: persistence, repositories, the unit of
-    /// work, the outbox with its processor and the in-app notifications. The processor dispatches events through the application, so the host
-    /// also calls <c>AddApplication</c>.
+    /// work, the outbox with its processor, the in-app notifications and the query handlers, which read the database
+    /// directly. The processor dispatches events through the application and the handlers run in its pipeline, so the
+    /// host also calls <c>AddApplication</c>.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddPersistence(configuration);
+
+        // Only the handlers of this assembly; the pipeline behaviors come from AddApplication.
+        services.AddMediatR(mediatR => mediatR.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(EventTypeRegistry.FromAssembly(typeof(IDomainEvent).Assembly));

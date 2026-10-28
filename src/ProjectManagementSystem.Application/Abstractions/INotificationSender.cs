@@ -1,3 +1,5 @@
+using ProjectManagementSystem.Application.Notifications;
+
 namespace ProjectManagementSystem.Application.Abstractions;
 
 /// <summary>
@@ -14,4 +16,15 @@ public interface INotificationSender
 /// <param name="RecipientEmployeeId">
 /// Empty means the management of the project; the domain has no role for it yet.
 /// </param>
-public sealed record Notification(string IdempotencyKey, Guid ProjectId, Guid? RecipientEmployeeId, string Message);
+/// <param name="Title">Short headline shown in the list; <paramref name="Message"/> gives the details.</param>
+/// <param name="WorkPackageId">Work package the notification links to, if any.</param>
+/// <param name="TaskId">Task the notification links to, if any; its work package is <paramref name="WorkPackageId"/>.</param>
+public sealed record Notification(
+    string IdempotencyKey,
+    Guid ProjectId,
+    Guid? RecipientEmployeeId,
+    NotificationKind Kind,
+    string Title,
+    string Message,
+    Guid? WorkPackageId = null,
+    Guid? TaskId = null);

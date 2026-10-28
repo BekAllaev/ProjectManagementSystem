@@ -6,9 +6,10 @@
 |---|---|---|
 | `Domain.Shared` | — | enums used by the domain and by the contracts (`ProjectState`, `WorkPackageStatus`, `ProjectTaskStatus`, `MilestoneStatus`, `DependencyType`, `RiskLevel`, `RiskStatus`) |
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
-| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command records and `CreatedId`, the gRPC service interfaces (one per aggregate): the public surface of the backend |
-| `Application` | `Domain`, `Application.Contracts` | command handlers, validators, pipeline behaviors, domain event handlers, ports for the infrastructure |
-| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per aggregate (each method only sends the command through MediatR), the interceptor that maps exceptions to gRPC status codes (forbidden → PermissionDenied, rule violation → FailedPrecondition, not found → NotFound, domain or FluentValidation validation → InvalidArgument, concurrency conflict → Aborted, cancelled call → Cancelled, anything else → Internal without details), `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`; only `POST /login`, `POST /refresh` and `GET /manage/info` are open, the rest answers 404), whose bearer token authenticates the gRPC calls |
+| `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command and query records with the read models they return, `CreatedId`, the gRPC service interfaces (one per aggregate, plus notifications and the dashboard): the public surface of the backend |
+| `Application` | `Domain`, `Application.Contracts` | command handlers, validators of commands and queries, pipeline behaviors, domain event handlers, ports for the infrastructure |
+| `Infrastructure` | `Application`, `Domain` | persistence (EF Core, SQL Server), repositories, the unit of work, the outbox and its processor, in-app notifications, the query handlers (see [Read side](#read-side)) |
+| `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per service interface (each method only sends the command or query through MediatR), the interceptor that maps exceptions to gRPC status codes (forbidden → PermissionDenied, rule violation → FailedPrecondition, not found → NotFound, domain or FluentValidation validation → InvalidArgument, concurrency conflict → Aborted, cancelled call → Cancelled, anything else → Internal without details), `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`; only `POST /login`, `POST /refresh` and `GET /manage/info` are open, the rest answers 404), whose bearer token authenticates the gRPC calls |
 
 The API exposes every command and query over gRPC (code-first, protobuf-net.Grpc, with gRPC-Web for the browser).
 Commands, queries and their results are the gRPC messages themselves: `[DataContract]` with `[DataMember(Order = N)]`
@@ -56,7 +57,8 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   never loaded on their own.
 - An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
   `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
-- Queries (CQRS) come later. The caller passes the ids it already knows (for example the work package of a
+- Queries (CQRS) do not use the repositories: they read the database directly (see [Read side](#read-side)).
+  The caller of a command passes the ids it already knows (for example the work package of a
   task), and the domain service checks that they fit together (the task is really in that work package).
   Where a rule needs *all* work packages of a project (closing the project, leaving the team), the caller
   loads them by `Project.WorkPackageIds`, and the domain service checks that the set is exactly that list.
@@ -312,7 +314,8 @@ with the unit of work.
 | `PredecessorCancelled` | `NotifyResponsibleOfSuccessorTask` | notifies the responsible persons of the unfinished successor task and its package |
 
 Notifications go through `INotificationSender`; each has an idempotency key, and a repeated key is not sent
-again.
+again. A notification has a `Kind` (`ResponsibleOutsideTeam`, `PredecessorCancelled`; `Other` for rows stored before
+the kind existed), a short `Title`, the `Message` and optionally the work package and task it links to.
 
 ## Infrastructure
 
@@ -331,30 +334,76 @@ Persistence and the composition root do not exist yet. When they are added:
 - implement `IRepository<TAggregate>.ExistsAsync` (translated to a query), add a unique index on `Employee.NormalizedEmail` and translate its
   violation into a `DomainRuleViolationException`.
 
-## Read side (computed, not stored)
+## Read side
 
-Milestone:
+Queries are computed on request from the tables of the aggregates; there are no stored projections yet. A query and
+the read model it returns are gRPC messages in `Application.Contracts/<Aggregate>/Queries/<UseCase>/`, its validator
+is in the same folder of `Application`, and its handler is in `Infrastructure/Queries/<Aggregate>/`: it reads the
+database without tracking and never changes anything. All reads of the handlers are in `ReadSources`, so a test
+translates each of them for SQL Server; the handlers themselves are tested on SQLite in memory. A query goes through
+the same pipeline as a command (logging, validation), without the unit of work.
+
+| Service | Queries |
+|---|---|
+| `IProjectService` | `GetProjects` (filter by state and title), `GetProject` (header with task counts and progress), `GetTeam` (one item per employee with all periods and rates), `GetRoles` (with `IsAssigned`) |
+| `IWorkPackageService` | `GetWorkPackages` (with tasks and `IsRegistered`), `GetTasks` (filter by status, work package, responsible person), `GetTask` (dependencies and time log) |
+| `IScheduleService` | `GetDependencies` |
+| `IMilestoneService` | `GetMilestones` |
+| `IFundingService` | `GetFunding` (tranches, actual cost by member and by work package) |
+| `IRiskService` | `GetRisks` (filter by status) |
+| `IEmployeeService` | `GetEmployees` (with the projects of today), `GetCurrentEmployee` |
+| `IDashboardService` | `GetDashboard`: open tasks of the caller in all projects, the projects they are on today, funding alerts |
+| `INotificationService` | `GetNotifications`, and the commands `MarkNotificationRead`, `MarkAllNotificationsRead` |
+
+**Version.** A read model of an aggregate carries its `Version` (for a list, every item has the version of its own
+aggregate; a read model of an aggregate that exists once per project, such as the funding or the schedule network,
+has `Version` 0 before the aggregate exists). The version grows with every saved change of the aggregate, so the client
+can tell whether something changed since its last read. Reads are consistent with the commands committed before them;
+what changes later are the effects of event handlers (a new work package is registered in the project, the dependencies
+of a cancelled task are removed). Until they are applied the client shows "updating" and reads again; for example a
+new work package has `IsRegistered = false` until the version of the project has grown by its registration.
+
+**What the caller may do.** Read models tell the client which actions the domain will allow, so it does not offer
+the others: `CanChangeStatus` (the task is not finished and the caller is responsible for it or for its package),
+`CanLogTime` (the task is in progress and the caller is on the team today; time is logged only for oneself),
+`CanRemove` of a time entry (the caller logged it and the task is in progress), `IsAssigned` of a role (it can no
+longer be renamed or deleted). The domain still checks every command.
+
+**Notifications.** A caller sees the notifications addressed to them and those for the management of the projects
+whose team they are on today (`RecipientEmployeeId` empty). The domain has no role for the management yet, so every
+member sees those, and one member marking such a notification read marks it read for all. A notification the caller
+does not see is not found.
+
+Milestone (`MilestoneHealth`):
 
 - progress — how many of the counted tasks are done (cancelled tasks stay in the set but are not counted);
-- lateness — `TargetDate` has passed and the status is still Open;
-- "closed with loose ends" — Completed, but contains unfinished tasks;
-- an empty milestone is not considered reached.
+- lateness (`Late`, `DaysLate`) — `TargetDate` has passed and the status is still Open;
+- "closed with loose ends" (`CompletedWithLooseEnds`) — Completed, but contains unfinished tasks;
+- an empty milestone (`CompletedEmpty`, no counted tasks) is not considered reached; otherwise a completed milestone
+  is `Reached`.
 
 Schedule:
 
-- a task whose FS predecessor is not finished gets a warning.
+- a task that is not finished and whose FS predecessor is not completed gets a warning (`HasWarning` of a dependency,
+  `HasUnfinishedFinishToStartPredecessor` of a task); starting it is allowed.
 
-Funding (from `FundingAdded`, `TimeLogged`, `TimeEntryRemoved`):
+Risk:
+
+- score = probability × impact, each counted 1 (low) to 3 (high); the level is High from 6, Medium from 3, Low below.
+
+Funding (from the tranches of `ProjectFunding` and the time entries of every `TaskTimeLog` of the project):
 
 - total funding = Σ `FundingTranche.Amount`;
 - actual cost (AC) = Σ `Hours` × `HourlyRate` over time entries; AC on a report date (EVM) is the same sum
   filtered by `WorkDate`;
-- remaining = total funding − AC at any moment;
-- past costs are never recalculated: every entry keeps its own rate.
+- remaining = total funding − AC at any moment; used percent = AC / total funding, empty without funding;
+- past costs are never recalculated: every entry keeps its own rate;
+- the dashboard warns about a project of the caller from 80% used or when it is overspent.
 
-The read model upserts a row by `EntryId` on `TimeLogged` and deletes it on `TimeEntryRemoved`, then
-recomputes the sums. A repeated delivery of an event does not double anything, so no separate
-deduplication is needed.
+When computing on request becomes too slow, a read model can be stored in the schema `read` and kept up to date by
+event handlers, behind the same query. For the funding it would upsert a row by `EntryId` on `TimeLogged` and delete it
+on `TimeEntryRemoved`, then recompute the sums; a repeated delivery of an event does not double anything, so no
+separate deduplication is needed.
 
 ## Considered alternatives
 

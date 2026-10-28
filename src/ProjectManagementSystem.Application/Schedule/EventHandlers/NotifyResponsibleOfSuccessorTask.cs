@@ -1,4 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Schedule.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
@@ -29,8 +30,12 @@ public sealed class NotifyResponsibleOfSuccessorTask(
                     $"predecessor-cancelled:{domainEvent.EventId}:{recipientId}",
                     domainEvent.ProjectId,
                     recipientId,
+                    NotificationKind.PredecessorCancelled,
+                    "A predecessor task was cancelled",
                     $"Predecessor task '{dependency.PredecessorTaskId}' of task '{task.Name}' was cancelled; " +
-                    "the dependency was removed. Check the plan of the task."),
+                    "the dependency was removed. Check the plan of the task.",
+                    workPackage.Id,
+                    task.Id),
                 cancellationToken);
         }
     }

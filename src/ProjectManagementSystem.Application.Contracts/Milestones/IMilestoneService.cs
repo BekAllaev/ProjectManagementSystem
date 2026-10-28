@@ -8,12 +8,13 @@ using ProjectManagementSystem.Application.Milestones.Commands.CreateMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.DeleteMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RemoveTaskFromMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RenameMilestone;
+using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones;
 
 namespace ProjectManagementSystem.Application.Milestones;
 
 /// <summary>
-/// gRPC service of the Milestone aggregate: one method per command. The host implements every
-/// method by sending the command through MediatR; the client shares this interface for typed calls.
+/// gRPC service of the Milestone aggregate: one method per command and per query. The host implements every
+/// method by sending the command or query through MediatR; the client shares this interface for typed calls.
 /// </summary>
 [ServiceContract(Name = "ProjectManagementSystem.MilestoneService")]
 public interface IMilestoneService
@@ -27,6 +28,8 @@ public interface IMilestoneService
     Task<CreatedId> CreateMilestone(CreateMilestoneCommand command, CallContext context = default);
 
     Task DeleteMilestone(DeleteMilestoneCommand command, CallContext context = default);
+
+    Task<MilestoneList> GetMilestones(GetMilestonesQuery query, CallContext context = default);
 
     Task RemoveTaskFromMilestone(RemoveTaskFromMilestoneCommand command, CallContext context = default);
 

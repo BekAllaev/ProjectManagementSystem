@@ -9,12 +9,14 @@ using ProjectManagementSystem.Application.Milestones.Commands.CreateMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.DeleteMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RemoveTaskFromMilestone;
 using ProjectManagementSystem.Application.Milestones.Commands.RenameMilestone;
+using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones;
 using ProtoBuf.Grpc;
 
 namespace ProjectManagementSystem.Api.Services;
 
 /// <summary>
-/// Sends every command of <see cref="IMilestoneService"/> through MediatR, so the pipeline behaviors apply. No logic here.
+/// Sends every command and query of <see cref="IMilestoneService"/> through MediatR, so the pipeline behaviors apply.
+/// No logic here.
 /// </summary>
 [Authorize]
 public sealed class MilestoneGrpcService(ISender mediator) : IMilestoneService
@@ -33,6 +35,9 @@ public sealed class MilestoneGrpcService(ISender mediator) : IMilestoneService
 
     public Task DeleteMilestone(DeleteMilestoneCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);
+
+    public Task<MilestoneList> GetMilestones(GetMilestonesQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
 
     public Task RemoveTaskFromMilestone(RemoveTaskFromMilestoneCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);

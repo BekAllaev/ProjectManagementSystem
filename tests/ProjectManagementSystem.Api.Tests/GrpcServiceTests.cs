@@ -4,13 +4,12 @@ using Grpc.Core;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using ProjectManagementSystem.Api.Services;
-using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProtoBuf.Grpc;
 
 namespace ProjectManagementSystem.Api.Tests;
 
 /// <summary>
-/// Every service method only sends its command through MediatR with the cancellation of the call.
+/// Every service method only sends its command or query through MediatR with the cancellation of the call.
 /// </summary>
 public class GrpcServiceTests
 {
@@ -24,7 +23,7 @@ public class GrpcServiceTests
 
     [Theory]
     [MemberData(nameof(Services))]
-    public async Task Every_method_sends_its_command_with_the_cancellation_of_the_call(Type service)
+    public async Task Every_method_sends_its_request_with_the_cancellation_of_the_call(Type service)
     {
         var sender = new RecordingSender();
         var instance = Activator.CreateInstance(service, sender)!;
@@ -32,11 +31,11 @@ public class GrpcServiceTests
 
         foreach (var method in service.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
         {
-            var command = RuntimeHelpers.GetUninitializedObject(method.GetParameters()[0].ParameterType);
+            var request = RuntimeHelpers.GetUninitializedObject(method.GetParameters()[0].ParameterType);
 
-            await (Task)method.Invoke(instance, [command, new CallContext(new CallOptions(cancellationToken: cancellation.Token))])!;
+            await (Task)method.Invoke(instance, [request, new CallContext(new CallOptions(cancellationToken: cancellation.Token))])!;
 
-            Assert.Same(command, sender.Request);
+            Assert.Same(request, sender.Request);
             Assert.Equal(cancellation.Token, sender.CancellationToken);
         }
     }
@@ -52,7 +51,8 @@ public class GrpcServiceTests
             Request = request;
             CancellationToken = cancellationToken;
 
-            object response = typeof(TResponse) == typeof(CreatedId) ? new CreatedId(Guid.NewGuid()) : Unit.Value;
+            // A command answers with CreatedId or Unit, a query with its read model.
+            var response = typeof(TResponse) == typeof(Unit) ? Unit.Value : RuntimeHelpers.GetUninitializedObject(typeof(TResponse));
             return Task.FromResult((TResponse)response);
         }
 

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 
@@ -16,7 +17,9 @@ public sealed class NotificationSenderTests : IDisposable
         .UseInMemoryDatabase(Guid.NewGuid().ToString())
         .Options;
 
-    private readonly Notification _notification = new("predecessor-cancelled:event:recipient", Guid.NewGuid(), Guid.NewGuid(), "Check the plan.");
+    private readonly Notification _notification = new(
+        "predecessor-cancelled:event:recipient", Guid.NewGuid(), Guid.NewGuid(), NotificationKind.PredecessorCancelled,
+        "A predecessor task was cancelled", "Check the plan.", Guid.NewGuid(), Guid.NewGuid());
 
     [Fact]
     public async Task Adds_the_notification_without_saving_it()
@@ -30,7 +33,11 @@ public sealed class NotificationSenderTests : IDisposable
         Assert.Equal(_notification.IdempotencyKey, added.IdempotencyKey);
         Assert.Equal(_notification.ProjectId, added.ProjectId);
         Assert.Equal(_notification.RecipientEmployeeId, added.RecipientEmployeeId);
+        Assert.Equal(_notification.Kind, added.Kind);
+        Assert.Equal(_notification.Title, added.Title);
         Assert.Equal(_notification.Message, added.Message);
+        Assert.Equal(_notification.WorkPackageId, added.WorkPackageId);
+        Assert.Equal(_notification.TaskId, added.TaskId);
         Assert.Equal(_clock.GetUtcNow().UtcDateTime, added.CreatedAt);
         Assert.Null(added.ReadAt);
         Assert.Equal(0, await CountStoredAsync());
