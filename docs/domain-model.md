@@ -338,12 +338,28 @@ Persistence and the composition root do not exist yet. When they are added:
 
 ## Read side
 
-Queries are computed on request from the tables of the aggregates; there are no stored projections yet. A query and
-the read model it returns are gRPC messages in `Application.Contracts/<Aggregate>/Queries/<UseCase>/`, its validator
-is in the same folder of `Application`, and its handler is in `Infrastructure/Queries/<Aggregate>/`: it reads the
-database without tracking and never changes anything. All reads of the handlers are in `ReadSources`, so a test
-translates each of them for SQL Server; the handlers themselves are tested on SQLite in memory. A query goes through
-the same pipeline as a command (logging, validation), without the unit of work.
+Every screen of the client reads a read model whose shape is that of the screen: one table per read model in the
+schema `read` (`ProjectItems`, `TaskItems`, `DependencyItems`, `MilestoneItems`, ...). The **projections**
+(`Infrastructure/ReadModels/Projections`) keep them up to date: they are domain event handlers, delivered by the
+outbox like the handlers of the application. A projection changes the rows its event is about and then lets
+`ProjectReadModelRefresher` recompute what a project takes from other rows (task counters, progress of packages,
+milestones and the project, statuses and warnings of dependencies, logged time and cost, funding figures). Projections
+never save: the outbox saves their rows together with the mark that the event was processed, so an event is projected
+atomically. They only set values and add a row once (by its id, or by the id of the event for a funding tranche), so
+a repeated delivery changes nothing.
+
+A **query** reads the rows and returns them as they are. It decides only what depends on the caller or on the day,
+which cannot be stored: who is a member today, which rate is valid today, whether a milestone is late, and what the
+caller may do. Names of employees and the risks are read from their aggregates, which have no events. A query and its
+read model are gRPC messages in `Application.Contracts/<Aggregate>/Queries/<UseCase>/`, its validator is in the same
+folder of `Application`, its handler in `Infrastructure/Queries/<Aggregate>/`. All reads of the handlers are in
+`ReadModelSources`, so a test translates each of them for SQL Server; the handlers and projections are tested on
+SQLite in memory, with the data arranged through commands and the events delivered through the outbox.
+
+The read models are **eventually consistent**: a command is visible to the queries once the outbox has delivered its
+events, usually right after the commit. Until then a new project is not found, and the client shows "updating".
+`ReadModelRebuilder` builds all read models anew from the aggregates (the migrator does it with
+`--rebuild-read-models`), for data saved before the projections existed or after a projection changed.
 
 | Service | Queries |
 |---|---|
@@ -357,13 +373,12 @@ the same pipeline as a command (logging, validation), without the unit of work.
 | `IDashboardService` | `GetDashboard`: open tasks of the caller in all projects, the projects they are on today, funding alerts |
 | `INotificationService` | `GetNotifications`, and the commands `MarkNotificationRead`, `MarkAllNotificationsRead` |
 
-**Version.** A read model of an aggregate carries its `Version` (for a list, every item has the version of its own
-aggregate; a read model of an aggregate that exists once per project, such as the funding or the schedule network,
-has `Version` 0 before the aggregate exists). The version grows with every saved change of the aggregate, so the client
-can tell whether something changed since its last read. Reads are consistent with the commands committed before them;
-what changes later are the effects of event handlers (a new work package is registered in the project, the dependencies
-of a cancelled task are removed). Until they are applied the client shows "updating" and reads again; for example a
-new work package has `IsRegistered = false` until the version of the project has grown by its registration.
+**Version.** Every event carries the version of its aggregate (`AggregateVersion`), and the projections keep it: a
+read model of an aggregate carries its `Version` (for a list, every item has the version of its own aggregate; one of
+an aggregate that exists once per project, such as the funding or the schedule network, has `Version` 0 before the
+aggregate exists). The version grows with every saved change of the aggregate, so the client can tell whether a read
+model already shows a change: for example a new work package has `IsRegistered = false` until its registration is
+projected.
 
 **What the caller may do.** Read models tell the client which actions the domain will allow, so it does not offer
 the others: `CanChangeStatus` (the task is not finished and the caller is responsible for it or for its package),
@@ -393,7 +408,7 @@ Risk:
 
 - score = probability × impact, each counted 1 (low) to 3 (high); the level is High from 6, Medium from 3, Low below.
 
-Funding (from the tranches of `ProjectFunding` and the time entries of every `TaskTimeLog` of the project):
+Funding (from `FundingAdded`, `TimeLogged`, `TimeEntryRemoved`):
 
 - total funding = Σ `FundingTranche.Amount`;
 - actual cost (AC) = Σ `Hours` × `HourlyRate` over time entries; AC on a report date (EVM) is the same sum
@@ -402,10 +417,8 @@ Funding (from the tranches of `ProjectFunding` and the time entries of every `Ta
 - past costs are never recalculated: every entry keeps its own rate;
 - the dashboard warns about a project of the caller from 80% used or when it is overspent.
 
-When computing on request becomes too slow, a read model can be stored in the schema `read` and kept up to date by
-event handlers, behind the same query. For the funding it would upsert a row by `EntryId` on `TimeLogged` and delete it
-on `TimeEntryRemoved`, then recompute the sums; a repeated delivery of an event does not double anything, so no
-separate deduplication is needed.
+The time entries of the funding are rows upserted by `EntryId` on `TimeLogged` and deleted on `TimeEntryRemoved`,
+and the sums are recomputed from them; a repeated delivery of an event does not double anything.
 
 ## Considered alternatives
 
