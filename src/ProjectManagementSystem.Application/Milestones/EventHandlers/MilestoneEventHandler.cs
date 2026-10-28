@@ -4,14 +4,18 @@ using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Milestones;
 using ProjectManagementSystem.Domain.Milestones.Events;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels.Projections;
+namespace ProjectManagementSystem.Application.Milestones.EventHandlers;
 
 /// <summary>
-/// Keeps the read models of the Milestone aggregate: the row of the milestone and its tasks, with the names of the
+/// Reacts to the events of the Milestone aggregate by keeping its read models: the row of the milestone and its tasks, with the names of the
 /// tasks and their packages. Statuses of the tasks and the progress are kept by the refresh of the project. Every event
 /// sets the version of the milestone.
 /// </summary>
-internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModelRefresher refresher) :
+public sealed class MilestoneEventHandler(
+    IReadModelRepository<MilestoneItemView> milestoneItems,
+    IReadModelRepository<MilestoneTaskItemView> milestoneTaskItems,
+    IReadModelRepository<TaskItemView> taskItems,
+    ProjectReadModelRefresher refresher) :
     IDomainEventHandler<MilestoneCreated>,
     IDomainEventHandler<MilestoneTaskAdded>,
     IDomainEventHandler<MilestoneTaskRemoved>,
@@ -22,11 +26,11 @@ internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModel
 {
     public async Task HandleAsync(MilestoneCreated domainEvent, CancellationToken cancellationToken = default)
     {
-        var milestone = await store.FindAsync<MilestoneItemView>(cancellationToken, domainEvent.MilestoneId);
+        var milestone = await milestoneItems.FindAsync(m => m.Id == domainEvent.MilestoneId, cancellationToken);
         if (milestone is null)
         {
             milestone = new MilestoneItemView { Id = domainEvent.MilestoneId, ProjectId = domainEvent.ProjectId, Status = MilestoneStatus.Open };
-            store.Add(milestone);
+            milestoneItems.Add(milestone);
         }
 
         milestone.Name = domainEvent.Name;
@@ -38,11 +42,11 @@ internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModel
     public Task HandleAsync(MilestoneTaskAdded domainEvent, CancellationToken cancellationToken = default) =>
         ChangeAsync(domainEvent.MilestoneId, domainEvent, async milestone =>
         {
-            if (await store.FindAsync<MilestoneTaskItemView>(cancellationToken, milestone.Id, domainEvent.TaskId) is not null)
+            if (await milestoneTaskItems.FindAsync(t => t.MilestoneId == milestone.Id && t.TaskId == domainEvent.TaskId, cancellationToken) is not null)
                 return;
 
-            var task = await store.FindAsync<TaskItemView>(cancellationToken, domainEvent.TaskId);
-            store.Add(new MilestoneTaskItemView
+            var task = await taskItems.FindAsync(t => t.Id == domainEvent.TaskId, cancellationToken);
+            milestoneTaskItems.Add(new MilestoneTaskItemView
             {
                 MilestoneId = milestone.Id,
                 TaskId = domainEvent.TaskId,
@@ -50,15 +54,15 @@ internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModel
                 WorkPackageId = task?.WorkPackageId ?? Guid.Empty,
                 Name = task?.Name ?? string.Empty,
                 WorkPackageDescription = task?.WorkPackageDescription ?? string.Empty,
-                Position = (await store.LoadAsync<MilestoneTaskItemView>(t => t.MilestoneId == milestone.Id, cancellationToken)).Count + 1,
+                Position = (await milestoneTaskItems.ListAsync(t => t.MilestoneId == milestone.Id, cancellationToken)).Count + 1,
             });
         }, cancellationToken);
 
     public Task HandleAsync(MilestoneTaskRemoved domainEvent, CancellationToken cancellationToken = default) =>
         ChangeAsync(domainEvent.MilestoneId, domainEvent, async milestone =>
         {
-            if (await store.FindAsync<MilestoneTaskItemView>(cancellationToken, milestone.Id, domainEvent.TaskId) is { } task)
-                store.Remove(task);
+            if (await milestoneTaskItems.FindAsync(t => t.MilestoneId == milestone.Id && t.TaskId == domainEvent.TaskId, cancellationToken) is { } task)
+                milestoneTaskItems.Remove(task);
         }, cancellationToken);
 
     public Task HandleAsync(MilestoneTargetDateChanged domainEvent, CancellationToken cancellationToken = default) =>
@@ -85,17 +89,17 @@ internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModel
 
     public async Task HandleAsync(MilestoneDeleted domainEvent, CancellationToken cancellationToken = default)
     {
-        if (await store.FindAsync<MilestoneItemView>(cancellationToken, domainEvent.MilestoneId) is { } milestone)
-            store.Remove(milestone);
+        if (await milestoneItems.FindAsync(m => m.Id == domainEvent.MilestoneId, cancellationToken) is { } milestone)
+            milestoneItems.Remove(milestone);
 
-        foreach (var task in await store.LoadAsync<MilestoneTaskItemView>(t => t.MilestoneId == domainEvent.MilestoneId, cancellationToken))
-            store.Remove(task);
+        foreach (var task in await milestoneTaskItems.ListAsync(t => t.MilestoneId == domainEvent.MilestoneId, cancellationToken))
+            milestoneTaskItems.Remove(task);
     }
 
     private async Task ChangeAsync(
         Guid milestoneId, IDomainEvent domainEvent, Func<MilestoneItemView, Task> change, CancellationToken cancellationToken)
     {
-        var milestone = await store.FindAsync<MilestoneItemView>(cancellationToken, milestoneId);
+        var milestone = await milestoneItems.FindAsync(m => m.Id == milestoneId, cancellationToken);
         if (milestone is null)
             return;
 
