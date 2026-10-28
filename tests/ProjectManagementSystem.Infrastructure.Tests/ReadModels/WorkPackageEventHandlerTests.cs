@@ -9,7 +9,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 
-public sealed class WorkPackageProjectionTests : ReadModelTestBase
+public sealed class WorkPackageEventHandlerTests : ReadModelTestBase
 {
     [Fact]
     public async Task Tasks_their_package_and_the_project_follow_the_events()

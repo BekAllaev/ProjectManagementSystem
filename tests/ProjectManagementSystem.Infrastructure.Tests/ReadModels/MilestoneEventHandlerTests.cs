@@ -14,7 +14,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 
-public sealed class MilestoneProjectionTests : ReadModelTestBase
+public sealed class MilestoneEventHandlerTests : ReadModelTestBase
 {
     [Fact]
     public async Task Milestone_keeps_its_tasks_and_their_progress()

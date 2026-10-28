@@ -9,7 +9,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.ReadModels;
 
-public sealed class ScheduleProjectionTests : ReadModelTestBase
+public sealed class ScheduleNetworkEventHandlerTests : ReadModelTestBase
 {
     private Guid _auth;
     private Guid _billing;
