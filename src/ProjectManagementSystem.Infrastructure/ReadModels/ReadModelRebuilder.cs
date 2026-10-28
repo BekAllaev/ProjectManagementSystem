@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Funding;
 using ProjectManagementSystem.Domain.Funding.Events;
@@ -13,7 +15,6 @@ using ProjectManagementSystem.Domain.TimeTracking.Events;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Domain.WorkPackages.Events;
 using ProjectManagementSystem.Infrastructure.Persistence;
-using ProjectManagementSystem.Infrastructure.Persistence.Repositories;
 using ProjectManagementSystem.Infrastructure.ReadModels.Projections;
 
 namespace ProjectManagementSystem.Infrastructure.ReadModels;
@@ -21,10 +22,11 @@ namespace ProjectManagementSystem.Infrastructure.ReadModels;
 /// <summary>
 /// Builds the read models anew from the current state of the aggregates, for data saved before the projections existed
 /// or after a change of a projection. The state of every aggregate is turned into the events that lead to it and fed to
-/// the same projections the outbox feeds, so the rows are the ones the events would have written. The old rows are
-/// deleted first; the work is saved project by project.
+/// the same handlers the outbox feeds (only their part that keeps the read models), so the rows are the ones the events
+/// would have written. The old rows are deleted first; the work is saved project by project. The handlers come from the
+/// container of the scope, so the rebuilder must be resolved from that scope.
 /// </summary>
-public sealed class ReadModelRebuilder(AppDbContext dbContext)
+public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider services)
 {
     public async Task RebuildAsync(CancellationToken cancellationToken = default)
     {
@@ -64,11 +66,8 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext)
     private async Task RebuildProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
         var store = new ReadModelStore(dbContext);
-        var refresher = new ProjectReadModelRefresher(
-            Rows<ProjectItemView>(), Rows<TaskItemView>(), Rows<TimeEntryItemView>(), Rows<WorkPackageItemView>(), Rows<DependencyItemView>(),
-            Rows<MilestoneTaskItemView>(), Rows<MilestoneItemView>(), Rows<FundingTrancheItemView>(), Rows<MemberCostItemView>(),
-            Rows<WorkPackageCostItemView>());
-        var projects = new ProjectProjection(store);
+        var refresher = services.GetRequiredService<ProjectReadModelRefresher>();
+        var projects = ActivatorUtilities.CreateInstance<ProjectEventHandler>(services);
         var workPackageProjection = new WorkPackageProjection(store, refresher);
         var schedule = new ScheduleProjection(store, refresher);
         var time = new TimeTrackingProjection(store, refresher);
@@ -143,8 +142,6 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext)
         foreach (var milestone in await dbContext.Set<Milestone>().AsNoTracking().Where(m => m.ProjectId == projectId).ToListAsync(cancellationToken))
             await RebuildMilestoneAsync(milestoneProjection, milestone, cancellationToken);
     }
-
-    private EfReadModelRepository<TRow> Rows<TRow>() where TRow : class => new(dbContext);
 
     private static async Task RebuildWorkPackageAsync(
         WorkPackageProjection projection, WorkPackage workPackage, Func<DateTime> next, CancellationToken cancellationToken)

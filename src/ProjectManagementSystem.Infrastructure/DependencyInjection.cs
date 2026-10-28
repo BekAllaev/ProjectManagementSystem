@@ -8,6 +8,7 @@ using ProjectManagementSystem.Infrastructure.Outbox;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 using ProjectManagementSystem.Infrastructure.Persistence.Repositories;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 using ProjectManagementSystem.Infrastructure.ReadModels.Projections;
 
 namespace ProjectManagementSystem.Infrastructure;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationSender, NotificationSender>();
 
         services.AddScoped<ReadModelStore>();
+        services.AddScoped<ReadModelRebuilder>();
         AddProjections(services);
 
         return services;

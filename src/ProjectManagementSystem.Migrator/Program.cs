@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ProjectManagementSystem.Application;
+using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Infrastructure;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProjectManagementSystem.Infrastructure.ReadModels;
@@ -25,7 +27,18 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
     ContentRootPath = AppContext.BaseDirectory,
 });
 
-builder.Services.AddPersistence(builder.Configuration);
+if (rebuildReadModels)
+{
+    // The rebuild runs the event handlers of the application, which need the whole application and infrastructure.
+    // It acts for no employee.
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddScoped<ICurrentUser, NoCurrentUser>();
+}
+else
+{
+    builder.Services.AddPersistence(builder.Configuration);
+}
 
 using var host = builder.Build();
 
@@ -58,7 +71,7 @@ try
     if (rebuildReadModels)
     {
         logger.LogInformation("Rebuilding the read models.");
-        await new ReadModelRebuilder(dbContext).RebuildAsync();
+        await scope.ServiceProvider.GetRequiredService<ReadModelRebuilder>().RebuildAsync();
         logger.LogInformation("Read models are rebuilt.");
     }
 
@@ -68,4 +81,12 @@ catch (Exception exception)
 {
     logger.LogError(exception, "Migration failed.");
     return 1;
+}
+
+/// <summary>
+/// The migrator runs no request of an employee.
+/// </summary>
+internal sealed class NoCurrentUser : ICurrentUser
+{
+    public Guid EmployeeId => Guid.Empty;
 }

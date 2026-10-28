@@ -4,14 +4,22 @@ using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Projects.Events;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels.Projections;
+namespace ProjectManagementSystem.Application.Projects.EventHandlers;
 
 /// <summary>
-/// Keeps the read models of the Project aggregate: the row of the project, its roles and its team. Every event sets
-/// the version of the project. A projection only sets values, so a repeated delivery changes nothing; an event of a
-/// project whose row does not exist (saved before the read models existed) is ignored.
+/// Reacts to the events of the Project aggregate. It keeps the read models of the project, its roles and its team
+/// (every event sets the version of the project), and when a membership ends it re-checks that the responsible persons
+/// of open work are still on the team. The read models only get values set, so a repeated delivery changes nothing;
+/// an event of a project without a read model (saved before the read models existed) changes no read model.
 /// </summary>
-internal sealed class ProjectProjection(ReadModelStore store) :
+public sealed class ProjectEventHandler(
+    IReadModelRepository<ProjectItemView> projects,
+    IReadModelRepository<WorkPackageItemView> workPackages,
+    IReadModelRepository<RoleItemView> roles,
+    IReadModelRepository<TeamMemberItemView> teamMembers,
+    IReadModelRepository<MembershipPeriodView> periods,
+    IReadModelRepository<HourlyRateItemView> rates,
+    ResponsiblePersonCheck responsiblePersonCheck) :
     IDomainEventHandler<ProjectCreated>,
     IDomainEventHandler<ProjectStarted>,
     IDomainEventHandler<ProjectCompleted>,
@@ -26,11 +34,11 @@ internal sealed class ProjectProjection(ReadModelStore store) :
 {
     public async Task HandleAsync(ProjectCreated domainEvent, CancellationToken cancellationToken = default)
     {
-        var project = await store.FindAsync<ProjectItemView>(cancellationToken, domainEvent.ProjectId);
+        var project = await projects.FindAsync(p => p.Id == domainEvent.ProjectId, cancellationToken);
         if (project is null)
         {
             project = new ProjectItemView { Id = domainEvent.ProjectId, State = ProjectState.Created, IsOpen = true };
-            store.Add(project);
+            projects.Add(project);
         }
 
         project.Title = domainEvent.Title;
@@ -59,11 +67,10 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        var workPackage = await store.FindAsync<WorkPackageItemView>(cancellationToken, domainEvent.WorkPackageId);
+        var workPackage = await workPackages.FindAsync(w => w.Id == domainEvent.WorkPackageId, cancellationToken);
         if (workPackage is not null && !workPackage.IsRegistered)
         {
-            var registered = await store.LoadAsync<WorkPackageItemView>(
-                w => w.ProjectId == domainEvent.ProjectId && w.IsRegistered, cancellationToken);
+            var registered = await workPackages.ListAsync(w => w.ProjectId == domainEvent.ProjectId && w.IsRegistered, cancellationToken);
             workPackage.IsRegistered = true;
             workPackage.RegistrationPosition = registered.Count + 1;
         }
@@ -73,11 +80,11 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        var role = await store.FindAsync<RoleItemView>(cancellationToken, domainEvent.RoleId);
+        var role = await roles.FindAsync(r => r.Id == domainEvent.RoleId, cancellationToken);
         if (role is null)
         {
             role = new RoleItemView { Id = domainEvent.RoleId, ProjectId = domainEvent.ProjectId };
-            store.Add(role);
+            roles.Add(role);
         }
 
         role.Name = domainEvent.Name;
@@ -88,11 +95,11 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        if (await store.FindAsync<RoleItemView>(cancellationToken, domainEvent.RoleId) is { } role)
+        if (await roles.FindAsync(r => r.Id == domainEvent.RoleId, cancellationToken) is { } role)
             role.Name = domainEvent.NewName;
 
         // A role is renamed only while it was never assigned, so no team member shows it yet; kept in step anyway.
-        foreach (var member in await store.LoadAsync<TeamMemberItemView>(m => m.RoleId == domainEvent.RoleId, cancellationToken))
+        foreach (var member in await teamMembers.ListAsync(m => m.RoleId == domainEvent.RoleId, cancellationToken))
             member.RoleName = domainEvent.NewName;
     }
 
@@ -100,7 +107,7 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        if (await store.FindAsync<RoleItemView>(cancellationToken, domainEvent.RoleId) is { } role)
+        if (await roles.FindAsync(r => r.Id == domainEvent.RoleId, cancellationToken) is { } role)
             role.Description = domainEvent.Description ?? string.Empty;
     }
 
@@ -108,17 +115,17 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        if (await store.FindAsync<RoleItemView>(cancellationToken, domainEvent.RoleId) is { } role)
-            store.Remove(role);
+        if (await roles.FindAsync(r => r.Id == domainEvent.RoleId, cancellationToken) is { } role)
+            roles.Remove(role);
     }
 
     public async Task HandleAsync(TeamMemberAdded domainEvent, CancellationToken cancellationToken = default)
     {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        if (await store.FindAsync<MembershipPeriodView>(cancellationToken, domainEvent.TeamMemberId) is null)
+        if (await periods.FindAsync(p => p.TeamMemberId == domainEvent.TeamMemberId, cancellationToken) is null)
         {
-            store.Add(new MembershipPeriodView
+            periods.Add(new MembershipPeriodView
             {
                 TeamMemberId = domainEvent.TeamMemberId,
                 ProjectId = domainEvent.ProjectId,
@@ -130,21 +137,22 @@ internal sealed class ProjectProjection(ReadModelStore store) :
 
         await AddRateAsync(domainEvent.ProjectId, domainEvent.TeamMemberId, domainEvent.EmployeeId, domainEvent.From, domainEvent.HourlyRate, cancellationToken);
 
-        var role = await store.FindAsync<RoleItemView>(cancellationToken, domainEvent.RoleId);
+        var role = await roles.FindAsync(r => r.Id == domainEvent.RoleId, cancellationToken);
         if (role is not null)
             role.IsAssigned = true;
 
-        var member = await store.FindAsync<TeamMemberItemView>(cancellationToken, domainEvent.ProjectId, domainEvent.EmployeeId);
+        var member = await teamMembers.FindAsync(
+            m => m.ProjectId == domainEvent.ProjectId && m.EmployeeId == domainEvent.EmployeeId, cancellationToken);
         if (member is null)
         {
             member = new TeamMemberItemView { ProjectId = domainEvent.ProjectId, EmployeeId = domainEvent.EmployeeId };
-            store.Add(member);
+            teamMembers.Add(member);
         }
 
         // The member shows the role of the latest period.
-        var periods = await store.LoadAsync<MembershipPeriodView>(
+        var memberPeriods = await periods.ListAsync(
             p => p.ProjectId == domainEvent.ProjectId && p.EmployeeId == domainEvent.EmployeeId, cancellationToken);
-        if (periods.MaxBy(p => p.From)?.TeamMemberId == domainEvent.TeamMemberId)
+        if (memberPeriods.MaxBy(p => p.From)?.TeamMemberId == domainEvent.TeamMemberId)
         {
             member.RoleId = domainEvent.RoleId;
             member.RoleName = role?.Name ?? string.Empty;
@@ -153,9 +161,18 @@ internal sealed class ProjectProjection(ReadModelStore store) :
 
     public async Task HandleAsync(TeamMembershipEnded domainEvent, CancellationToken cancellationToken = default)
     {
+        await ProjectAsync(domainEvent, cancellationToken);
+        await responsiblePersonCheck.CheckLeavingAsync(domainEvent.ProjectId, domainEvent.EmployeeId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Only the change of the read models, without the re-check; also used to rebuild the read models.
+    /// </summary>
+    public async Task ProjectAsync(TeamMembershipEnded domainEvent, CancellationToken cancellationToken = default)
+    {
         await ChangeProjectAsync(domainEvent.ProjectId, domainEvent, _ => { }, cancellationToken);
 
-        if (await store.FindAsync<MembershipPeriodView>(cancellationToken, domainEvent.TeamMemberId) is { } period)
+        if (await periods.FindAsync(p => p.TeamMemberId == domainEvent.TeamMemberId, cancellationToken) is { } period)
             period.To = domainEvent.To;
     }
 
@@ -169,7 +186,7 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     private async Task ChangeProjectAsync(
         Guid projectId, IDomainEvent domainEvent, Action<ProjectItemView> change, CancellationToken cancellationToken)
     {
-        var project = await store.FindAsync<ProjectItemView>(cancellationToken, projectId);
+        var project = await projects.FindAsync(p => p.Id == projectId, cancellationToken);
         if (project is null)
             return;
 
@@ -180,9 +197,9 @@ internal sealed class ProjectProjection(ReadModelStore store) :
     private async Task AddRateAsync(
         Guid projectId, Guid teamMemberId, Guid employeeId, DateOnly from, decimal amount, CancellationToken cancellationToken)
     {
-        if (await store.FindAsync<HourlyRateItemView>(cancellationToken, teamMemberId, from) is not null)
+        if (await rates.FindAsync(r => r.TeamMemberId == teamMemberId && r.From == from, cancellationToken) is not null)
             return;
 
-        store.Add(new HourlyRateItemView { TeamMemberId = teamMemberId, From = from, ProjectId = projectId, EmployeeId = employeeId, Amount = amount });
+        rates.Add(new HourlyRateItemView { TeamMemberId = teamMemberId, From = from, ProjectId = projectId, EmployeeId = employeeId, Amount = amount });
     }
 }
