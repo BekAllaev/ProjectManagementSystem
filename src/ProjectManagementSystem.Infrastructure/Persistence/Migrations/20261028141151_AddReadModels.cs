@@ -49,7 +49,7 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Date = table.Column<DateOnly>(type: "date", nullable: false),
                     Reason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
-                    AddedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Position = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -138,7 +138,7 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     WorkPackageDescription = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     IsCounted = table.Column<bool>(type: "bit", nullable: false),
-                    AddedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Position = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -286,7 +286,7 @@ namespace ProjectManagementSystem.Infrastructure.Persistence.Migrations
                     CancellationReason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsRegistered = table.Column<bool>(type: "bit", nullable: false),
-                    RegisteredAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RegistrationPosition = table.Column<int>(type: "int", nullable: true),
                     CompletedTasks = table.Column<int>(type: "int", nullable: false),
                     CountedTasks = table.Column<int>(type: "int", nullable: false),
                     Version = table.Column<long>(type: "bigint", nullable: false)

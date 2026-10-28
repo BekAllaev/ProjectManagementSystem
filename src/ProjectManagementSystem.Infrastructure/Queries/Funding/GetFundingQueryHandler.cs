@@ -19,7 +19,7 @@ internal sealed class GetFundingQueryHandler(AppDbContext dbContext) : IQueryHan
             project.Id, project.Currency, project.TotalFunding, project.ActualCost, project.RemainingFunding, project.UsedPercent,
             project.IsOverspent,
             // Newest date first; of tranches with the same date, the one added last comes first.
-            tranches.OrderByDescending(t => t.Date).ThenByDescending(t => t.AddedAt)
+            tranches.OrderByDescending(t => t.Date).ThenByDescending(t => t.Position)
                 .Select(t => new FundingTrancheItem(t.Amount, t.Date, t.Reason)).ToList(),
             byMember.OrderByDescending(c => c.Cost)
                 .Select(c => new MemberCostItem(employees.Ref(c.EmployeeId), c.Hours, c.Cost)).ToList(),

@@ -21,7 +21,7 @@ internal sealed class FundingProjection(ReadModelStore store, ProjectReadModelRe
                 Amount = domainEvent.Amount,
                 Date = domainEvent.Date,
                 Reason = domainEvent.Reason ?? string.Empty,
-                AddedAt = domainEvent.OccurredAt,
+                Position = (await store.LoadAsync<FundingTrancheItemView>(t => t.ProjectId == domainEvent.ProjectId, cancellationToken)).Count + 1,
             });
         }
 

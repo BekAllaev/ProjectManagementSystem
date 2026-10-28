@@ -61,8 +61,10 @@ internal sealed class ProjectProjection(ReadModelStore store) :
         var workPackage = await store.FindAsync<WorkPackageItemView>(cancellationToken, domainEvent.WorkPackageId);
         if (workPackage is not null && !workPackage.IsRegistered)
         {
+            var registered = await store.LoadAsync<WorkPackageItemView>(
+                w => w.ProjectId == domainEvent.ProjectId && w.IsRegistered, cancellationToken);
             workPackage.IsRegistered = true;
-            workPackage.RegisteredAt = domainEvent.OccurredAt;
+            workPackage.RegistrationPosition = registered.Count + 1;
         }
     }
 

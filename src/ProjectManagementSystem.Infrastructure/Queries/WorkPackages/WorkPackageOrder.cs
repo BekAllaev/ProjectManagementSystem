@@ -8,5 +8,5 @@ internal static class WorkPackageOrder
     /// In the order of registration in the project; a package not registered yet comes last, by creation.
     /// </summary>
     public static IOrderedEnumerable<WorkPackageItemView> InProjectOrder(this IEnumerable<WorkPackageItemView> workPackages) =>
-        workPackages.OrderBy(w => w.RegisteredAt ?? DateTime.MaxValue).ThenBy(w => w.CreatedAt);
+        workPackages.OrderBy(w => w.RegistrationPosition ?? int.MaxValue).ThenBy(w => w.CreatedAt);
 }

@@ -25,9 +25,10 @@ public sealed class WorkPackageItemView
     public bool IsRegistered { get; set; }
 
     /// <summary>
-    /// Packages are listed in the order they were registered; an unregistered one comes last.
+    /// 1 for the first package registered in the project, then one more for every registration; empty until the
+    /// package is registered. Packages are listed in this order, an unregistered one last.
     /// </summary>
-    public DateTime? RegisteredAt { get; set; }
+    public int? RegistrationPosition { get; set; }
 
     public int CompletedTasks { get; set; }
 

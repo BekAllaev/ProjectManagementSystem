@@ -49,7 +49,7 @@ internal sealed class MilestoneProjection(ReadModelStore store, ProjectReadModel
                 WorkPackageId = task?.WorkPackageId ?? Guid.Empty,
                 Name = task?.Name ?? string.Empty,
                 WorkPackageDescription = task?.WorkPackageDescription ?? string.Empty,
-                AddedAt = domainEvent.OccurredAt,
+                Position = (await store.LoadAsync<MilestoneTaskItemView>(t => t.MilestoneId == milestone.Id, cancellationToken)).Count + 1,
             });
         }, cancellationToken);
 
