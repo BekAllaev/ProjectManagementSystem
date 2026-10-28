@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectManagementSystem.Application.Projects.EventHandlers;
+using ProjectManagementSystem.Application.Schedule.EventHandlers;
 using ProjectManagementSystem.Application.WorkPackages.EventHandlers;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Domain.Funding;
@@ -70,7 +71,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         var refresher = services.GetRequiredService<ProjectReadModelRefresher>();
         var projects = ActivatorUtilities.CreateInstance<ProjectEventHandler>(services);
         var workPackageHandler = ActivatorUtilities.CreateInstance<WorkPackageEventHandler>(services);
-        var schedule = new ScheduleProjection(store, refresher);
+        var schedule = ActivatorUtilities.CreateInstance<ScheduleNetworkEventHandler>(services);
         var time = new TimeTrackingProjection(store, refresher);
         var fundingProjection = new FundingProjection(store, refresher);
         var milestoneProjection = new MilestoneProjection(store, refresher);
@@ -121,7 +122,7 @@ public sealed class ReadModelRebuilder(AppDbContext dbContext, IServiceProvider 
         if (await dbContext.Set<ScheduleNetwork>().AsNoTracking().SingleOrDefaultAsync(n => n.Id == projectId, cancellationToken) is { } network)
         {
             foreach (var dependency in network.Dependencies)
-                await schedule.HandleAsync(new DependencyAdded(project.Id, dependency) { AggregateVersion = network.Version }, cancellationToken);
+                await schedule.ProjectAsync(new DependencyAdded(project.Id, dependency) { AggregateVersion = network.Version }, cancellationToken);
         }
 
         foreach (var timeLog in await dbContext.Set<TaskTimeLog>().AsNoTracking().Where(l => l.ProjectId == projectId).ToListAsync(cancellationToken))
