@@ -14,7 +14,7 @@ internal static class NotificationInbox
     public static async Task<IQueryable<NotificationRecord>> NotificationsOfAsync(
         this AppDbContext dbContext, Guid employeeId, DateOnly today, CancellationToken cancellationToken)
     {
-        var projectIds = await dbContext.MembershipsOn(today, employeeId)
+        var projectIds = await dbContext.MembershipPeriodsOn(today, employeeId)
             .Select(m => m.ProjectId)
             .Distinct()
             .ToListAsync(cancellationToken);

@@ -21,12 +21,10 @@ internal sealed class GetNotificationsQueryHandler(AppDbContext dbContext, ICurr
             selected = selected.Take(take);
         var notifications = await selected.ToListAsync(cancellationToken);
 
-        var projects = await dbContext.ProjectTitles(notifications.Select(n => n.ProjectId).Distinct().ToList())
+        var projects = await dbContext.ProjectItems(notifications.Select(n => n.ProjectId).Distinct().ToList())
             .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken);
-        var workPackageIds = notifications.Where(n => n.WorkPackageId is not null).Select(n => n.WorkPackageId!.Value).Distinct().ToList();
-        var taskNames = (await dbContext.WorkPackages(workPackageIds).ToListAsync(cancellationToken))
-            .SelectMany(w => w.Tasks)
-            .ToDictionary(t => t.Id, t => t.Name);
+        var taskIds = notifications.Where(n => n.TaskId is not null).Select(n => n.TaskId!.Value).Distinct().ToList();
+        var taskNames = await dbContext.TaskItems(taskIds).ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
 
         var items = notifications
             .Select(n => new NotificationItem(

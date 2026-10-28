@@ -7,11 +7,14 @@ using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Risks;
 
+/// <summary>
+/// Risks have no events, so they are read from their aggregate.
+/// </summary>
 internal sealed class GetRisksQueryHandler(AppDbContext dbContext) : IQueryHandler<GetRisksQuery, RiskList>
 {
     public async Task<RiskList> Handle(GetRisksQuery query, CancellationToken cancellationToken)
     {
-        var project = await dbContext.GetProjectAsync(query.ProjectId, cancellationToken);
+        var project = await dbContext.GetProjectItemAsync(query.ProjectId, cancellationToken);
         var risks = await dbContext.RisksOf(project.Id, query.Status).ToListAsync(cancellationToken);
         var employees = await EmployeeDirectory.LoadAsync(dbContext, risks.Select(r => r.OwnerId), cancellationToken);
 
