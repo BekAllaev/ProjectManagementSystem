@@ -11,12 +11,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ProjectManagementSystem.Application.Employees;
+using ProjectManagementSystem.Application.Employees.Queries.GetCurrentEmployee;
 using ProjectManagementSystem.Application.Projects;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
 using ProjectManagementSystem.Application.WorkPackages;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteWorkPackage;
+using ProjectManagementSystem.Domain.Employees;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
+using ProjectManagementSystem.Domain.Services;
 using ProjectManagementSystem.Domain.Tests.Fakes;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Identity;
@@ -98,6 +102,22 @@ public sealed class ApiHostTests : IClassFixture<ApiHostTests.Factory>
         await Client<IWorkPackageService>().CompleteWorkPackage(
             new CompleteWorkPackageCommand(workPackage.Id), WithToken(await LoginAsync(responsible)));
         Assert.Equal(WorkPackageStatus.Completed, workPackage.Status);
+    }
+
+    [Fact]
+    public async Task Query_answers_with_its_read_model()
+    {
+        var employee = await new EmployeeService(new InMemoryRepository<Employee>()).RegisterAsync("Ada", "Lovelace", "ada@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.Add(employee);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var current = await Client<IEmployeeService>().GetCurrentEmployee(new GetCurrentEmployeeQuery(), WithToken(await LoginAsync(employee.Id)));
+
+        Assert.Equal((employee.Id, "Ada", "Lovelace", "ada@example.com"), (current.Id, current.FirstName, current.LastName, current.Email));
     }
 
     [Fact]

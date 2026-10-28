@@ -1,3 +1,5 @@
+using ProjectManagementSystem.Application.Notifications;
+
 namespace ProjectManagementSystem.Infrastructure.Persistence.Notifications;
 
 /// <summary>
@@ -17,7 +19,21 @@ public sealed class NotificationRecord
     /// </summary>
     public Guid? RecipientEmployeeId { get; init; }
 
+    public NotificationKind Kind { get; init; }
+
+    public required string Title { get; init; }
+
     public required string Message { get; init; }
+
+    /// <summary>
+    /// Work package the notification links to, if any.
+    /// </summary>
+    public Guid? WorkPackageId { get; init; }
+
+    /// <summary>
+    /// Task the notification links to, if any; it is in <see cref="WorkPackageId"/>.
+    /// </summary>
+    public Guid? TaskId { get; init; }
 
     public DateTime CreatedAt { get; init; }
 

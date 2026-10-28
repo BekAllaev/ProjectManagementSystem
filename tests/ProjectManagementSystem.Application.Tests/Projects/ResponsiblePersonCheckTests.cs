@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Application.Projects.Commands.RemoveTeamMember;
 using ProjectManagementSystem.Application.WorkPackages.Commands.ChangeWorkPackageResponsible;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask;
@@ -36,6 +37,9 @@ public class ResponsiblePersonCheckTests : CommandTestBase
         var notification = Assert.Single(App.Notifications.Sent);
         Assert.Null(notification.RecipientEmployeeId);
         Assert.Equal(_project.Id, notification.ProjectId);
+        Assert.Equal(NotificationKind.ResponsibleOutsideTeam, notification.Kind);
+        Assert.Equal(workPackageId, notification.WorkPackageId);
+        Assert.Null(notification.TaskId);
         Assert.Contains(workPackageId.ToString(), notification.Message);
         Assert.Contains(_leaving.ToString(), notification.Message);
         Assert.Contains(workPackageId, _project.WorkPackageIds);

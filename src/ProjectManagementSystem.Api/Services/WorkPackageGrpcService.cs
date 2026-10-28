@@ -11,12 +11,16 @@ using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteWorkPack
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPackage;
 using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask;
+using ProjectManagementSystem.Application.WorkPackages.Queries.GetTask;
+using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks;
+using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages;
 using ProtoBuf.Grpc;
 
 namespace ProjectManagementSystem.Api.Services;
 
 /// <summary>
-/// Sends every command of <see cref="IWorkPackageService"/> through MediatR, so the pipeline behaviors apply. No logic here.
+/// Sends every command and query of <see cref="IWorkPackageService"/> through MediatR, so the pipeline behaviors apply.
+/// No logic here.
 /// </summary>
 [Authorize]
 public sealed class WorkPackageGrpcService(ISender mediator) : IWorkPackageService
@@ -44,6 +48,15 @@ public sealed class WorkPackageGrpcService(ISender mediator) : IWorkPackageServi
 
     public Task<CreatedId> CreateWorkPackage(CreateWorkPackageCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);
+
+    public Task<TaskDetails> GetTask(GetTaskQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
+
+    public Task<TaskList> GetTasks(GetTasksQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
+
+    public Task<WorkPackageList> GetWorkPackages(GetWorkPackagesQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
 
     public Task StartTask(StartTaskCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);

@@ -1,3 +1,4 @@
+using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Application.Schedule.Commands.AddDependency;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CancelWorkPackage;
@@ -49,6 +50,12 @@ public class ScheduleEventHandlerTests : CommandTestBase
         Assert.Equal(
             new[] { _successorOwner, Member }.Order(),
             App.Notifications.Sent.Select(n => n.RecipientEmployeeId!.Value).Order());
+        Assert.All(App.Notifications.Sent, n =>
+        {
+            Assert.Equal(NotificationKind.PredecessorCancelled, n.Kind);
+            Assert.Equal(_second.Id, n.WorkPackageId);
+            Assert.Equal(C, n.TaskId);
+        });
     }
 
     [Fact]

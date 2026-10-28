@@ -11,12 +11,17 @@ using ProjectManagementSystem.Application.Projects.Commands.DeleteRole;
 using ProjectManagementSystem.Application.Projects.Commands.RemoveTeamMember;
 using ProjectManagementSystem.Application.Projects.Commands.RenameRole;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
+using ProjectManagementSystem.Application.Projects.Queries.GetProject;
+using ProjectManagementSystem.Application.Projects.Queries.GetProjects;
+using ProjectManagementSystem.Application.Projects.Queries.GetRoles;
+using ProjectManagementSystem.Application.Projects.Queries.GetTeam;
 
 namespace ProjectManagementSystem.Application.Projects;
 
 /// <summary>
-/// gRPC service of the Project (with its roles and team) aggregate: one method per command. The host implements every
-/// method by sending the command through MediatR; the client shares this interface for typed calls.
+/// gRPC service of the Project (with its roles and team) aggregate: one method per command and per query. The host
+/// implements every method by sending the command or query through MediatR; the client shares this interface for typed
+/// calls.
 /// </summary>
 [ServiceContract(Name = "ProjectManagementSystem.ProjectService")]
 public interface IProjectService
@@ -34,6 +39,14 @@ public interface IProjectService
     Task<CreatedId> CreateRole(CreateRoleCommand command, CallContext context = default);
 
     Task DeleteRole(DeleteRoleCommand command, CallContext context = default);
+
+    Task<ProjectDetails> GetProject(GetProjectQuery query, CallContext context = default);
+
+    Task<ProjectList> GetProjects(GetProjectsQuery query, CallContext context = default);
+
+    Task<RoleList> GetRoles(GetRolesQuery query, CallContext context = default);
+
+    Task<Team> GetTeam(GetTeamQuery query, CallContext context = default);
 
     Task RemoveTeamMember(RemoveTeamMemberCommand command, CallContext context = default);
 

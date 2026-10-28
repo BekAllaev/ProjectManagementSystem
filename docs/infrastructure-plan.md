@@ -12,7 +12,7 @@
 - **Время:** `TimeProvider` везде, включая доменные события и тесты. Системные часы (`DateTime.UtcNow`, `Guid.CreateVersion7()` без аргумента) в production-коде и тестах не используются.
 - **Transactional Outbox:** события пишутся в outbox в том же `SaveChanges`, что и агрегат. Processor — `BackgroundService` без polling: будится сигналом после commit + один проход при старте.
 - **Порядок outbox:** строгий глобальный порядок по `Sequence`. Упавшее сообщение — очередь ждёт его повтора (backoff). После N неудачных попыток тип события паркуется (ключ парковки = тип события): это сообщение и все последующие сообщения того же типа получают статус Parked и не обрабатываются, остальная очередь идёт дальше. Парковка ≠ удаление: сообщения остаются для ручного разблокирования.
-- **Read-модели:** та же база, схема `read`. В этом плане не реализуются (будут вместе с фронтом).
+- **Read-модели:** та же база, схема `read`. В этом плане не реализуются (будут вместе с фронтом). Сделано позже: запросы пока вычисляются из таблиц агрегатов, без хранимых проекций (см. «Read side» в `domain-model.md`).
 - **Уведомления:** in-app таблица `Notifications`, unique index на `IdempotencyKey`.
 - **Уникальный email:** unique index на `Employees.NormalizedEmail` как страховка от гонки.
 - **Интеграционные тесты:** только локально против установленного SQL Server, не в CI, без контейнеров.
@@ -51,7 +51,7 @@
    - `DomainEvents` агрегатов — `Ignore`.
 4. Таблица `OutboxMessages`: `Sequence` (bigint identity, PK кластерный), `EventId` (unique), `EventType` (стабильное имя), `Payload` (nvarchar(max), JSON), `OccurredAt`, `ProcessedAt`, `Attempts`, `NextAttemptAt`, `LastError`, `ParkedAt`. Индекс по `(ProcessedAt, ParkedAt, Sequence)`.
 5. Таблица `ParkedEventTypes`: `EventType` (PK), `ParkedAt`, `Reason`.
-6. Таблица `Notifications`: `Id`, `IdempotencyKey` (unique), `ProjectId`, `RecipientEmployeeId` (null = руководство проекта), `Message`, `CreatedAt`, `ReadAt` (null).
+6. Таблица `Notifications`: `Id`, `IdempotencyKey` (unique), `ProjectId`, `RecipientEmployeeId` (null = руководство проекта), `Message`, `CreatedAt`, `ReadAt` (null). Позже (миграция `AddNotificationDetails`) добавлены `Kind`, `Title`, `WorkPackageId`, `TaskId`.
 7. Начальная миграция `Initial`.
 8. `DependencyInjection.AddInfrastructure(IServiceCollection, IConfiguration)`: DbContext со строкой подключения `ConnectionStrings:Default`, `EnableRetryOnFailure()`.
 9. **Добавлено при ревью:** проект `src/ProjectManagementSystem.Migrator` — консольное приложение на Generic Host, применяет миграции (`dotnet run --project src/ProjectManagementSystem.Migrator`; с `--script` печатает идемпотентный SQL без подключения к базе). Настройки: `appsettings.json` → `appsettings.{Environment}.json` → user secrets (Development) → переменные окружения → командная строка. Он же startup-проект для `dotnet ef` (`--project src/ProjectManagementSystem.Infrastructure --startup-project src/ProjectManagementSystem.Migrator`). Регистрирует только `AddPersistence` (DbContext), не весь `AddInfrastructure`.

@@ -12,12 +12,17 @@ using ProjectManagementSystem.Application.Projects.Commands.DeleteRole;
 using ProjectManagementSystem.Application.Projects.Commands.RemoveTeamMember;
 using ProjectManagementSystem.Application.Projects.Commands.RenameRole;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
+using ProjectManagementSystem.Application.Projects.Queries.GetProject;
+using ProjectManagementSystem.Application.Projects.Queries.GetProjects;
+using ProjectManagementSystem.Application.Projects.Queries.GetRoles;
+using ProjectManagementSystem.Application.Projects.Queries.GetTeam;
 using ProtoBuf.Grpc;
 
 namespace ProjectManagementSystem.Api.Services;
 
 /// <summary>
-/// Sends every command of <see cref="IProjectService"/> through MediatR, so the pipeline behaviors apply. No logic here.
+/// Sends every command and query of <see cref="IProjectService"/> through MediatR, so the pipeline behaviors apply.
+/// No logic here.
 /// </summary>
 [Authorize]
 public sealed class ProjectGrpcService(ISender mediator) : IProjectService
@@ -42,6 +47,18 @@ public sealed class ProjectGrpcService(ISender mediator) : IProjectService
 
     public Task DeleteRole(DeleteRoleCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);
+
+    public Task<ProjectDetails> GetProject(GetProjectQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
+
+    public Task<ProjectList> GetProjects(GetProjectsQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
+
+    public Task<RoleList> GetRoles(GetRolesQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
+
+    public Task<Team> GetTeam(GetTeamQuery query, CallContext context = default) =>
+        mediator.Send(query, context.CancellationToken);
 
     public Task RemoveTeamMember(RemoveTeamMemberCommand command, CallContext context = default) =>
         mediator.Send(command, context.CancellationToken);

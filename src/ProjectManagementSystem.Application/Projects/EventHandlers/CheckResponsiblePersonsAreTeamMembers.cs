@@ -1,4 +1,5 @@
 using ProjectManagementSystem.Application.Abstractions;
+using ProjectManagementSystem.Application.Notifications;
 using ProjectManagementSystem.Domain.Interfaces;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Projects.Events;
@@ -74,7 +75,10 @@ public sealed class CheckResponsiblePersonsAreTeamMembers(
                 $"responsible-outside-team:{workPackage.Id}:{employeeId}",
                 project.Id,
                 RecipientEmployeeId: null,
+                NotificationKind.ResponsibleOutsideTeam,
+                "Responsible person is no longer on the team",
                 $"Employee '{employeeId}' is responsible for open work in work package '{workPackage.Id}' " +
-                $"but has no ongoing membership in the team of project '{project.Title}'. Reassign the work."),
+                $"but has no ongoing membership in the team of project '{project.Title}'. Reassign the work.",
+                workPackage.Id),
             cancellationToken);
 }

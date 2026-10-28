@@ -8,7 +8,7 @@ using ProjectManagementSystem.Infrastructure.Identity;
 using ProjectManagementSystem.Infrastructure.Persistence;
 using ProtoBuf.Grpc.Server;
 
-// Backend of the Blazor client: every command is a gRPC call (code-first, gRPC-Web for the browser).
+// Backend of the Blazor client: every command and query is a gRPC call (code-first, gRPC-Web for the browser).
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
@@ -44,9 +44,11 @@ app.UseAuthorization();
 
 app.MapAuthEndpoints();
 
+app.MapGrpcService<DashboardGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<EmployeeGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<FundingGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<MilestoneGrpcService>().EnableGrpcWeb();
+app.MapGrpcService<NotificationGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<ProjectGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<RiskGrpcService>().EnableGrpcWeb();
 app.MapGrpcService<ScheduleGrpcService>().EnableGrpcWeb();
