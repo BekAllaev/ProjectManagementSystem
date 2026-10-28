@@ -48,12 +48,14 @@ public static class TestData
 
     /// <summary>
     /// Creates a work package and registers it in the project, as the handler of
-    /// <see cref="WorkPackages.Events.WorkPackageCreated"/> does after the commit.
+    /// <see cref="WorkPackages.Events.WorkPackageCreated"/> does after the commit. The project is left as after that
+    /// commit, without pending events, so a project seeded before stays without events.
     /// </summary>
     public static WorkPackage WorkPackage(Project project, Guid responsiblePersonId)
     {
         var workPackage = new WorkPackageService(TimeProvider).CreateWorkPackage(project, "Work package", responsiblePersonId);
         project.RegisterWorkPackage(workPackage.Id);
+        project.ClearDomainEvents();
 
         return workPackage;
     }
