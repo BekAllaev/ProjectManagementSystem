@@ -20,7 +20,7 @@ namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 /// <summary>
 /// Read models of people: employees, the dashboard and the notifications of the caller.
 /// </summary>
-public sealed class PeopleQueryTests : QueryTestBase
+public sealed class PeopleQueryTests : SqliteTestBase
 {
     [Fact]
     public async Task Employees_are_ordered_by_name_with_the_projects_they_are_on_today()

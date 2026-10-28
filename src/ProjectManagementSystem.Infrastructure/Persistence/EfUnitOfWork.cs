@@ -110,7 +110,7 @@ internal sealed class EfUnitOfWork(
         {
             foreach (var domainEvent in aggregate.DomainEvents)
             {
-                var stamped = Stamp(domainEvent, now);
+                var stamped = Stamp(domainEvent, now, aggregate.Version);
                 var (eventType, payload) = serializer.Serialize(stamped);
 
                 dbContext.OutboxMessages.Add(new OutboxMessage
@@ -129,9 +129,10 @@ internal sealed class EfUnitOfWork(
         return count;
     }
 
-    private static IDomainEvent Stamp(IDomainEvent domainEvent, DateTimeOffset now) =>
+    /// <param name="version">Version the aggregate is saved with: already raised for an updated aggregate.</param>
+    private static IDomainEvent Stamp(IDomainEvent domainEvent, DateTimeOffset now, long version) =>
         domainEvent is DomainEvent stampable
-            ? stampable with { EventId = Guid.CreateVersion7(now), OccurredAt = now.UtcDateTime }
+            ? stampable with { EventId = Guid.CreateVersion7(now), OccurredAt = now.UtcDateTime, AggregateVersion = version }
             : throw new InvalidOperationException(
                 $"Domain event '{domainEvent.GetType().Name}' must derive from {nameof(DomainEvent)} to be saved.");
 

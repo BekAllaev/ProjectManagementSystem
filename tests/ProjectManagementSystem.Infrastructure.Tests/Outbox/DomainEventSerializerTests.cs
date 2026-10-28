@@ -31,6 +31,7 @@ public class DomainEventSerializerTests
         Assert.IsType(eventType, restored);
         Assert.Equal(original.EventId, restored.EventId);
         Assert.Equal(original.OccurredAt, restored.OccurredAt);
+        Assert.Equal(original.AggregateVersion, restored.AggregateVersion);
         Assert.Equal(DateTimeKind.Utc, restored.OccurredAt.Kind);
         foreach (var property in eventType.GetProperties())
             Assert.Equal(Json(property.GetValue(original)), Json(property.GetValue(restored)));
@@ -73,7 +74,7 @@ public class DomainEventSerializerTests
     private static string Json(object? value) => JsonSerializer.Serialize(value);
 
     private static IDomainEvent Stamp(IDomainEvent domainEvent) =>
-        ((DomainEvent)domainEvent) with { EventId = Guid.CreateVersion7(Now), OccurredAt = Now.UtcDateTime };
+        ((DomainEvent)domainEvent) with { EventId = Guid.CreateVersion7(Now), OccurredAt = Now.UtcDateTime, AggregateVersion = 3 };
 
     /// <summary>
     /// An instance of the event with a distinct non-default value in every parameter of its primary constructor.

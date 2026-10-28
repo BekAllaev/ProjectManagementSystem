@@ -20,7 +20,7 @@ namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 /// <summary>
 /// Dependencies, milestones, funding and risks of one project.
 /// </summary>
-public sealed class PlanningQueryTests : QueryTestBase
+public sealed class PlanningQueryTests : SqliteTestBase
 {
     private readonly Guid _colleague = Guid.NewGuid();
     private readonly Project _project;

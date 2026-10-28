@@ -15,7 +15,7 @@ using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.Tests.Queries;
 
-public sealed class ProjectQueryTests : QueryTestBase
+public sealed class ProjectQueryTests : SqliteTestBase
 {
     [Fact]
     public async Task Projects_show_progress_and_funding_and_are_ordered_by_title()
