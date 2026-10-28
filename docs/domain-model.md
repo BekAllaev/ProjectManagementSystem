@@ -7,8 +7,8 @@
 | `Domain.Shared` | — | enums used by the domain and by the contracts (`ProjectState`, `WorkPackageStatus`, `ProjectTaskStatus`, `MilestoneStatus`, `DependencyType`, `RiskLevel`, `RiskStatus`) |
 | `Domain` | `Domain.Shared` | aggregates, domain services, specifications, domain events |
 | `Application.Contracts` | `Domain.Shared` | `ICommand` / `IQuery`, the command and query records with the read models they return, `CreatedId`, the gRPC service interfaces (one per aggregate, plus notifications and the dashboard): the public surface of the backend |
-| `Application` | `Domain`, `Application.Contracts` | command handlers, validators of commands and queries, pipeline behaviors, domain event handlers, ports for the infrastructure |
-| `Infrastructure` | `Application`, `Domain` | persistence (EF Core, SQL Server), repositories, the unit of work, the outbox and its processor, in-app notifications, the query handlers (see [Read side](#read-side)) |
+| `Application` | `Domain`, `Application.Contracts` | command and query handlers with their validators, pipeline behaviors, one event handler per aggregate, the read models, ports for the infrastructure |
+| `Infrastructure` | `Application`, `Domain` | persistence (EF Core, SQL Server) with the mapping of the read models, repositories, the unit of work, the outbox and its processor, in-app notifications, the rebuild of the read models (see [Read side](#read-side)) |
 | `Api` | `Application`, `Infrastructure` | the gRPC host: one service implementation per service interface (each method only sends the command or query through MediatR), the interceptor that maps exceptions to gRPC status codes (forbidden → PermissionDenied, rule violation → FailedPrecondition, not found → NotFound, domain or FluentValidation validation → InvalidArgument, concurrency conflict → Aborted, cancelled call → Cancelled, anything else → Internal without details), `ICurrentUser` from the `employee_id` claim, CORS for the client; sign-in with ASP.NET Core Identity (`MapIdentityApi` under `/auth`; only `POST /login`, `POST /refresh` and `GET /manage/info` are open, the rest answers 404), whose bearer token authenticates the gRPC calls |
 
 The API exposes every command and query over gRPC (code-first, protobuf-net.Grpc, with gRPC-Web for the browser).
@@ -57,7 +57,7 @@ service, so the rule cannot be bypassed: for example `WorkPackage.AddTask` is ca
   never loaded on their own.
 - An aggregate that exists once per project or per task uses that id as its own id: `ScheduleNetwork.Id` and
   `ProjectFunding.Id` are the project id, `TaskTimeLog.Id` is the task id. So they are found by id too.
-- Queries (CQRS) do not use the repositories: they read the database directly (see [Read side](#read-side)).
+- Queries (CQRS) do not use the repositories of the aggregates: they read the read models (see [Read side](#read-side)).
   The caller of a command passes the ids it already knows (for example the work package of a
   task), and the domain service checks that they fit together (the task is really in that work package).
   Where a rule needs *all* work packages of a project (closing the project, leaving the team), the caller
@@ -289,29 +289,35 @@ so an employee has at most one account. The domain knows nothing of accounts; th
 | Rule | Aggregates | How it is enforced |
 |---|---|---|
 | The responsible person of a package/task is a team member (at assignment time) | WorkPackage ↔ Project | `WorkPackageService` + `IsTeamMemberOnSpecification` |
-| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`. Re-check after commit by `CheckResponsiblePersonsAreTeamMembers` (an assignment racing with leaving the team, a package not registered yet, a membership ending in the future): the management of the project is notified, nothing is changed automatically |
+| A responsible person of an open package/task cannot be removed from the team | Project ↔ WorkPackage | `ProjectService.EndTeamMembership` gets all work packages of the project (exactly `WorkPackageIds`) and rejects with `IsResponsibleForOpenWorkSpecification`. Re-check after commit by `ResponsiblePersonCheck` from the event handlers of the project and the work packages (an assignment racing with leaving the team, a package not registered yet, a membership ending in the future): the management of the project is notified, nothing is changed automatically |
 | A project is completed only when every work package is Completed or Cancelled | Project ↔ WorkPackage | `ProjectService.Complete` gets exactly the packages of `WorkPackageIds`; packages never reopen and registering a package changes the version of `Project`. A package created but not yet registered is cancelled by the handler of `WorkPackageCreated` when it finds the project closed (compensation) |
 | No new work in a closed project | Project → WorkPackage, ScheduleNetwork, Milestone, ProjectFunding | `WorkPackageService.CreateWorkPackage` checks `Project.IsOpen`, a concurrent closing is compensated by the handler of `WorkPackageCreated`; `ScheduleNetworkService`, `MilestoneService`, `FundingService` check `Project.IsOpen`. A concurrent closing is not detected for ScheduleNetwork, Milestone and ProjectFunding: no invariant breaks, at worst a superfluous record appears; accepted without compensation |
 | The email of an employee is unique | Employee ↔ all Employees | `EmployeeService` with `IRepository<Employee>.ExistsAsync`; a unique index on `NormalizedEmail` stops concurrent registrations |
-| Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | handlers `RemoveDependenciesOfCancelledWorkPackage` / `RemoveDependenciesOfCancelledTask` → `RemoveDependenciesOf` |
-| A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `ScheduleNetworkService` + the handler `RemoveDependencyOfAlreadyCancelledTask` of `DependencyAdded` removes it if a task is already cancelled |
+| Cancelling a package/task removes its dependencies | WorkPackage → ScheduleNetwork | `WorkPackageEventHandler` on `WorkPackageCancelled` / `TaskCancelled` → `RemoveDependenciesOf` |
+| A dependency links only existing tasks of the project that are not cancelled | ScheduleNetwork ↔ WorkPackage | `ScheduleNetworkService` + `ScheduleNetworkEventHandler` on `DependencyAdded` removes it if a task is already cancelled |
 | `LogTime` / `RemoveEntry` only on an InProgress task | TaskTimeLog ↔ WorkPackage | `TaskTimeLogService`; a race with `CompleteTask` is accepted |
 | `LogTime`: the employee (the current user) is a team member on `WorkDate` (otherwise `DomainForbiddenException`), `WorkDate` is not in the future, the entry gets the hourly rate valid on `WorkDate` | TaskTimeLog ↔ Project | `TaskTimeLogService` reads the rate from `TeamMember` and passes it to `LogTime`; rates are never changed retroactively, so there is no race to compensate |
 | FS predecessor is not finished | ScheduleNetwork ↔ WorkPackage | not blocked; a warning on the read side |
 | A task added to a milestone exists in a work package of the project and is not cancelled | Milestone ↔ WorkPackage | `MilestoneService.AddTask`; a concurrent cancellation is accepted without compensation, cancelled tasks are ignored on the read side |
 
-Event handlers live in `src/ProjectManagementSystem.Application/<Aggregate>/EventHandlers`. Every handler is
-idempotent, because the outbox may deliver an event more than once, and saves its own change (one aggregate)
-with the unit of work.
+Every aggregate whose events get a reaction has **one event handler**, `<Aggregate>EventHandler` in
+`src/ProjectManagementSystem.Application/<Aggregate>/EventHandlers`, for all its events: it keeps the read models of the
+aggregate (see [Read side](#read-side)) and does what else the event calls for. Every handler is idempotent, because
+the outbox may deliver an event more than once, and saves its own change (one aggregate) with the unit of work. A
+handler that also changes an aggregate offers `ProjectAsync` for the events concerned: only the change of the read
+models, which the rebuild of the read models uses so that it changes no aggregate and notifies nobody.
 
-| Event(s) | Handler | Effect |
+| Handler | Events | Effect besides the read models |
 |---|---|---|
-| `WorkPackageCreated` | `RegisterWorkPackageInProject` | `Project.RegisterWorkPackage`; if the project is already closed, cancels the package instead (compensation) |
-| `WorkPackageCreated`, `ResponsiblePersonChanged`, `TaskAdded`, `TeamMembershipEnded` | `CheckResponsiblePersonsAreTeamMembers` | notifies the management of the project about a responsible person of open work without an ongoing team membership |
-| `TaskCancelled` | `RemoveDependenciesOfCancelledTask` | `ScheduleNetwork.RemoveDependenciesOf` |
-| `WorkPackageCancelled` | `RemoveDependenciesOfCancelledWorkPackage` | `ScheduleNetwork.RemoveDependenciesOf` |
-| `DependencyAdded` | `RemoveDependencyOfAlreadyCancelledTask` | removes a dependency on a task cancelled concurrently |
-| `PredecessorCancelled` | `NotifyResponsibleOfSuccessorTask` | notifies the responsible persons of the unfinished successor task and its package |
+| `ProjectEventHandler` | project, role and team events, `WorkPackageRegistered` | on `TeamMembershipEnded`: `ResponsiblePersonCheck` of all open work of the employee |
+| `WorkPackageEventHandler` | work package and task events | on `WorkPackageCreated`: `Project.RegisterWorkPackage`, or cancels the package if the project is already closed (compensation); on `WorkPackageCreated`, `ResponsiblePersonChanged`, `TaskAdded`: `ResponsiblePersonCheck` of the assignment; on `TaskCancelled`, `WorkPackageCancelled`: `ScheduleNetwork.RemoveDependenciesOf` |
+| `ScheduleNetworkEventHandler` | `DependencyAdded`, `DependencyRemoved`, `PredecessorCancelled` | on `DependencyAdded`: removes a dependency on a task cancelled concurrently; on `PredecessorCancelled`: notifies the responsible persons of the unfinished successor task and its package |
+| `TaskTimeLogEventHandler` | `TimeLogged`, `TimeEntryRemoved` | — |
+| `ProjectFundingEventHandler` | `FundingAdded` | — |
+| `MilestoneEventHandler` | milestone events | — |
+
+`ResponsiblePersonCheck` notifies the management of the project about a responsible person of open work without an
+ongoing team membership.
 
 Notifications go through `INotificationSender`; each has an idempotency key, and a repeated key is not sent
 again. A notification has a `Kind` (`ResponsibleOutsideTeam`, `PredecessorCancelled`; `Other` for rows stored before
@@ -339,27 +345,31 @@ Persistence and the composition root do not exist yet. When they are added:
 ## Read side
 
 Every screen of the client reads a read model whose shape is that of the screen: one table per read model in the
-schema `read` (`ProjectItems`, `TaskItems`, `DependencyItems`, `MilestoneItems`, ...). The **projections**
-(`Infrastructure/ReadModels/Projections`) keep them up to date: they are domain event handlers, delivered by the
-outbox like the handlers of the application. A projection changes the rows its event is about and then lets
-`ProjectReadModelRefresher` recompute what a project takes from other rows (task counters, progress of packages,
-milestones and the project, statuses and warnings of dependencies, logged time and cost, funding figures). Projections
-never save: the outbox saves their rows together with the mark that the event was processed, so an event is projected
-atomically. They only set values and add a row once (by its id, or by the id of the event for a funding tranche), so
-a repeated delivery changes nothing.
+schema `read` (`ProjectItems`, `TaskItems`, `DependencyItems`, `MilestoneItems`, ...). The read models are part of the
+query side, not of the domain: their rows are classes in `Application/ReadModels`, mapped by the infrastructure, and
+`IReadModelRepository<TRow>` (implemented by the infrastructure) lists, finds, adds and removes rows by a predicate.
 
-A **query** reads the rows and returns them as they are. It decides only what depends on the caller or on the day,
-which cannot be stored: who is a member today, which rate is valid today, whether a milestone is late, and what the
-caller may do. Names of employees and the risks are read from their aggregates, which have no events. A query and its
-read model are gRPC messages in `Application.Contracts/<Aggregate>/Queries/<UseCase>/`, its validator is in the same
-folder of `Application`, its handler in `Infrastructure/Queries/<Aggregate>/`. All reads of the handlers are in
-`ReadModelSources`, so a test translates each of them for SQL Server; the handlers and projections are tested on
-SQLite in memory, with the data arranged through commands and the events delivered through the outbox.
+The **event handlers** of the aggregates (see [Event handlers](#cross-aggregate-rules)) keep the read models up to
+date: a handler changes the rows its event is about and then lets `ProjectReadModelRefresher` recompute what a project
+takes from other rows (task counters, progress of packages, milestones and the project, statuses and warnings of
+dependencies, logged time and cost, funding figures). Rows are never saved by the handler itself: the outbox saves them
+together with the mark that the event was processed (or the unit of work, when the handler also saves an aggregate).
+Only values are set and a row is added once (by its id, or by the id of the event for a funding tranche), so a repeated
+delivery changes nothing.
+
+A **query handler** lives in `Application/<Aggregate>/Queries/<UseCase>/`, next to its validator, like a command
+handler; the query and its result are gRPC messages in the same folder of `Application.Contracts`. It reads the rows
+and returns them as they are, deciding only what depends on the caller or on the day, which cannot be stored: who is
+a member today, which rate is valid today, whether a milestone is late, and what the caller may do. Employees and
+risks have no events, so their aggregates are read as their read models (`IReadModelRepository<Employee>`,
+`IReadModelRepository<Risk>`). Notifications are a read model too (`NotificationItemView`), written by the
+infrastructure behind `INotificationSender`. Query and event handlers are tested on SQLite in memory, with the data
+arranged through commands and the events delivered through the outbox.
 
 The read models are **eventually consistent**: a command is visible to the queries once the outbox has delivered its
 events, usually right after the commit. Until then a new project is not found, and the client shows "updating".
 `ReadModelRebuilder` builds all read models anew from the aggregates (the migrator does it with
-`--rebuild-read-models`), for data saved before the projections existed or after a projection changed.
+`--rebuild-read-models`), for data saved before the read models existed or after an event handler changed.
 
 | Service | Queries |
 |---|---|
@@ -373,7 +383,7 @@ events, usually right after the commit. Until then a new project is not found, a
 | `IDashboardService` | `GetDashboard`: open tasks of the caller in all projects, the projects they are on today, funding alerts |
 | `INotificationService` | `GetNotifications`, and the commands `MarkNotificationRead`, `MarkAllNotificationsRead` |
 
-**Version.** Every event carries the version of its aggregate (`AggregateVersion`), and the projections keep it: a
+**Version.** Every event carries the version of its aggregate (`AggregateVersion`), and the event handlers keep it: a
 read model of an aggregate carries its `Version` (for a list, every item has the version of its own aggregate; one of
 an aggregate that exists once per project, such as the funding or the schedule network, has `Version` 0 before the
 aggregate exists). The version grows with every saved change of the aggregate, so the client can tell whether a read
