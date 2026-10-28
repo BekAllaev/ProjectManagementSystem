@@ -1,17 +1,16 @@
 using ProjectManagementSystem.Application.Milestones;
-using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.WorkPackages;
 using ProjectManagementSystem.Domain.Milestones;
 using ProjectManagementSystem.Domain.Risks;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.ReadModels;
+namespace ProjectManagementSystem.Application.ReadModels;
 
 /// <summary>
 /// Progress of a set of tasks: cancelled tasks stay in the set but are not counted.
 /// </summary>
-internal readonly record struct TaskProgress(int Completed, int Counted)
+public readonly record struct TaskProgress(int Completed, int Counted)
 {
     public int Percent => ReadModelRules.Percent(Completed, Counted);
 
@@ -26,7 +25,7 @@ internal readonly record struct TaskProgress(int Completed, int Counted)
 /// <summary>
 /// Funding of a project against its actual cost. Funding only grows and may be exceeded.
 /// </summary>
-internal readonly record struct FundingFigures(decimal Total, decimal ActualCost)
+public readonly record struct FundingFigures(decimal Total, decimal ActualCost)
 {
     public decimal Remaining => Total - ActualCost;
 
@@ -41,7 +40,7 @@ internal readonly record struct FundingFigures(decimal Total, decimal ActualCost
 /// <summary>
 /// Values the read side computes and the domain does not know (see the read side in <c>docs/domain-model.md</c>).
 /// </summary>
-internal static class ReadModelRules
+public static class ReadModelRules
 {
     /// <summary>
     /// From this share of funding used, the dashboard warns about the project.
