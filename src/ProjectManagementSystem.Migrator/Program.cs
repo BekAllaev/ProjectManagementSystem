@@ -7,16 +7,20 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ProjectManagementSystem.Infrastructure;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 // Applies the migrations of AppDbContext to the database of ConnectionStrings:Default.
 // With --script it prints an idempotent SQL script of all migrations instead and does not connect to the database.
+// With --rebuild-read-models it also builds the read models anew from the aggregates after migrating, for data saved
+// before the projections existed or after a projection changed; stop the API meanwhile, so the outbox does not write.
 // Settings: appsettings.json, appsettings.{Environment}.json, user secrets (Development), environment variables,
 // command line. It is also the startup project for dotnet ef, which reads the same settings.
 var scriptOnly = args.Contains("--script");
+var rebuildReadModels = args.Contains("--rebuild-read-models");
 
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
-    Args = args.Where(arg => arg != "--script").ToArray(),
+    Args = args.Where(arg => arg is not "--script" and not "--rebuild-read-models").ToArray(),
     // appsettings.json is copied to the output, so the migrator finds it whatever the current directory is.
     ContentRootPath = AppContext.BaseDirectory,
 });
@@ -43,15 +47,21 @@ try
         dbContext.Database.SetCommandTimeout(TimeSpan.FromSeconds(commandTimeout.Value));
 
     var pending = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
-    if (pending.Count == 0)
+    if (pending.Count > 0)
     {
-        logger.LogInformation("Database is up to date.");
-        return 0;
+        logger.LogInformation("Applying {Count} migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
+        await dbContext.Database.MigrateAsync();
     }
 
-    logger.LogInformation("Applying {Count} migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
-    await dbContext.Database.MigrateAsync();
     logger.LogInformation("Database is up to date.");
+
+    if (rebuildReadModels)
+    {
+        logger.LogInformation("Rebuilding the read models.");
+        await new ReadModelRebuilder(dbContext).RebuildAsync();
+        logger.LogInformation("Read models are rebuilt.");
+    }
+
     return 0;
 }
 catch (Exception exception)
