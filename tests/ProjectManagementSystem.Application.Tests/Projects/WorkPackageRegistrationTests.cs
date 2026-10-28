@@ -1,8 +1,8 @@
 using ProjectManagementSystem.Application.Projects.Commands.CloseProject;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
-using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPackage;
+using ProjectManagementSystem.Application.WorkPackages.EventHandlers;
 using ProjectManagementSystem.Domain.Exceptions;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Tests.Fakes;
@@ -66,7 +66,7 @@ public class WorkPackageRegistrationTests : CommandTestBase
 
         var workPackage = App.WorkPackages.All.Single();
         Assert.Equal(WorkPackageStatus.Cancelled, workPackage.Status);
-        Assert.Equal(RegisterWorkPackageInProject.ProjectClosedReason, workPackage.CancellationReason);
+        Assert.Equal(WorkPackageEventHandler.ProjectClosedReason, workPackage.CancellationReason);
         Assert.Equal(ProjectTaskStatus.Cancelled, workPackage.GetTask(taskId).Status);
         Assert.Equal(ProjectState.Completed, project.State);
         Assert.Empty(project.WorkPackageIds);

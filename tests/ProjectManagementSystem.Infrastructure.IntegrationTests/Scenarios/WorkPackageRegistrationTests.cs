@@ -4,15 +4,16 @@ using ProjectManagementSystem.Application.Projects.Commands.CloseProject;
 using ProjectManagementSystem.Application.Projects.Commands.CreateProject;
 using ProjectManagementSystem.Application.Projects.Commands.CreateRole;
 using ProjectManagementSystem.Application.Projects.Commands.StartProject;
-using ProjectManagementSystem.Application.Projects.EventHandlers;
 using ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPackage;
+using ProjectManagementSystem.Application.WorkPackages.EventHandlers;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Infrastructure.IntegrationTests.Scenarios;
 
 /// <summary>
-/// Eventual consistency of <see cref="RegisterWorkPackageInProject"/> through the real commands, the outbox and the
+/// Eventual consistency of the registration of a work package by <see cref="WorkPackageEventHandler"/> through the real
+/// commands, the outbox and the
 /// handler: the work package is created in one transaction and registered in its project in the next one.
 /// </summary>
 public sealed class WorkPackageRegistrationTests(IntegrationTestDatabase database) : IntegrationTestBase(database)
@@ -42,7 +43,7 @@ public sealed class WorkPackageRegistrationTests(IntegrationTestDatabase databas
 
         var workPackage = await LoadAsync<WorkPackage>(workPackageId);
         Assert.Equal(WorkPackageStatus.Cancelled, workPackage.Status);
-        Assert.Equal(RegisterWorkPackageInProject.ProjectClosedReason, workPackage.CancellationReason);
+        Assert.Equal(WorkPackageEventHandler.ProjectClosedReason, workPackage.CancellationReason);
         var project = await LoadAsync<Project>(projectId);
         Assert.Equal(ProjectState.Completed, project.State);
         Assert.DoesNotContain(workPackageId, project.WorkPackageIds);
