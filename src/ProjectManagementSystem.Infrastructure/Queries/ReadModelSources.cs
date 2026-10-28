@@ -129,9 +129,6 @@ internal static class ReadModelSources
             n.RecipientEmployeeId == employeeId ||
             (n.RecipientEmployeeId == null && managedProjectIds.Contains(n.ProjectId)));
 
-    public static DateOnly Today(this TimeProvider timeProvider) =>
-        DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-
     /// <exception cref="Application.Exceptions.AggregateNotFoundException">The project has no read model (yet).</exception>
     public static async Task<ProjectItemView> GetProjectItemAsync(this AppDbContext dbContext, Guid projectId, CancellationToken cancellationToken) =>
         await dbContext.ProjectItem(projectId).SingleOrDefaultAsync(cancellationToken)
