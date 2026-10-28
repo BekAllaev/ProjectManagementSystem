@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Milestones;

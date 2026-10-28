@@ -1,15 +1,15 @@
+using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
-using ProjectManagementSystem.Application.Projects.Queries.GetProject;
+using ProjectManagementSystem.Application.ReadModels;
 using ProjectManagementSystem.Application.WorkPackages;
-using ProjectManagementSystem.Infrastructure.Persistence;
 
-namespace ProjectManagementSystem.Infrastructure.Queries.Projects;
+namespace ProjectManagementSystem.Application.Projects.Queries.GetProject;
 
-internal sealed class GetProjectQueryHandler(AppDbContext dbContext) : IQueryHandler<GetProjectQuery, ProjectDetails>
+public sealed class GetProjectQueryHandler(IReadModelRepository<ProjectItemView> projects) : IQueryHandler<GetProjectQuery, ProjectDetails>
 {
     public async Task<ProjectDetails> Handle(GetProjectQuery query, CancellationToken cancellationToken)
     {
-        var p = await dbContext.GetProjectItemAsync(query.ProjectId, cancellationToken);
+        var p = await projects.GetAsync(query.ProjectId, cancellationToken);
 
         return new ProjectDetails(
             p.Id, p.Title, p.Description, p.State, p.IsOpen, p.Currency, p.CreationDate, p.StartDate, p.CompletionDate,
