@@ -4,6 +4,7 @@ using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Dashboard.Queries.GetDashboard;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Dashboard;
 

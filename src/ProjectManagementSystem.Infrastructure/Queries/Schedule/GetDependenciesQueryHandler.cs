@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Schedule.Queries.GetDependencies;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Schedule;
 
@@ -39,7 +40,7 @@ internal sealed class GetDependenciesQueryHandler(AppDbContext dbContext) : IQue
                 x.Successor!,
                 x.Dependency.Type,
                 x.Dependency.PredecessorWorkPackageId != x.Dependency.SuccessorWorkPackageId,
-                ReadModelRules.HasWarning(x.Dependency, x.Predecessor!.Status, x.Successor!.Status)))
+                ReadModelRules.HasWarning(x.Dependency.Type, x.Predecessor!.Status, x.Successor!.Status)))
             .OrderBy(d => d.Predecessor.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(d => d.Successor.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();

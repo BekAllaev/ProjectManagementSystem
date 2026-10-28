@@ -5,7 +5,7 @@ using ProjectManagementSystem.Domain.Risks;
 using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
 
-namespace ProjectManagementSystem.Infrastructure.Queries;
+namespace ProjectManagementSystem.Infrastructure.ReadModels;
 
 /// <summary>
 /// Progress of a set of tasks: cancelled tasks stay in the set but are not counted.
@@ -68,8 +68,8 @@ internal static class ReadModelRules
     /// The warning of the schedule: a finish-to-start predecessor is not completed while the successor is not finished.
     /// Starting the successor is still allowed.
     /// </summary>
-    public static bool HasWarning(Dependency dependency, ProjectTaskStatus predecessorStatus, ProjectTaskStatus successorStatus) =>
-        dependency.Type == DependencyType.FinishToStart &&
+    public static bool HasWarning(DependencyType type, ProjectTaskStatus predecessorStatus, ProjectTaskStatus successorStatus) =>
+        type == DependencyType.FinishToStart &&
         predecessorStatus != ProjectTaskStatus.Completed &&
         !IsFinished(successorStatus);
 
@@ -81,7 +81,7 @@ internal static class ReadModelRules
         dependencies.Any(d =>
             d.SuccessorTaskId == taskId &&
             statusByTaskId.TryGetValue(d.PredecessorTaskId, out var predecessorStatus) &&
-            HasWarning(d, predecessorStatus, status));
+            HasWarning(d.Type, predecessorStatus, status));
 
     /// <summary>
     /// Probability × impact, each counted 1 (low) to 3 (high).

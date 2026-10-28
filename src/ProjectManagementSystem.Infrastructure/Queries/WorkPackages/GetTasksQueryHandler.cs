@@ -3,6 +3,7 @@ using ProjectManagementSystem.Application.Abstractions;
 using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.WorkPackages;
 

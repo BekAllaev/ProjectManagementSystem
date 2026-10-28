@@ -5,6 +5,7 @@ using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones;
 using ProjectManagementSystem.Domain.Milestones;
 using ProjectManagementSystem.Domain.WorkPackages;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Milestones;
 

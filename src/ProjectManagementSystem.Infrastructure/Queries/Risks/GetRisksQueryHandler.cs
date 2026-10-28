@@ -3,6 +3,7 @@ using ProjectManagementSystem.Application.Abstractions.Messaging;
 using ProjectManagementSystem.Application.Risks.Queries.GetRisks;
 using ProjectManagementSystem.Domain.Risks;
 using ProjectManagementSystem.Infrastructure.Persistence;
+using ProjectManagementSystem.Infrastructure.ReadModels;
 
 namespace ProjectManagementSystem.Infrastructure.Queries.Risks;
 
