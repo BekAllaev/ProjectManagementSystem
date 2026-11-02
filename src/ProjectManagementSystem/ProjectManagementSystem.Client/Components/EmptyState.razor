@@ -1,0 +1,16 @@
+<div class="pf-empty">
+    <MudIcon Icon="@Icon" Class="pf-empty-icon" />
+    <div>@Title</div>
+    <div class="pf-muted pf-small">@Text</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Icon { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = default!;
+
+    [Parameter]
+    public string? Text { get; set; }
+}

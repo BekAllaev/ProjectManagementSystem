@@ -1,0 +1,119 @@
+@page "/login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@using System.ComponentModel.DataAnnotations
+@inject AuthService Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · ProjectFlow</PageTitle>
+
+<div class="pf-login">
+    <div class="pf-brand pf-login-brand">
+        <span class="pf-brand-mark"></span>
+        <span class="pf-brand-name">ProjectFlow</span>
+    </div>
+
+    <MudPaper Class="pf-card pf-login-card" Elevation="0">
+        <div>
+            <h1 class="pf-login-title">Sign in</h1>
+            <div class="pf-muted">Use the email of your employee account.</div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Variant="Variant.Text" Class="pf-login-error">@_error</MudAlert>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="SignInAsync" FormName="login">
+            <DataAnnotationsValidator />
+            <div class="pf-login-fields">
+                <MudTextField @bind-Value="_model.Email" For="() => _model.Email" Label="Email" InputType="InputType.Email"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" autocomplete="username" AutoFocus="true"
+                              Disabled="_busy" />
+                <MudTextField @bind-Value="_model.Password" For="() => _model.Password" Label="Password"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End" AdornmentIcon="@(_showPassword ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)"
+                              OnAdornmentClick="() => _showPassword = !_showPassword" AdornmentAriaLabel="Show password"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" autocomplete="current-password" Disabled="_busy" />
+                <MudCheckBox @bind-Value="_model.RememberMe" Label="Keep me signed in" Color="Color.Primary" Dense="true" Disabled="_busy" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           Disabled="_busy" Class="pf-login-submit">
+                    @if (_busy)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Signing in…</span>
+                    }
+                    else
+                    {
+                        <span>Sign in</span>
+                    }
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    private readonly LoginModel _model = new();
+    private bool _busy;
+    private bool _showPassword;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Signed in already: nothing to do here.
+        if ((await AuthenticationState).User.Identity?.IsAuthenticated == true)
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+    }
+
+    private async Task SignInAsync()
+    {
+        _busy = true;
+        _error = null;
+
+        var result = await Auth.LoginAsync(_model.Email.Trim(), _model.Password, _model.RememberMe);
+
+        _busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo(SafeReturnUrl(), replace: true);
+            return;
+        }
+
+        _model.Password = string.Empty;
+        _error = result.Failure switch
+        {
+            LoginFailure.InvalidCredentials => "The email or the password is wrong.",
+            LoginFailure.LockedOut => "Too many failed attempts. The account is locked for a few minutes.",
+            LoginFailure.ServerUnreachable => "The server cannot be reached. Check that the API is running and try again.",
+            _ => "Signing in failed on the server. Try again later.",
+        };
+    }
+
+    /// <summary>
+    /// Only a path of this app, so a crafted link cannot send the user to another site after signing in.
+    /// </summary>
+    private string SafeReturnUrl() =>
+        ReturnUrl is { Length: > 0 } url && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") &&
+        !url.StartsWith("/login", StringComparison.OrdinalIgnoreCase)
+            ? url
+            : "/";
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Enter your email.")]
+        [EmailAddress(ErrorMessage = "This is not an email address.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Enter your password.")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}

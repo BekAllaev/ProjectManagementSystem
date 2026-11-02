@@ -1,0 +1,10 @@
+@* A thin indeterminate bar along the top edge of a card while its data loads. *@
+@if (Visible)
+{
+    <div class="pf-loading-bar"><div></div></div>
+}
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+}

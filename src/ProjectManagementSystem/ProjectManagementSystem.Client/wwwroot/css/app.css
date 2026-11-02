@@ -1,0 +1,213 @@
+/* ProjectFlow — the Nocturne design system of the UI prototype on top of MudBlazor. The palette of MudBlazor is set in
+   Theme/ProjectFlowTheme.cs; these are the same tokens for what MudBlazor does not draw. */
+
+:root {
+    color-scheme: dark;
+
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    --color-accent: #9184d9;
+    --color-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
+
+    --color-neutral-100: #f3f5fe;
+    --color-neutral-200: #e4e7f5;
+    --color-neutral-300: #cfd3e5;
+    --color-neutral-400: #b2b6ca;
+    --color-neutral-500: #9397ab;
+    --color-neutral-600: #75798c;
+    --color-neutral-700: #595d6c;
+    --color-neutral-800: #3f424d;
+    --color-neutral-900: #292b31;
+
+    --color-accent-100: #f5f4ff;
+    --color-accent-200: #e7e5fe;
+    --color-accent-300: #d2cefd;
+    --color-accent-400: #b5abfc;
+    --color-accent-700: #5d5294;
+    --color-accent-800: #423a6a;
+    --color-accent-900: #2b2741;
+
+    --color-ok: oklch(0.76 0.11 160);
+    --color-warn: oklch(0.80 0.12 80);
+    --color-bad: oklch(0.70 0.15 25);
+
+    --radius-md: 8px;
+    --shadow-sm: 0 0 0 1px #3f424d;
+    --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+html, body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: "Inter", system-ui, sans-serif;
+}
+
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+a { color: var(--color-accent-300); }
+a:hover { color: var(--color-accent-200); }
+
+.pf-muted { color: var(--color-muted); }
+.pf-small { font-size: 12px; }
+.pf-nowrap { white-space: nowrap; }
+.pf-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-stack { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+/* — shell — */
+
+.mud-appbar.pf-appbar {
+    background: var(--color-surface);
+    box-shadow: 0 1px 0 var(--color-neutral-800);
+}
+.pf-appbar .mud-toolbar { gap: 12px; padding: 0 12px 0 8px; }
+
+.pf-brand {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--color-text); text-decoration: none;
+}
+.pf-brand:hover { color: var(--color-text); }
+.pf-brand-mark { width: 6px; height: 18px; border-radius: 2px; background: var(--color-accent); }
+.pf-brand-name { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+
+.pf-bell .mud-badge.mud-badge-top.right.mud-badge-overlap { inset: auto auto calc(100% - 18px) calc(100% - 18px); }
+.pf-bell .mud-badge { color: var(--color-bg); font-weight: 600; }
+
+.pf-user-button {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 8px 3px 3px; border: 1px solid transparent; border-radius: var(--radius-md);
+    background: transparent; color: var(--color-text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.pf-user-button:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.pf-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 600;
+    background: var(--color-accent-700); color: var(--color-accent-100);
+}
+.pf-user-card { padding: 8px 16px 10px; font-size: 13px; min-width: 220px; }
+.pf-user-card .pf-muted { font-size: 12px; }
+
+.mud-drawer.pf-drawer { box-shadow: 1px 0 0 var(--color-neutral-900); }
+.pf-nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+.pf-nav .mud-nav-link { border-radius: var(--radius-md); height: 38px; padding: 0 12px; color: var(--color-neutral-200); }
+.pf-nav .mud-nav-link:hover:not(.mud-nav-link-disabled) { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.pf-nav .mud-nav-link.active:not(.mud-nav-link-disabled) { background: var(--color-accent-900); color: var(--color-accent-200); }
+.pf-nav .mud-nav-link.active:not(.mud-nav-link-disabled) .mud-nav-link-icon { color: var(--color-accent-200); }
+.pf-nav .mud-nav-link-text { margin-left: 12px; font-size: 14px; }
+
+.pf-page {
+    padding: 14px 28px 48px;
+    display: flex; flex-direction: column; gap: 18px;
+    max-width: 1440px;
+}
+@media (max-width: 600px) { .pf-page { padding: 12px 16px 32px; } }
+
+.pf-breadcrumbs { padding: 0; font-size: 13px; }
+.pf-page-header { display: flex; align-items: flex-start; gap: 12px; }
+.pf-page-header > :first-child { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.pf-page-title { margin: 0; font-size: 25px; font-weight: 500; line-height: 1.12; letter-spacing: -0.015em; }
+.pf-page-header .pf-muted { font-size: 13px; }
+
+.pf-alert-body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* — cards and lists — */
+
+.pf-card {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 16px;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+.pf-card-header { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.pf-card-title { flex: 1; font-size: 15px; font-weight: 500; }
+
+.pf-list { display: flex; flex-direction: column; }
+.pf-list-spaced { gap: 14px; }
+.pf-list-gap { gap: 8px; }
+.pf-row { display: flex; align-items: center; gap: 12px; padding: 9px 8px; margin: 0 -8px; border-radius: var(--radius-md); }
+.pf-row-top { align-items: flex-start; gap: 10px; }
+.pf-row-main { flex: 1; min-width: 0; }
+
+.pf-tag {
+    display: inline-flex; align-items: center;
+    padding: 1px 8px; border-radius: 6px;
+    font-size: 12px; line-height: 18px; white-space: nowrap;
+}
+.pf-tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
+.pf-tag-accent { background: var(--color-accent-800); color: var(--color-accent-100); }
+.pf-tag-ok { background: color-mix(in oklch, var(--color-ok) 22%, transparent); color: oklch(0.88 0.07 160); }
+.pf-tag-outline { background: transparent; color: var(--color-neutral-400); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+
+.pf-project { display: flex; flex-direction: column; gap: 6px; }
+.pf-project-line { display: flex; align-items: center; gap: 8px; }
+.pf-percent { width: 40px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pf-progress { height: 4px; border-radius: 2px; background: var(--color-neutral-800); overflow: hidden; }
+.pf-progress > div { height: 100%; background: var(--color-accent); border-radius: 2px; transition: width .6s; }
+
+.pf-funding { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-md); }
+.pf-funding-icon { margin-top: 1px; }
+.pf-funding-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-funding-bad { background: color-mix(in oklch, var(--color-bad) 12%, transparent); }
+.pf-funding-bad .pf-funding-icon, .pf-funding-bad .pf-funding-amount { color: oklch(0.80 0.12 25); }
+.pf-funding-warn { background: color-mix(in oklch, var(--color-warn) 10%, transparent); }
+.pf-funding-warn .pf-funding-icon, .pf-funding-warn .pf-funding-amount { color: oklch(0.86 0.10 80); }
+
+.pf-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; flex: none; background: transparent; }
+.pf-dot-unread { background: var(--color-accent); }
+.pf-read { color: var(--color-neutral-300); }
+
+.pf-empty { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 20px 0 8px; }
+.pf-empty-icon { color: var(--color-neutral-600); font-size: 26px; }
+
+.pf-loading-bar {
+    position: absolute; left: 0; right: 0; top: 0; height: 2px; overflow: hidden;
+    background: var(--color-accent-900); z-index: 2;
+}
+.pf-loading-bar > div {
+    position: absolute; top: 0; bottom: 0; width: 40%;
+    background: var(--color-accent);
+    animation: pf-indeterminate 1.1s ease-in-out infinite;
+}
+@keyframes pf-indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+
+.pf-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+    gap: 16px;
+}
+
+/* — sign-in — */
+
+.pf-auth-page {
+    min-height: 100vh;
+    padding: 24px 16px;
+    background:
+        radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 60%),
+        var(--color-bg);
+}
+.pf-login {
+    max-width: 380px; margin: 12vh auto 0;
+    display: flex; flex-direction: column; gap: 18px;
+}
+.pf-login-brand .pf-brand-name { font-size: 20px; }
+.mud-paper.pf-login-card { gap: 16px; padding: 22px; background: var(--color-surface); }
+.pf-login-title { margin: 0 0 4px; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; }
+.pf-login-card .pf-muted { font-size: 13px; }
+.pf-login-fields { display: flex; flex-direction: column; gap: 12px; }
+.pf-login-submit { margin-top: 4px; min-height: 36px; }
+
+/* The outlined primary button of Nocturne: an accent line, a tint on hover, never a flood. */
+.mud-button-outlined.mud-button-outlined-primary:hover {
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+#blazor-error-ui {
+    background: var(--color-surface); color: var(--color-text);
+    bottom: 0; box-shadow: var(--shadow-md);
+    display: none; left: 0; padding: 0.6rem 1.25rem 0.7rem 1.25rem; position: fixed; width: 100%; z-index: 1000;
+}
+#blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: 0.75rem; top: 0.5rem; }

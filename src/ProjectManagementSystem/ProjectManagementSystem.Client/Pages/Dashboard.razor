@@ -1,0 +1,239 @@
+@page "/"
+@using ProjectManagementSystem.Application.Dashboard
+@using ProjectManagementSystem.Application.Dashboard.Queries.GetDashboard
+@using ProjectManagementSystem.Application.Notifications
+@using ProjectManagementSystem.Application.Notifications.Queries.GetNotifications
+@inject IDashboardService DashboardService
+@inject INotificationService NotificationService
+
+<PageTitle>Dashboard · ProjectFlow</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="pf-breadcrumbs" />
+
+<div class="pf-page-header">
+    <div>
+        <h1 class="pf-page-title">Dashboard</h1>
+        <div class="pf-muted">@Display.Date(DateTime.Now)</div>
+    </div>
+    <MudTooltip Text="Refresh">
+        <MudIconButton Icon="@Icons.Material.Rounded.Refresh" OnClick="LoadAsync" Disabled="_loading" aria-label="Refresh" />
+    </MudTooltip>
+</div>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="pf-alert"
+              ContentAlignment="HorizontalAlignment.Start" ShowCloseIcon="false">
+        <div class="pf-alert-body">
+            <span>The dashboard could not be loaded. @_error</span>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+        </div>
+    </MudAlert>
+}
+
+<div class="pf-dashboard-grid">
+    @* My open tasks *@
+    <section class="pf-card">
+        <LoadingBar Visible="_loading" />
+        <div class="pf-card-header">
+            <span class="pf-card-title">My open tasks</span>
+            @if (_dashboard is not null)
+            {
+                <span class="pf-tag pf-tag-neutral">@_dashboard.OpenTasks.Count</span>
+            }
+        </div>
+        @if (_dashboard is null)
+        {
+            <SkeletonRows Count="4" />
+        }
+        else if (_dashboard.OpenTasks.Count == 0)
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.TaskAlt" Title="No open tasks" Text="Tasks you are responsible for show up here." />
+        }
+        else
+        {
+            <div class="pf-list">
+                @foreach (var task in _dashboard.OpenTasks)
+                {
+                    <div class="pf-row">
+                        <div class="pf-row-main">
+                            <div class="pf-ellipsis">@task.Name</div>
+                            <div class="pf-muted pf-small pf-ellipsis">@task.ProjectTitle · @task.WorkPackageDescription</div>
+                        </div>
+                        <span class="pf-muted pf-small pf-nowrap">@Display.Hours(task.LoggedHours) / @Display.Hours(task.EstimatedEffort)</span>
+                        <Tag Value="Display.Tag(task.Status)" />
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @* My projects *@
+    <section class="pf-card">
+        <LoadingBar Visible="_loading" />
+        <div class="pf-card-header">
+            <span class="pf-card-title">My projects</span>
+        </div>
+        @if (_dashboard is null)
+        {
+            <SkeletonRows Count="3" />
+        }
+        else if (_dashboard.Projects.Count == 0)
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.FolderOff" Title="No projects" Text="Projects whose team you are a member of show up here." />
+        }
+        else
+        {
+            <div class="pf-list pf-list-spaced">
+                @foreach (var project in _dashboard.Projects)
+                {
+                    <div class="pf-project">
+                        <div class="pf-project-line">
+                            <span class="pf-row-main pf-ellipsis">@project.Title</span>
+                            <Tag Value="Display.Tag(project.State)" />
+                            <span class="pf-percent">@project.ProgressPercent%</span>
+                        </div>
+                        <div class="pf-progress"><div style="width:@(Math.Clamp(project.ProgressPercent, 0, 100))%"></div></div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @* Funding status *@
+    <section class="pf-card">
+        <LoadingBar Visible="_loading" />
+        <div class="pf-card-header">
+            <span class="pf-card-title">Funding status</span>
+        </div>
+        @if (_dashboard is null)
+        {
+            <SkeletonRows Count="2" />
+        }
+        else if (_dashboard.FundingAlerts.Count == 0)
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.Savings" Title="Funding is on track"
+                        Text="Projects that used 80% of their funding or more show up here." />
+        }
+        else
+        {
+            <div class="pf-list pf-list-gap">
+                @foreach (var alert in _dashboard.FundingAlerts)
+                {
+                    <div class="pf-funding @(alert.IsOverspent ? "pf-funding-bad" : "pf-funding-warn")">
+                        <MudIcon Icon="@(alert.IsOverspent ? Icons.Material.Outlined.Report : Icons.Material.Outlined.WarningAmber)" Size="Size.Small" Class="pf-funding-icon" />
+                        <div class="pf-row-main">
+                            <div>@FundingTitle(alert)</div>
+                            <div class="pf-muted pf-small">@FundingText(alert)</div>
+                        </div>
+                        <span class="pf-funding-amount">@FundingAmount(alert)</span>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @* Recent notifications *@
+    <section class="pf-card">
+        <LoadingBar Visible="_loading" />
+        <div class="pf-card-header">
+            <span class="pf-card-title">Recent notifications</span>
+            @if (_notifications is { UnreadCount: > 0 })
+            {
+                <span class="pf-tag pf-tag-accent">@_notifications.UnreadCount unread</span>
+            }
+        </div>
+        @if (_notifications is null)
+        {
+            <SkeletonRows Count="3" />
+        }
+        else if (_notifications.Items.Count == 0)
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.NotificationsOff" Title="No notifications"
+                        Text="New problems with your work show up here." />
+        }
+        else
+        {
+            <div class="pf-list">
+                @foreach (var notification in _notifications.Items)
+                {
+                    <div class="pf-row pf-row-top">
+                        <span class="pf-dot @(notification.IsRead ? string.Empty : "pf-dot-unread")"></span>
+                        <div class="pf-row-main">
+                            <div class="@(notification.IsRead ? "pf-read" : string.Empty)">@notification.Title</div>
+                            <div class="pf-muted pf-small">@notification.ProjectTitle · @Display.Ago(notification.CreatedAt, DateTime.UtcNow)</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private const int RecentNotifications = 5;
+
+    private readonly List<BreadcrumbItem> _breadcrumbs = [new("Dashboard", href: null, disabled: true)];
+
+    private MyDashboard? _dashboard;
+    private NotificationList? _notifications;
+    private bool _loading;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        // Both calls go out at once; each card shows its data as soon as it is there.
+        var dashboard = DashboardService.GetDashboard(new GetDashboardQuery());
+        var notifications = NotificationService.GetNotifications(new GetNotificationsQuery(UnreadOnly: false, Take: RecentNotifications));
+
+        try
+        {
+            _dashboard = await dashboard;
+            _notifications = await notifications;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+            await ObserveAsync(notifications);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// The other call of a failed load, so its outcome is not lost and its exception not left unobserved.
+    /// </summary>
+    private async Task ObserveAsync(Task<NotificationList> notifications)
+    {
+        try
+        {
+            _notifications = await notifications;
+        }
+        catch (Exception)
+        {
+            // Already reported by the first failure.
+        }
+    }
+
+    private static string FundingTitle(FundingAlertItem alert) =>
+        alert.IsOverspent
+            ? $"{alert.ProjectTitle} is overspent"
+            : $"{alert.ProjectTitle} has used {alert.UsedPercent?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}%";
+
+    private static string FundingText(FundingAlertItem alert) =>
+        alert.IsOverspent
+            ? $"Actual cost exceeds total funding of {Display.Money(alert.TotalFunding, alert.Currency)}"
+            : $"{Display.Money(alert.ActualCost, alert.Currency)} of {Display.Money(alert.TotalFunding, alert.Currency)} funding spent";
+
+    private static string FundingAmount(FundingAlertItem alert) =>
+        alert.IsOverspent
+            ? Display.Money(alert.RemainingFunding, alert.Currency)
+            : $"{Display.Money(alert.RemainingFunding, alert.Currency)} left";
+}

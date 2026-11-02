@@ -1,0 +1,103 @@
+@using ProjectManagementSystem.Application.Employees
+@using ProjectManagementSystem.Application.Employees.Queries.GetCurrentEmployee
+@using ProjectManagementSystem.Application.Notifications
+@using ProjectManagementSystem.Application.Notifications.Queries.GetNotifications
+@inject IEmployeeService Employees
+@inject INotificationService Notifications
+@inject AuthService Auth
+@inject NavigationManager Navigation
+
+@* The bar at the top of the shell: navigation toggle, brand, unread notifications and the menu of the user. *@
+<MudAppBar Elevation="0" Class="pf-appbar" Gutters="false">
+    <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" OnClick="OnToggleNavigation" aria-label="Toggle navigation" />
+    <a class="pf-brand" href="">
+        <span class="pf-brand-mark"></span>
+        <span class="pf-brand-name">ProjectFlow</span>
+    </a>
+
+    <MudSpacer />
+
+    <MudTooltip Text="@(_unreadCount == 1 ? "1 unread notification" : $"{_unreadCount} unread notifications")">
+        <MudBadge Content="_unreadCount" Visible="_unreadCount > 0" Max="99" Color="Color.Primary" Overlap="true" Class="pf-bell">
+            <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="Notifications" />
+        </MudBadge>
+    </MudTooltip>
+
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" PopoverClass="pf-user-menu">
+        <ActivatorContent>
+            <button type="button" class="pf-user-button">
+                <span class="pf-avatar">@_initials</span>
+                <span class="pf-user-name">@_displayName</span>
+                <MudIcon Icon="@Icons.Material.Rounded.ExpandMore" Size="Size.Small" />
+            </button>
+        </ActivatorContent>
+        <ChildContent>
+            <div class="pf-user-card">
+                <div>@_displayName</div>
+                <div class="pf-muted">@_email</div>
+            </div>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="LogoutAsync">Sign out</MudMenuItem>
+        </ChildContent>
+    </MudMenu>
+</MudAppBar>
+
+@code {
+    [Parameter]
+    public EventCallback OnToggleNavigation { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    private string _displayName = string.Empty;
+    private string _email = string.Empty;
+    private string _initials = string.Empty;
+    private int _unreadCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Until the employee arrives, the header shows the email of the sign-in.
+        var user = (await AuthenticationState).User;
+        _email = _displayName = user.Identity?.Name ?? string.Empty;
+        _initials = _email.Length > 0 ? _email[..1].ToUpperInvariant() : "?";
+
+        var employee = LoadEmployeeAsync();
+        var unread = LoadUnreadCountAsync();
+        await Task.WhenAll(employee, unread);
+    }
+
+    private async Task LoadEmployeeAsync()
+    {
+        try
+        {
+            var employee = await Employees.GetCurrentEmployee(new GetCurrentEmployeeQuery());
+            _displayName = $"{employee.FirstName} {employee.LastName}";
+            _email = employee.Email;
+            _initials = Display.Initials(employee.FirstName, employee.LastName);
+        }
+        catch (Exception)
+        {
+            // The header keeps the email; the page shows the error of its own calls.
+        }
+    }
+
+    private async Task LoadUnreadCountAsync()
+    {
+        try
+        {
+            // UnreadCount counts every unread notification, whatever Take is.
+            var notifications = await Notifications.GetNotifications(new GetNotificationsQuery(UnreadOnly: true, Take: 1));
+            _unreadCount = notifications.UnreadCount;
+        }
+        catch (Exception)
+        {
+            _unreadCount = 0;
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        Navigation.NavigateTo("login", replace: true);
+    }
+}
