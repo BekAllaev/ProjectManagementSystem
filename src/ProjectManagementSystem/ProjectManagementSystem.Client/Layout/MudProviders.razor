@@ -1,5 +1,23 @@
 @* The theme and the providers MudBlazor needs once per page, shared by both layouts. *@
-<MudThemeProvider Theme="ProjectFlowTheme.Theme" IsDarkMode="true" />
+@implements IDisposable
+@inject ThemeService ThemeService
+
+<MudThemeProvider Theme="ProjectFlowTheme.Theme" IsDarkMode="ThemeService.IsDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        ThemeService.Changed += OnThemeChanged;
+
+        // The error page renders statically on the server, where there is no storage of the browser to read.
+        if (RendererInfo.IsInteractive)
+            await ThemeService.EnsureLoadedAsync();
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeService.Changed -= OnThemeChanged;
+}

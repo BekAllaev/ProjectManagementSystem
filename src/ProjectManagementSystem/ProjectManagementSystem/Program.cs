@@ -6,6 +6,8 @@ using ProjectManagementSystem.Components;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMudServices();
+// The layouts of the client also render the error page here, statically.
+builder.Services.AddScoped<ProjectManagementSystem.Client.Theme.ThemeService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();

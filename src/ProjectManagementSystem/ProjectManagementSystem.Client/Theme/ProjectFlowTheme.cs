@@ -3,14 +3,45 @@ using MudBlazor;
 namespace ProjectManagementSystem.Client.Theme;
 
 /// <summary>
-/// The MudBlazor theme of the client, from the Nocturne design system of the UI prototype: a dark blue-grey ground,
-/// Inter, 8px radii and one blurple accent. The same tokens are CSS variables in <c>wwwroot/css/app.css</c> for the
-/// parts MudBlazor does not style (status tags, progress bars, alerts).
+/// The MudBlazor theme of the client, from the Nocturne design system of the UI prototype: a dark blue-grey ground
+/// (or its light counterpart), Inter, 8px radii and one blurple accent. The same tokens are CSS variables in
+/// <c>wwwroot/css/app.css</c> for the parts MudBlazor has no parameter for; <see cref="ThemeService"/> switches both.
 /// </summary>
 public static class ProjectFlowTheme
 {
     public static MudTheme Theme { get; } = new()
     {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#6f62c4",
+            PrimaryContrastText = "#ffffff",
+            Secondary = "#7972a9",
+            Background = "#f4f4f8",
+            BackgroundGray = "#ececf2",
+            Surface = "#fbfbfd",
+            AppbarBackground = "#fbfbfd",
+            AppbarText = "#1b1c28",
+            DrawerBackground = "#f4f4f8",
+            DrawerText = "#3f424d",
+            DrawerIcon = "#595d6c",
+            TextPrimary = "#1b1c28",
+            TextSecondary = "rgba(27,28,40,0.6)",
+            TextDisabled = "rgba(27,28,40,0.38)",
+            ActionDefault = "#595d6c",
+            ActionDisabled = "rgba(27,28,40,0.3)",
+            ActionDisabledBackground = "rgba(207,211,229,0.5)",
+            LinesDefault = "#e1e2ea",
+            LinesInputs = "#cfd3e5",
+            TableLines = "#e4e5ec",
+            Divider = "#e4e5ec",
+            DividerLight = "#ececf2",
+            Skeleton = "rgba(27,28,40,0.08)",
+            OverlayDark = "rgba(27,28,40,0.35)",
+            Info = "#3b6fd8",
+            Success = "#2e9e72",
+            Warning = "#c98a1c",
+            Error = "#d0453b",
+        },
         PaletteDark = new PaletteDark
         {
             Primary = "#9184d9",
