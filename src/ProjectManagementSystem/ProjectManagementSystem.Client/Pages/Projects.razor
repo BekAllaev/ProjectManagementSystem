@@ -1,0 +1,190 @@
+@page "/projects"
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Queries.GetProjects
+@using ProjectManagementSystem.Domain.Projects
+@implements IDisposable
+@inject IProjectService ProjectService
+
+<PageTitle>Projects · ProjectFlow</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 pf-breadcrumbs" />
+
+<MudText Typo="Typo.h3" HtmlTag="h1">Projects</MudText>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+    <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Placeholder="Filter by name"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" DebounceInterval="300" Clearable="true"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" MaxLength="200"
+                  Class="pf-search flex-grow-0" Style="width:280px" />
+    <MudToggleGroup T="StatusFilter" Value="_status" ValueChanged="StatusChangedAsync" Outlined="true" Delimiters="false"
+                    Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+        <MudToggleItem Value="StatusFilter.All" Text="All" />
+        <MudToggleItem Value="StatusFilter.Created" Text="Created" />
+        <MudToggleItem Value="StatusFilter.InProgress" Text="In progress" />
+        <MudToggleItem Value="StatusFilter.Completed" Text="Completed" />
+    </MudToggleGroup>
+</MudStack>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <span>The projects could not be loaded. @_error</span>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+<MudTable T="ProjectListItem" Items="_projects" Loading="_loading" LoadingProgressColor="Color.Primary" Hover="true"
+          Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.Title" InitialDirection="SortDirection.Ascending">Name</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.State">Status</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.StartDate ?? DateTime.MaxValue">Start</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.CompletionDate ?? DateTime.MaxValue">Completed</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.ProgressPercent">Done</MudTableSortLabel></MudTh>
+        <MudTh Class="pf-right"><MudTableSortLabel T="ProjectListItem" SortBy="p => p.RemainingFunding" FullWidth="true">Funding remaining</MudTableSortLabel></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.body2">@context.Title</MudText>
+                @if (!string.IsNullOrWhiteSpace(context.Description))
+                {
+                    <MudText Typo="Typo.caption" Class="pf-muted">@context.Description</MudText>
+                }
+            </MudStack>
+        </MudTd>
+        <MudTd DataLabel="Status"><StatusChipView Value="Display.Chip(context.State)" /></MudTd>
+        <MudTd DataLabel="Start" Class="text-nowrap">
+            @if (context.StartDate is { } start)
+            {
+                @Display.ShortDate(start)
+            }
+            else
+            {
+                <span class="pf-muted">Not started</span>
+            }
+        </MudTd>
+        <MudTd DataLabel="Completed" Class="text-nowrap pf-muted">
+            @(context.CompletionDate is { } completed ? Display.ShortDate(completed) : "—")
+        </MudTd>
+        <MudTd DataLabel="Done" Class="pf-progress-cell">
+            <MudTooltip Text="@($"{context.CompletedTasks} of {context.CountedTasks} tasks completed")" Inline="false">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudProgressLinear Color="Color.Primary" Value="Math.Clamp(context.ProgressPercent, 0, 100)" Rounded="true"
+                                       Size="Size.Small" Class="flex-grow-1" />
+                    <MudText Typo="Typo.body2" Align="Align.Right" Class="pf-percent">@context.ProgressPercent%</MudText>
+                </MudStack>
+            </MudTooltip>
+        </MudTd>
+        <MudTd DataLabel="Funding remaining" Style="text-align:right" Class="text-nowrap">
+            @if (context.TotalFunding == 0 && context.ActualCost == 0)
+            {
+                <span class="pf-muted">—</span>
+            }
+            else if (context.IsOverspent)
+            {
+                <MudTooltip Class="d-inline-flex" Text="@($"Overspent: actual cost {Display.Money(context.ActualCost, context.Currency)} of {Display.Money(context.TotalFunding, context.Currency)} funding")">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Spacing="1" Class="pf-overspent">
+                        <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                        <span>@Display.Money(context.RemainingFunding, context.Currency)</span>
+                    </MudStack>
+                </MudTooltip>
+            }
+            else
+            {
+                @Display.Money(context.RemainingFunding, context.Currency)
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyState Icon="@Icons.Material.Outlined.FolderOff" Title="No projects"
+                    Text="@(_search is { Length: > 0 } || _status != StatusFilter.All ? "No project matches the filter." : "Projects show up here once they are created.")" />
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading projects…</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private enum StatusFilter
+    {
+        All,
+        Created,
+        InProgress,
+        Completed,
+    }
+
+    private readonly List<BreadcrumbItem> _breadcrumbs = [new("Projects", href: null, disabled: true)];
+
+    private IReadOnlyList<ProjectListItem> _projects = [];
+    private string? _search;
+    private StatusFilter _status = StatusFilter.All;
+    private bool _loading;
+    private string? _error;
+    private CancellationTokenSource? _load;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SearchChangedAsync(string? search)
+    {
+        _search = search;
+        return LoadAsync();
+    }
+
+    private Task StatusChangedAsync(StatusFilter status)
+    {
+        _status = status;
+        return LoadAsync();
+    }
+
+    /// <summary>
+    /// The API filters by state and name; a newer load cancels the one still running, so typing never shows an
+    /// older answer last.
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = new CancellationTokenSource();
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var query = new GetProjectsQuery(StateOf(_status), string.IsNullOrWhiteSpace(_search) ? null : _search.Trim());
+            var projects = await ProjectService.GetProjects(query, load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _projects = projects.Items;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+    }
+
+    private static ProjectState? StateOf(StatusFilter status) => status switch
+    {
+        StatusFilter.Created => ProjectState.Created,
+        StatusFilter.InProgress => ProjectState.InProgress,
+        StatusFilter.Completed => ProjectState.Completed,
+        _ => null,
+    };
+
+    public void Dispose()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+    }
+}

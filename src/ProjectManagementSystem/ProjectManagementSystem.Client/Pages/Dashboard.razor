@@ -70,6 +70,10 @@
 
     <MudItem xs="12" lg="6">
         <DashboardCard Title="My projects" Loading="_loading">
+            <Actions>
+                <MudButton Href="projects" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small">All projects</MudButton>
+            </Actions>
+            <ChildContent>
             @if (_dashboard is null)
             {
                 <SkeletonRows Count="3" />
@@ -94,6 +98,7 @@
                     }
                 </MudStack>
             }
+            </ChildContent>
         </DashboardCard>
     </MudItem>
 
