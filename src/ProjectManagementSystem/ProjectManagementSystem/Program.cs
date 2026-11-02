@@ -10,11 +10,6 @@ builder.Services.AddMudServices();
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
-// The router of the client checks [Authorize] of the pages, also when the error page renders statically here, so
-// the host needs the services of authorization, though it has no sign-in of its own (see MapRazorComponents below).
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddAuthorization();
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -36,10 +31,6 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(ProjectManagementSystem.Client._Imports).Assembly)
-    // Every page is served to everyone: the client decides in the browser whether the user is signed in (and sends
-    // them to the login page if not), and the API checks the token of every call. Without this, the [Authorize] of
-    // the pages would make this host challenge a sign-in it does not have.
-    .AllowAnonymous();
+    .AddAdditionalAssemblies(typeof(ProjectManagementSystem.Client._Imports).Assembly);
 
 app.Run();
