@@ -34,6 +34,8 @@ public static class Display
 
     public static string Date(DateTime date) => date.ToString("dddd, d MMMM yyyy", Culture);
 
+    public static string ShortDate(DateTime date) => date.ToString("dd MMM yyyy", Culture);
+
     /// <summary>
     /// How long ago <paramref name="utc"/> was, as the notification lists show it.
     /// </summary>

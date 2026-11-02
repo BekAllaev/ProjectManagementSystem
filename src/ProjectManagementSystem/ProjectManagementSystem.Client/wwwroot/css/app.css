@@ -66,6 +66,13 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-brand-name { font-size: 17px; letter-spacing: -0.01em; }
 
 .pf-bell .mud-badge { color: var(--color-bg); font-weight: 600; }
+/* MudBadge puts an overlapping badge 12px into a 48px icon button, which reaches out of the 56px app bar; the design
+   sits a smaller one on the upper right of the bell itself. */
+.pf-bell .mud-badge.mud-badge-top.right.mud-badge-overlap {
+    inset: auto auto calc(100% - 28px) calc(100% - 24px);
+    height: 16px; min-width: 16px; padding: 0 4px;
+    font-size: 10px; line-height: 16px;
+}
 
 .pf-user-button.mud-button-root { text-transform: none; padding: 3px 8px 3px 3px; }
 .pf-avatar.mud-avatar { background: var(--color-accent-700); color: var(--color-accent-100); font-size: 11px; font-weight: 600; }
@@ -110,6 +117,30 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-read { color: var(--color-neutral-300); }
 
 .pf-empty-icon { color: var(--color-neutral-600); }
+
+/* — projects — */
+
+.pf-table.mud-table { background: var(--color-surface); border-color: var(--color-neutral-800); }
+.pf-table .mud-table-head .mud-table-cell {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--color-neutral-500);
+}
+.pf-table .mud-table-cell { border-color: var(--color-neutral-800); }
+.pf-table .mud-table-body .mud-table-row:last-child .mud-table-cell { border-bottom: 0; }
+.pf-progress-cell { min-width: 150px; }
+.pf-overspent { color: oklch(0.80 0.12 25) !important; }
+.pf-search .mud-input.mud-input-outlined { background: var(--color-surface); }
+.pf-toggle.mud-toggle-group { background: var(--color-surface); border-color: var(--color-neutral-800); height: 40px; }
+.pf-toggle .mud-toggle-item { padding: 0 14px; color: var(--color-neutral-200) !important; text-transform: none; font-weight: 400; white-space: nowrap; }
+@media (max-width: 600px) { .pf-toggle .mud-toggle-item { padding: 0 10px; } }
+/* The selected option is a tint with an accent line, never a flood of the accent. */
+.pf-toggle .mud-toggle-item.pf-toggle-selected {
+    background: var(--color-accent-900) !important; color: var(--color-accent-200) !important;
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.pf-table .pf-right { text-align: right; }
+.pf-table .pf-right .mud-table-sort-label { justify-content: flex-end; }
+.pf-progress-cell .mud-progress-linear { min-width: 80px; }
 
 /* — sign-in — */
 
