@@ -1,0 +1,23 @@
+@* A card of the dashboard: a title row with optional extras on the right, a loading bar and the content. *@
+<MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-3" Style="height:100%">
+    <LoadingBar Visible="Loading" />
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="min-height:30px">
+        <MudText Typo="Typo.h6" Class="flex-grow-1">@Title</MudText>
+        @Actions
+    </MudStack>
+    @ChildContent
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = default!;
+
+    [Parameter]
+    public bool Loading { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

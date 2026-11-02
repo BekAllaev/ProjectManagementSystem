@@ -1,7 +1,0 @@
-@* A small status label, tinted by its kind (see the pf-tag classes of app.css). *@
-<span class="pf-tag @Value.CssClass">@Value.Label</span>
-
-@code {
-    [Parameter, EditorRequired]
-    public StatusTag Value { get; set; } = default!;
-}

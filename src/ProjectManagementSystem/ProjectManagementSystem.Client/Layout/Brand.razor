@@ -1,0 +1,13 @@
+@* The ProjectFlow mark: an accent bar beside the name. *@
+<MudLink Href="@Href" Underline="Underline.None" Color="Color.Inherit" Class="d-inline-flex align-center gap-2 pf-brand">
+    <span class="pf-brand-mark"></span>
+    <MudText Typo="Typo.h6" Class="pf-brand-name">ProjectFlow</MudText>
+</MudLink>
+
+@code {
+    /// <summary>
+    /// Where the mark leads; on the login page nowhere, so it is not a link there.
+    /// </summary>
+    [Parameter]
+    public string? Href { get; set; }
+}

@@ -8,167 +8,164 @@
 
 <PageTitle>Dashboard · ProjectFlow</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" Class="pf-breadcrumbs" />
+<MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 pf-breadcrumbs" />
 
-<div class="pf-page-header">
-    <div>
-        <h1 class="pf-page-title">Dashboard</h1>
-        <div class="pf-muted">@Display.Date(DateTime.Now)</div>
-    </div>
+<MudStack Row="true" AlignItems="AlignItems.Start" Class="mb-1">
+    <MudStack Spacing="0" Class="flex-grow-1">
+        <MudText Typo="Typo.h3" HtmlTag="h1">Dashboard</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">@Display.Date(DateTime.Now)</MudText>
+    </MudStack>
     <MudTooltip Text="Refresh">
         <MudIconButton Icon="@Icons.Material.Rounded.Refresh" OnClick="LoadAsync" Disabled="_loading" aria-label="Refresh" />
     </MudTooltip>
-</div>
+</MudStack>
 
 @if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="pf-alert"
-              ContentAlignment="HorizontalAlignment.Start" ShowCloseIcon="false">
-        <div class="pf-alert-body">
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
             <span>The dashboard could not be loaded. @_error</span>
             <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
-        </div>
+        </MudStack>
     </MudAlert>
 }
 
-<div class="pf-dashboard-grid">
-    @* My open tasks *@
-    <section class="pf-card">
-        <LoadingBar Visible="_loading" />
-        <div class="pf-card-header">
-            <span class="pf-card-title">My open tasks</span>
-            @if (_dashboard is not null)
+<MudGrid Spacing="4">
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="My open tasks" Loading="_loading">
+            <Actions>
+                @if (_dashboard is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Class="ma-0 pf-chip">@_dashboard.OpenTasks.Count</MudChip>
+                }
+            </Actions>
+            <ChildContent>
+                @if (_dashboard is null)
+                {
+                    <SkeletonRows Count="4" />
+                }
+                else if (_dashboard.OpenTasks.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Outlined.TaskAlt" Title="No open tasks" Text="Tasks you are responsible for show up here." />
+                }
+                else
+                {
+                    <MudStack Spacing="0">
+                        @foreach (var task in _dashboard.OpenTasks)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="pf-row">
+                                <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                                    <MudText Typo="Typo.body2" Truncate="true">@task.Name</MudText>
+                                    <MudText Typo="Typo.caption" Truncate="true" Class="pf-muted">@task.ProjectTitle · @task.WorkPackageDescription</MudText>
+                                </MudStack>
+                                <MudText Typo="Typo.caption" Class="pf-muted text-nowrap">@Display.Hours(task.LoggedHours) / @Display.Hours(task.EstimatedEffort)</MudText>
+                                <StatusChipView Value="Display.Chip(task.Status)" />
+                            </MudStack>
+                        }
+                    </MudStack>
+                }
+            </ChildContent>
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="My projects" Loading="_loading">
+            @if (_dashboard is null)
             {
-                <span class="pf-tag pf-tag-neutral">@_dashboard.OpenTasks.Count</span>
+                <SkeletonRows Count="3" />
             }
-        </div>
-        @if (_dashboard is null)
-        {
-            <SkeletonRows Count="4" />
-        }
-        else if (_dashboard.OpenTasks.Count == 0)
-        {
-            <EmptyState Icon="@Icons.Material.Outlined.TaskAlt" Title="No open tasks" Text="Tasks you are responsible for show up here." />
-        }
-        else
-        {
-            <div class="pf-list">
-                @foreach (var task in _dashboard.OpenTasks)
-                {
-                    <div class="pf-row">
-                        <div class="pf-row-main">
-                            <div class="pf-ellipsis">@task.Name</div>
-                            <div class="pf-muted pf-small pf-ellipsis">@task.ProjectTitle · @task.WorkPackageDescription</div>
-                        </div>
-                        <span class="pf-muted pf-small pf-nowrap">@Display.Hours(task.LoggedHours) / @Display.Hours(task.EstimatedEffort)</span>
-                        <Tag Value="Display.Tag(task.Status)" />
-                    </div>
-                }
-            </div>
-        }
-    </section>
-
-    @* My projects *@
-    <section class="pf-card">
-        <LoadingBar Visible="_loading" />
-        <div class="pf-card-header">
-            <span class="pf-card-title">My projects</span>
-        </div>
-        @if (_dashboard is null)
-        {
-            <SkeletonRows Count="3" />
-        }
-        else if (_dashboard.Projects.Count == 0)
-        {
-            <EmptyState Icon="@Icons.Material.Outlined.FolderOff" Title="No projects" Text="Projects whose team you are a member of show up here." />
-        }
-        else
-        {
-            <div class="pf-list pf-list-spaced">
-                @foreach (var project in _dashboard.Projects)
-                {
-                    <div class="pf-project">
-                        <div class="pf-project-line">
-                            <span class="pf-row-main pf-ellipsis">@project.Title</span>
-                            <Tag Value="Display.Tag(project.State)" />
-                            <span class="pf-percent">@project.ProgressPercent%</span>
-                        </div>
-                        <div class="pf-progress"><div style="width:@(Math.Clamp(project.ProgressPercent, 0, 100))%"></div></div>
-                    </div>
-                }
-            </div>
-        }
-    </section>
-
-    @* Funding status *@
-    <section class="pf-card">
-        <LoadingBar Visible="_loading" />
-        <div class="pf-card-header">
-            <span class="pf-card-title">Funding status</span>
-        </div>
-        @if (_dashboard is null)
-        {
-            <SkeletonRows Count="2" />
-        }
-        else if (_dashboard.FundingAlerts.Count == 0)
-        {
-            <EmptyState Icon="@Icons.Material.Outlined.Savings" Title="Funding is on track"
-                        Text="Projects that used 80% of their funding or more show up here." />
-        }
-        else
-        {
-            <div class="pf-list pf-list-gap">
-                @foreach (var alert in _dashboard.FundingAlerts)
-                {
-                    <div class="pf-funding @(alert.IsOverspent ? "pf-funding-bad" : "pf-funding-warn")">
-                        <MudIcon Icon="@(alert.IsOverspent ? Icons.Material.Outlined.Report : Icons.Material.Outlined.WarningAmber)" Size="Size.Small" Class="pf-funding-icon" />
-                        <div class="pf-row-main">
-                            <div>@FundingTitle(alert)</div>
-                            <div class="pf-muted pf-small">@FundingText(alert)</div>
-                        </div>
-                        <span class="pf-funding-amount">@FundingAmount(alert)</span>
-                    </div>
-                }
-            </div>
-        }
-    </section>
-
-    @* Recent notifications *@
-    <section class="pf-card">
-        <LoadingBar Visible="_loading" />
-        <div class="pf-card-header">
-            <span class="pf-card-title">Recent notifications</span>
-            @if (_notifications is { UnreadCount: > 0 })
+            else if (_dashboard.Projects.Count == 0)
             {
-                <span class="pf-tag pf-tag-accent">@_notifications.UnreadCount unread</span>
+                <EmptyState Icon="@Icons.Material.Outlined.FolderOff" Title="No projects" Text="Projects whose team you are a member of show up here." />
             }
-        </div>
-        @if (_notifications is null)
-        {
-            <SkeletonRows Count="3" />
-        }
-        else if (_notifications.Items.Count == 0)
-        {
-            <EmptyState Icon="@Icons.Material.Outlined.NotificationsOff" Title="No notifications"
-                        Text="New problems with your work show up here." />
-        }
-        else
-        {
-            <div class="pf-list">
-                @foreach (var notification in _notifications.Items)
+            else
+            {
+                <MudStack Spacing="4">
+                    @foreach (var project in _dashboard.Projects)
+                    {
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.body2" Truncate="true" Class="flex-grow-1">@project.Title</MudText>
+                                <StatusChipView Value="Display.Chip(project.State)" />
+                                <MudText Typo="Typo.body2" Align="Align.Right" Class="pf-percent">@project.ProgressPercent%</MudText>
+                            </MudStack>
+                            <MudProgressLinear Color="Color.Primary" Value="Math.Clamp(project.ProgressPercent, 0, 100)" Rounded="true" Size="Size.Small" />
+                        </MudStack>
+                    }
+                </MudStack>
+            }
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Funding status" Loading="_loading">
+            @if (_dashboard is null)
+            {
+                <SkeletonRows Count="2" />
+            }
+            else if (_dashboard.FundingAlerts.Count == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Savings" Title="Funding is on track"
+                            Text="Projects that used 80% of their funding or more show up here." />
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    @foreach (var alert in _dashboard.FundingAlerts)
+                    {
+                        <MudAlert Severity="@(alert.IsOverspent ? Severity.Error : Severity.Warning)" Variant="Variant.Text" Dense="true"
+                                  ContentAlignment="HorizontalAlignment.Start" Class="pf-funding">
+                            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3">
+                                <MudStack Spacing="0" Class="flex-grow-1">
+                                    <MudText Typo="Typo.body2" Class="pf-funding-title">@FundingTitle(alert)</MudText>
+                                    <MudText Typo="Typo.caption" Class="pf-muted">@FundingText(alert)</MudText>
+                                </MudStack>
+                                <MudText Typo="Typo.body2" Class="text-nowrap pf-funding-amount">@FundingAmount(alert)</MudText>
+                            </MudStack>
+                        </MudAlert>
+                    }
+                </MudStack>
+            }
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Recent notifications" Loading="_loading">
+            <Actions>
+                @if (_notifications is { UnreadCount: > 0 })
                 {
-                    <div class="pf-row pf-row-top">
-                        <span class="pf-dot @(notification.IsRead ? string.Empty : "pf-dot-unread")"></span>
-                        <div class="pf-row-main">
-                            <div class="@(notification.IsRead ? "pf-read" : string.Empty)">@notification.Title</div>
-                            <div class="pf-muted pf-small">@notification.ProjectTitle · @Display.Ago(notification.CreatedAt, DateTime.UtcNow)</div>
-                        </div>
-                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0 pf-chip">@_notifications.UnreadCount unread</MudChip>
                 }
-            </div>
-        }
-    </section>
-</div>
+            </Actions>
+            <ChildContent>
+                @if (_notifications is null)
+                {
+                    <SkeletonRows Count="3" />
+                }
+                else if (_notifications.Items.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Outlined.NotificationsOff" Title="No notifications"
+                                Text="New problems with your work show up here." />
+                }
+                else
+                {
+                    <MudStack Spacing="0">
+                        @foreach (var notification in _notifications.Items)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="3" Class="pf-row">
+                                <span class="pf-dot @(notification.IsRead ? string.Empty : "pf-dot-unread")"></span>
+                                <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                                    <MudText Typo="Typo.body2" Class="@(notification.IsRead ? "pf-read" : string.Empty)">@notification.Title</MudText>
+                                    <MudText Typo="Typo.caption" Class="pf-muted">@notification.ProjectTitle · @Display.Ago(notification.CreatedAt, DateTime.UtcNow)</MudText>
+                                </MudStack>
+                            </MudStack>
+                        }
+                    </MudStack>
+                }
+            </ChildContent>
+        </DashboardCard>
+    </MudItem>
+</MudGrid>
 
 @code {
     private const int RecentNotifications = 5;

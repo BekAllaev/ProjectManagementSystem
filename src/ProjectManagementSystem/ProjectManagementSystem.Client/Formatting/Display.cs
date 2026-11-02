@@ -1,4 +1,5 @@
 using System.Globalization;
+using MudBlazor;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.WorkPackages;
 
@@ -55,23 +56,25 @@ public static class Display
         string.Concat(firstName.AsSpan(0, Math.Min(1, firstName.Length)), lastName.AsSpan(0, Math.Min(1, lastName.Length)))
             .ToUpperInvariant();
 
-    public static StatusTag Tag(ProjectTaskStatus status) => status switch
+    public static StatusChip Chip(ProjectTaskStatus status) => status switch
     {
-        ProjectTaskStatus.Open => new("Open", "pf-tag-neutral"),
-        ProjectTaskStatus.InProgress => new("In progress", "pf-tag-accent"),
-        ProjectTaskStatus.Completed => new("Completed", "pf-tag-ok"),
-        ProjectTaskStatus.Cancelled => new("Cancelled", "pf-tag-outline"),
-        _ => new(status.ToString(), "pf-tag-neutral"),
+        ProjectTaskStatus.Open => new("Open", Color.Default),
+        ProjectTaskStatus.InProgress => new("In progress", Color.Primary),
+        ProjectTaskStatus.Completed => new("Completed", Color.Success),
+        ProjectTaskStatus.Cancelled => new("Cancelled", Color.Default, Variant.Outlined),
+        _ => new(status.ToString(), Color.Default),
     };
 
-    public static StatusTag Tag(ProjectState state) => state switch
+    public static StatusChip Chip(ProjectState state) => state switch
     {
-        ProjectState.Created => new("Created", "pf-tag-neutral"),
-        ProjectState.InProgress => new("In progress", "pf-tag-accent"),
-        ProjectState.Completed => new("Completed", "pf-tag-outline"),
-        _ => new(state.ToString(), "pf-tag-neutral"),
+        ProjectState.Created => new("Created", Color.Default),
+        ProjectState.InProgress => new("In progress", Color.Primary),
+        ProjectState.Completed => new("Completed", Color.Default, Variant.Outlined),
+        _ => new(state.ToString(), Color.Default),
     };
 }
 
-/// <param name="CssClass">One of the <c>pf-tag-*</c> classes of <c>app.css</c>.</param>
-public sealed record StatusTag(string Label, string CssClass);
+/// <summary>
+/// How a status reads as a <see cref="MudChip{T}"/>: tinted text chips, outlined for finished or dropped work.
+/// </summary>
+public sealed record StatusChip(string Label, Color Color, Variant Variant = Variant.Text);

@@ -5,17 +5,19 @@
 
 <PageTitle>Error · ProjectFlow</PageTitle>
 
-<div class="pf-stack" style="max-width:640px;margin:12vh auto 0">
-    <h1 class="pf-page-title">Something went wrong</h1>
-    <div class="pf-muted">An error occurred while processing your request.</div>
+<MudContainer MaxWidth="MaxWidth.Small" Class="pt-16">
+    <MudStack Spacing="3" AlignItems="AlignItems.Start">
+        <MudText Typo="Typo.h3" HtmlTag="h1">Something went wrong</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">An error occurred while processing your request.</MudText>
 
-    @if (ShowRequestId)
-    {
-        <div class="pf-muted">Request ID: <code>@RequestId</code></div>
-    }
+        @if (ShowRequestId)
+        {
+            <MudText Typo="Typo.body2" Class="pf-muted">Request ID: <code>@RequestId</code></MudText>
+        }
 
-    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/">Go to the dashboard</MudButton>
-</div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/">Go to the dashboard</MudButton>
+    </MudStack>
+</MudContainer>
 
 @code{
     [CascadingParameter]

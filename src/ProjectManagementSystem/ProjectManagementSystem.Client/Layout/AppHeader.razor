@@ -10,10 +10,7 @@
 @* The bar at the top of the shell: navigation toggle, brand, unread notifications and the menu of the user. *@
 <MudAppBar Elevation="0" Class="pf-appbar" Gutters="false">
     <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" OnClick="OnToggleNavigation" aria-label="Toggle navigation" />
-    <a class="pf-brand" href="">
-        <span class="pf-brand-mark"></span>
-        <span class="pf-brand-name">ProjectFlow</span>
-    </a>
+    <Brand Href="" />
 
     <MudSpacer />
 
@@ -23,20 +20,24 @@
         </MudBadge>
     </MudTooltip>
 
-    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" PopoverClass="pf-user-menu">
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" PopoverClass="pf-user-menu" Class="ml-1">
         <ActivatorContent>
-            <button type="button" class="pf-user-button">
-                <span class="pf-avatar">@_initials</span>
-                <span class="pf-user-name">@_displayName</span>
-                <MudIcon Icon="@Icons.Material.Rounded.ExpandMore" Size="Size.Small" />
-            </button>
+            @* A custom activator opens the menu itself (MudBlazor 9). *@
+            <MudButton OnClick="@context.ToggleAsync" Variant="Variant.Text" Color="Color.Inherit"
+                       EndIcon="@Icons.Material.Rounded.ExpandMore" Class="pf-user-button" aria-label="Account menu">
+                <MudAvatar Size="Size.Small" Class="pf-avatar">@_initials</MudAvatar>
+                <MudText Typo="Typo.body2" Class="d-none d-sm-flex ml-2">@_displayName</MudText>
+            </MudButton>
         </ActivatorContent>
         <ChildContent>
-            <div class="pf-user-card">
-                <div>@_displayName</div>
-                <div class="pf-muted">@_email</div>
-            </div>
-            <MudDivider />
+            <MudStack Spacing="0" Class="px-4 pt-2 pb-3">
+                <MudText Typo="Typo.body2">@_displayName</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pf-muted">@_email</MudText>
+            </MudStack>
+            <MudDivider Class="mb-1" />
+            @* Profile and the light theme come with their own pages and palette. *@
+            <MudMenuItem Icon="@Icons.Material.Outlined.Person" Disabled="true">Profile</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.DarkMode" Disabled="true">Theme: Dark</MudMenuItem>
             <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="LogoutAsync">Sign out</MudMenuItem>
         </ChildContent>
     </MudMenu>

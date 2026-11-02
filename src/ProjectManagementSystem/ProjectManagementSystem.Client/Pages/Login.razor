@@ -6,78 +6,72 @@
 
 <PageTitle>Sign in · ProjectFlow</PageTitle>
 
-<div class="pf-login-page">
-    <header class="pf-brand pf-login-brand">
-        <span class="pf-brand-mark"></span>
-        <span class="pf-brand-name">ProjectFlow</span>
-    </header>
+<MudStack Spacing="0" Class="pf-login-page">
+    <Brand />
 
-    <main class="pf-login">
-        <div class="pf-login-heading">
-            <h1 class="pf-login-title">Sign in</h1>
-            <p class="pf-login-subtitle">Use your work account to continue.</p>
-        </div>
+    <MudStack Spacing="5" Justify="Justify.Center" Class="flex-grow-1 py-12 pf-login">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.h3" HtmlTag="h1">Sign in</MudText>
+            <MudText Typo="Typo.body1" Class="pf-muted">Use your work account to continue.</MudText>
+        </MudStack>
 
         @if (_error is not null)
         {
-            <div class="pf-login-error" role="alert">
-                <MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Size="Size.Small" />
-                <span>@_error</span>
-            </div>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true">@_error</MudAlert>
         }
 
-        <EditForm Model="_model" OnValidSubmit="SignInAsync" FormName="login" class="pf-login-form">
+        <EditForm Model="_model" OnValidSubmit="SignInAsync" FormName="login">
             <DataAnnotationsValidator />
+            <MudStack Spacing="4">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2" HtmlTag="label" for="login-email" Class="pf-field-label">Email</MudText>
+                    <MudTextField @bind-Value="_model.Email" For="() => _model.Email" InputId="login-email"
+                                  Placeholder="name@company.com" InputType="InputType.Email" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" AutoFocus="true" Disabled="_busy" autocomplete="username" Class="pf-input" />
+                </MudStack>
 
-            <div class="pf-field">
-                <label for="login-email">Email</label>
-                <InputText id="login-email" type="email" class="pf-input" placeholder="name@company.com"
-                           autocomplete="username" autofocus @bind-Value="_model.Email" disabled="@_busy" />
-                <ValidationMessage For="() => _model.Email" class="pf-field-error" />
-            </div>
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2" HtmlTag="label" for="login-password" Class="pf-field-label">Password</MudText>
+                    <MudTextField @bind-Value="_model.Password" For="() => _model.Password" InputId="login-password"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Disabled="_busy" autocomplete="current-password" Class="pf-input"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showPassword ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)"
+                                  OnAdornmentClick="() => _showPassword = !_showPassword"
+                                  AdornmentAriaLabel="@(_showPassword ? "Hide password" : "Show password")" />
+                </MudStack>
 
-            <div class="pf-field">
-                <label for="login-password">Password</label>
-                <div class="pf-input-wrap">
-                    <InputText id="login-password" type="@(_showPassword ? "text" : "password")" class="pf-input pf-input-with-action"
-                               autocomplete="current-password" @bind-Value="_model.Password" disabled="@_busy" />
-                    <button type="button" class="pf-input-action" @onclick="() => _showPassword = !_showPassword"
-                            aria-label="@(_showPassword ? "Hide password" : "Show password")">
-                        <MudIcon Icon="@(_showPassword ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)" Size="Size.Small" />
-                    </button>
-                </div>
-                <ValidationMessage For="() => _model.Password" class="pf-field-error" />
-            </div>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudCheckBox @bind-Value="_model.RememberMe" Label="Keep me signed in" Color="Color.Primary" Dense="true"
+                                 Disabled="_busy" Class="ml-n1" />
+                    <MudLink Typo="Typo.body2" OnClick="() => _showResetHint = !_showResetHint" Class="pf-link">Forgot password?</MudLink>
+                </MudStack>
 
-            <div class="pf-login-options">
-                <label class="pf-checkbox">
-                    <InputCheckbox @bind-Value="_model.RememberMe" disabled="@_busy" />
-                    <span>Keep me signed in</span>
-                </label>
-                <button type="button" class="pf-link-button" @onclick="() => _showResetHint = !_showResetHint">Forgot password?</button>
-            </div>
-
-            @if (_showResetHint)
-            {
-                <div class="pf-login-hint">Passwords are reset by your administrator. Ask them for a new one.</div>
-            }
-
-            <button type="submit" class="pf-btn pf-btn-primary pf-btn-block" disabled="@_busy">
-                @if (_busy)
+                @if (_showResetHint)
                 {
-                    <span class="pf-spinner" aria-hidden="true"></span>
-                    <span>Signing in…</span>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true">
+                        Passwords are reset by your administrator. Ask them for a new one.
+                    </MudAlert>
                 }
-                else
-                {
-                    <span>Sign in</span>
-                }
-            </button>
+
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           Disabled="_busy" Class="mt-1 pf-submit">
+                    @if (_busy)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" Class="mr-2" Style="width:16px;height:16px" />
+                        <span>Signing in…</span>
+                    }
+                    else
+                    {
+                        <span>Sign in</span>
+                    }
+                </MudButton>
+            </MudStack>
         </EditForm>
-    </main>
+    </MudStack>
 
-    <footer class="pf-login-footer">© @DateTime.Now.Year ProjectFlow</footer>
-</div>
+    <MudText Typo="Typo.body2" Class="pf-muted">© @DateTime.Now.Year ProjectFlow</MudText>
+</MudStack>
 
 @code {
     [SupplyParameterFromQuery]
