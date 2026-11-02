@@ -31,10 +31,47 @@
     --color-ok: oklch(0.76 0.11 160);
     --color-warn: oklch(0.80 0.12 80);
     --color-bad: oklch(0.70 0.15 25);
+    --color-bad-text: oklch(0.80 0.12 25);
 
     --radius-md: 8px;
     --shadow-sm: 0 0 0 1px #3f424d;
     --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* The light theme (ThemeService sets data-theme on <html>). The ramps run the other way round, so every rule that
+   takes a step for its role (800 for edges and quiet fills, 200 for text on a tint, 900 for a selected tint) reads
+   the same on a light ground; the accent is a step darker to keep its contrast. */
+:root[data-theme="light"] {
+    color-scheme: light;
+
+    --color-bg: #f4f4f8;
+    --color-surface: #fbfbfd;
+    --color-text: #1b1c28;
+    --color-accent: #6f62c4;
+    --color-muted: color-mix(in srgb, var(--color-text) 60%, transparent);
+
+    --color-neutral-100: #292b31;
+    --color-neutral-200: #3f424d;
+    --color-neutral-300: #595d6c;
+    --color-neutral-400: #75798c;
+    --color-neutral-500: #858a9e;
+    --color-neutral-600: #b2b6ca;
+    --color-neutral-700: #cfd3e5;
+    --color-neutral-800: #e1e2ea;
+    --color-neutral-900: #ececf2;
+
+    --color-accent-100: #2b2741;
+    --color-accent-200: #423a6a;
+    --color-accent-300: #5d5294;
+    --color-accent-400: #6f62c4;
+    --color-accent-700: #dedafc;
+    --color-accent-800: #e7e5fe;
+    --color-accent-900: #eeecfd;
+
+    --color-bad-text: oklch(0.55 0.17 25);
+
+    --shadow-sm: 0 0 0 1px #e1e2ea;
+    --shadow-md: 0 0 0 1px #cfd3e5, 0 6px 18px rgba(27, 28, 40, 0.12);
 }
 
 html, body {
@@ -95,6 +132,10 @@ h1[tabindex="-1"]:focus { outline: none; }
 @media (max-width: 600px) { .pf-page { padding: 12px 16px 32px; } }
 
 .pf-breadcrumbs { font-size: 13px; }
+/* The current page is the last item, which MudBlazor dims as disabled; the design shows it in the text colour and the
+   links before it muted. */
+.pf-breadcrumbs .mud-breadcrumb-item.mud-disabled > * { color: var(--color-text); opacity: 1; }
+.pf-breadcrumbs .mud-breadcrumb-item:not(.mud-disabled) > a { color: var(--color-neutral-400); }
 
 /* — dashboard — */
 
@@ -128,7 +169,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-table .mud-table-cell { border-color: var(--color-neutral-800); }
 .pf-table .mud-table-body .mud-table-row:last-child .mud-table-cell { border-bottom: 0; }
 .pf-progress-cell { min-width: 150px; }
-.pf-overspent { color: oklch(0.80 0.12 25) !important; }
+.pf-overspent { color: var(--color-bad-text) !important; }
 .pf-search .mud-input.mud-input-outlined { background: var(--color-surface); }
 .pf-toggle.mud-toggle-group { background: var(--color-surface); border-color: var(--color-neutral-800); height: 40px; }
 .pf-toggle .mud-toggle-item { padding: 0 14px; color: var(--color-neutral-200) !important; text-transform: none; font-weight: 400; white-space: nowrap; }

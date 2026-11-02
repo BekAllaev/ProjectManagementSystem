@@ -5,6 +5,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* The theme the user chose (ThemeService), set before anything paints, so a light page never flashes dark. *@
+    <script>try { if (localStorage.getItem("pms.theme") === "light") document.documentElement.setAttribute("data-theme", "light"); } catch { }</script>
     <ResourcePreloader />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />

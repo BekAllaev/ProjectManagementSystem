@@ -6,6 +6,7 @@
 @inject INotificationService Notifications
 @inject AuthService Auth
 @inject NavigationManager Navigation
+@inject ThemeService ThemeService
 
 @* The bar at the top of the shell: navigation toggle, brand, unread notifications and the menu of the user. *@
 <MudAppBar Elevation="0" Class="pf-appbar" Gutters="false">
@@ -35,9 +36,12 @@
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pf-muted">@_email</MudText>
             </MudStack>
             <MudDivider Class="mb-1" />
-            @* Profile and the light theme come with their own pages and palette. *@
+            @* Profile comes with its own page. *@
             <MudMenuItem Icon="@Icons.Material.Outlined.Person" Disabled="true">Profile</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.DarkMode" Disabled="true">Theme: Dark</MudMenuItem>
+            <MudMenuItem Icon="@(ThemeService.IsDarkMode ? Icons.Material.Outlined.DarkMode : Icons.Material.Outlined.LightMode)"
+                         OnClick="ToggleThemeAsync" AutoClose="false">
+                Theme: @(ThemeService.IsDarkMode ? "Dark" : "Light")
+            </MudMenuItem>
             <MudMenuItem Icon="@Icons.Material.Outlined.Logout" OnClick="LogoutAsync">Sign out</MudMenuItem>
         </ChildContent>
     </MudMenu>
@@ -95,6 +99,8 @@
             _unreadCount = 0;
         }
     }
+
+    private Task ToggleThemeAsync() => ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode);
 
     private async Task LogoutAsync()
     {
