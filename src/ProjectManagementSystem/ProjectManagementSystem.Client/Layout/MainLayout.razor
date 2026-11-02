@@ -18,9 +18,12 @@
         </MudLayout>
     </Authorized>
     <NotAuthorized>
-        @* A page open to everyone (the 404 page), or the redirect to the login page. *@
-        <div class="pf-auth-page">@Body</div>
+        @* Every page of the shell needs a signed-in user; pages open to everyone use AuthLayout (the login page). *@
+        <RedirectToLogin />
     </NotAuthorized>
+    <Authorizing>
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+    </Authorizing>
 </AuthorizeView>
 
 <div id="blazor-error-ui" data-nosnippet>

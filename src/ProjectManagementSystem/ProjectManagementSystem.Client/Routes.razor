@@ -1,13 +1,8 @@
 <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
-            <NotAuthorized>
-                <RedirectToLogin />
-            </NotAuthorized>
-            <Authorizing>
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
-            </Authorizing>
-        </AuthorizeRouteView>
+        @* Sign-in is enforced by MainLayout, not by [Authorize] on the pages: the host serves the pages through
+           endpoints, and authorization metadata on them would make it check a sign-in it does not have. *@
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
