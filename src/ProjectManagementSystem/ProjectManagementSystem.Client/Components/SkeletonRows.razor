@@ -1,14 +1,12 @@
-<div class="pf-list">
+<MudStack Spacing="3" Class="py-2">
     @for (var i = 0; i < Count; i++)
     {
-        <div class="pf-row">
-            <div class="pf-row-main">
-                <MudSkeleton Width="70%" />
-                <MudSkeleton Width="45%" Height="14px" />
-            </div>
-        </div>
+        <MudStack Spacing="1">
+            <MudSkeleton Width="70%" />
+            <MudSkeleton Width="45%" Height="14px" />
+        </MudStack>
     }
-</div>
+</MudStack>
 
 @code {
     [Parameter]

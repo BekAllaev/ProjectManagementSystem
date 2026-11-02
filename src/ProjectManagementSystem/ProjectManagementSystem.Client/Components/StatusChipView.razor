@@ -1,0 +1,7 @@
+@* A small status label (see Display.Chip). *@
+<MudChip T="string" Size="Size.Small" Color="Value.Color" Variant="Value.Variant" Class="ma-0 pf-chip">@Value.Label</MudChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public StatusChip Value { get; set; } = default!;
+}

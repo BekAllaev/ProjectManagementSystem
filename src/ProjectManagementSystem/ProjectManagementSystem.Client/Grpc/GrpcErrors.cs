@@ -10,7 +10,9 @@ public static class GrpcErrors
 {
     public static string Describe(Exception exception) => exception switch
     {
-        RpcException { StatusCode: StatusCode.Unavailable } =>
+        // The browser could not send the call at all (the API is down, or CORS refused it): gRPC reports that as
+        // Internal with the HttpRequestException of fetch in its debug exception.
+        RpcException rpc when rpc.StatusCode == StatusCode.Unavailable || rpc.Status.DebugException is HttpRequestException =>
             "The server cannot be reached. Check that the API is running and try again.",
         RpcException { StatusCode: StatusCode.Unauthenticated } =>
             "Your session has ended. Please sign in again.",
