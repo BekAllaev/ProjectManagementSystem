@@ -183,6 +183,20 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-table .pf-right .mud-table-sort-label { justify-content: flex-end; }
 .pf-progress-cell .mud-progress-linear { min-width: 80px; }
 
+/* — notifications — */
+
+.pf-notification {
+    display: flex; gap: 12px; padding: 12px; border-radius: var(--radius-md); cursor: pointer;
+}
+.pf-notification:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }
+.pf-notification-unread { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+.pf-notification-icon { color: var(--color-neutral-400); margin-top: 1px; flex: none; }
+.pf-notification-message { color: var(--color-neutral-300); text-wrap: pretty; }
+
+/* — dialogs — */
+
+.pf-dialog.mud-dialog { background: var(--color-surface); }
+
 /* — sign-in — */
 
 .pf-auth-page {

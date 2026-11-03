@@ -1,0 +1,216 @@
+@page "/notifications"
+@using ProjectManagementSystem.Application.Notifications
+@using ProjectManagementSystem.Application.Notifications.Commands.MarkAllNotificationsRead
+@using ProjectManagementSystem.Application.Notifications.Commands.MarkNotificationRead
+@using ProjectManagementSystem.Application.Notifications.Queries.GetNotifications
+@implements IDisposable
+@inject INotificationService NotificationService
+@inject NotificationEvents NotificationEvents
+@inject ISnackbar Snackbar
+
+<PageTitle>Notifications · ProjectFlow</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 pf-breadcrumbs" />
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+    <MudText Typo="Typo.h3" HtmlTag="h1" Class="flex-grow-1">Notifications</MudText>
+    <MudToggleGroup T="NotificationFilter" Value="_filter" ValueChanged="FilterChangedAsync" Outlined="true" Delimiters="false"
+                    Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+        <MudToggleItem Value="NotificationFilter.All" Text="All" />
+        <MudToggleItem Value="NotificationFilter.Unread" Text="@(_unreadCount > 0 ? $"Unread ({_unreadCount})" : "Unread")" />
+    </MudToggleGroup>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.DoneAll"
+               OnClick="MarkAllReadAsync" Disabled="_unreadCount == 0 || _markingAll" Class="pf-submit">
+        Mark all read
+    </MudButton>
+</MudStack>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <span>The notifications could not be loaded. @_error</span>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+<MudPaper Elevation="0" Outlined="true" Class="pf-card pa-2">
+    <LoadingBar Visible="_loading" />
+    @if (_notifications is null)
+    {
+        <div class="px-2"><SkeletonRows Count="5" /></div>
+    }
+    else if (_notifications.Count == 0)
+    {
+        <div class="px-3 py-4">
+            <EmptyState Icon="@Icons.Material.Outlined.NotificationsOff"
+                        Title="@(_filter == NotificationFilter.Unread ? "No unread notifications" : "No notifications")"
+                        Text="New problems with your work show up here." />
+        </div>
+    }
+    else
+    {
+        <MudStack Spacing="0" role="list">
+            @foreach (var notification in _notifications)
+            {
+                <div role="listitem" tabindex="0" class="pf-notification @(notification.IsRead ? string.Empty : "pf-notification-unread")"
+                     title="@(notification.IsRead ? null : "Mark as read")"
+                     @onclick="() => MarkReadAsync(notification)"
+                     @onkeydown="e => OnKeyDownAsync(e, notification)">
+                    <span class="pf-dot @(notification.IsRead ? string.Empty : "pf-dot-unread")"></span>
+                    <MudIcon Icon="@IconOf(notification.Kind)" Size="Size.Small" Class="pf-notification-icon" />
+                    <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                        <MudText Typo="Typo.body2" Class="@(notification.IsRead ? "pf-read" : string.Empty)">@notification.Title</MudText>
+                        <MudText Typo="Typo.body2" Class="pf-notification-message">@notification.Message</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap" Class="mt-1">
+                            <MudText Typo="Typo.caption" Class="pf-muted">
+                                @notification.ProjectTitle · @Display.Ago(notification.CreatedAt, DateTime.UtcNow)
+                            </MudText>
+                            @if (notification.IsForProjectManagement)
+                            {
+                                <MudTooltip Text="Addressed to the management of the project; read by one member, it is read for all.">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0 pf-chip">Project management</MudChip>
+                                </MudTooltip>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(notification.TaskName))
+                            {
+                                <MudText Typo="Typo.caption" Class="pf-muted">Task: @notification.TaskName</MudText>
+                            }
+                        </MudStack>
+                    </MudStack>
+                </div>
+            }
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    private enum NotificationFilter
+    {
+        All,
+        Unread,
+    }
+
+    private readonly List<BreadcrumbItem> _breadcrumbs = [new("Notifications", href: null, disabled: true)];
+
+    private List<NotificationItem>? _notifications;
+    private int _unreadCount;
+    private NotificationFilter _filter = NotificationFilter.All;
+    private bool _loading;
+    private bool _markingAll;
+    private string? _error;
+    private CancellationTokenSource? _load;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task FilterChangedAsync(NotificationFilter filter)
+    {
+        _filter = filter;
+        return LoadAsync();
+    }
+
+    /// <summary>
+    /// A newer load cancels the one still running, so switching the filter never shows an older answer last.
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = new CancellationTokenSource();
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var query = new GetNotificationsQuery(UnreadOnly: _filter == NotificationFilter.Unread, Take: null);
+            var notifications = await NotificationService.GetNotifications(query, load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _notifications = [.. notifications.Items];
+            _unreadCount = notifications.UnreadCount;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+    }
+
+    private Task OnKeyDownAsync(KeyboardEventArgs e, NotificationItem notification) =>
+        e.Key is "Enter" or " " ? MarkReadAsync(notification) : Task.CompletedTask;
+
+    /// <summary>
+    /// Clicking a notification marks it read. The list shows it read at once and goes back if the call fails.
+    /// In the Unread filter it stays in the list until the next load, so the row does not jump away under the pointer.
+    /// </summary>
+    private async Task MarkReadAsync(NotificationItem notification)
+    {
+        if (notification.IsRead || _notifications is null)
+            return;
+
+        Replace(notification, notification with { IsRead = true });
+        _unreadCount = Math.Max(0, _unreadCount - 1);
+
+        try
+        {
+            await NotificationService.MarkNotificationRead(new MarkNotificationReadCommand(notification.Id));
+            NotificationEvents.NotifyChanged();
+        }
+        catch (Exception exception)
+        {
+            Replace(notification with { IsRead = true }, notification);
+            _unreadCount++;
+            Snackbar.Add($"The notification could not be marked as read. {GrpcErrors.Describe(exception)}", Severity.Error);
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        _markingAll = true;
+
+        try
+        {
+            await NotificationService.MarkAllNotificationsRead(new MarkAllNotificationsReadCommand());
+            NotificationEvents.NotifyChanged();
+            Snackbar.Add("All notifications marked as read", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add($"The notifications could not be marked as read. {GrpcErrors.Describe(exception)}", Severity.Error);
+        }
+        finally
+        {
+            _markingAll = false;
+        }
+    }
+
+    private void Replace(NotificationItem current, NotificationItem replacement)
+    {
+        var index = _notifications?.IndexOf(current) ?? -1;
+        if (index >= 0)
+            _notifications![index] = replacement;
+    }
+
+    private static string IconOf(NotificationKind kind) => kind switch
+    {
+        NotificationKind.ResponsibleOutsideTeam => Icons.Material.Outlined.PersonOff,
+        NotificationKind.PredecessorCancelled => Icons.Material.Outlined.LinkOff,
+        _ => Icons.Material.Outlined.Notifications,
+    };
+
+    public void Dispose()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+    }
+}
