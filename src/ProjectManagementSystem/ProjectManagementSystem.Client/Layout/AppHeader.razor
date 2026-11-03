@@ -7,6 +7,8 @@
 @inject AuthService Auth
 @inject NavigationManager Navigation
 @inject ThemeService ThemeService
+@inject NotificationEvents NotificationEvents
+@implements IDisposable
 
 @* The bar at the top of the shell: navigation toggle, brand, unread notifications and the menu of the user. *@
 <MudAppBar Elevation="0" Class="pf-appbar" Gutters="false">
@@ -17,7 +19,7 @@
 
     <MudTooltip Text="@(_unreadCount == 1 ? "1 unread notification" : $"{_unreadCount} unread notifications")">
         <MudBadge Content="_unreadCount" Visible="_unreadCount > 0" Max="99" Color="Color.Primary" Overlap="true" Class="pf-bell">
-            <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="Notifications" />
+            <MudIconButton Href="notifications" Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="Notifications" />
         </MudBadge>
     </MudTooltip>
 
@@ -66,6 +68,8 @@
         _email = _displayName = user.Identity?.Name ?? string.Empty;
         _initials = _email.Length > 0 ? _email[..1].ToUpperInvariant() : "?";
 
+        NotificationEvents.Changed += OnNotificationsChanged;
+
         var employee = LoadEmployeeAsync();
         var unread = LoadUnreadCountAsync();
         await Task.WhenAll(employee, unread);
@@ -100,6 +104,12 @@
         }
     }
 
+    private void OnNotificationsChanged() => InvokeAsync(async () =>
+    {
+        await LoadUnreadCountAsync();
+        StateHasChanged();
+    });
+
     private Task ToggleThemeAsync() => ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode);
 
     private async Task LogoutAsync()
@@ -107,4 +117,6 @@
         await Auth.LogoutAsync();
         Navigation.NavigateTo("login", replace: true);
     }
+
+    public void Dispose() => NotificationEvents.Changed -= OnNotificationsChanged;
 }

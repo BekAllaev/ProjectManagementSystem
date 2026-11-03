@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using ProjectManagementSystem.Client.Auth;
 using ProjectManagementSystem.Client.Grpc;
+using ProjectManagementSystem.Client.State;
 using ProjectManagementSystem.Client.Theme;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<NotificationEvents>();
 
 var apiBaseAddress = new Uri(builder.Configuration["Api:BaseAddress"]
     ?? throw new InvalidOperationException("Api:BaseAddress is not configured in wwwroot/appsettings.json."));

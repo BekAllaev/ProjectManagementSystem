@@ -1,0 +1,141 @@
+@page "/employees"
+@using ProjectManagementSystem.Application.Employees
+@using ProjectManagementSystem.Application.Employees.Queries.GetEmployees
+@implements IDisposable
+@inject IEmployeeService EmployeeService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Employees · ProjectFlow</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 pf-breadcrumbs" />
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+    <MudText Typo="Typo.h3" HtmlTag="h1" Class="flex-grow-1">Employees</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.PersonAdd"
+               OnClick="NewEmployeeAsync" Class="pf-submit">
+        New employee
+    </MudButton>
+</MudStack>
+
+<MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Placeholder="Filter by name or email"
+              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" DebounceInterval="300" Clearable="true"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" MaxLength="200"
+              Class="pf-search flex-grow-0" Style="width:280px" />
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <span>The employees could not be loaded. @_error</span>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+<MudTable T="EmployeeItem" Items="_employees" Loading="_loading" LoadingProgressColor="Color.Primary" Hover="true"
+          Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="EmployeeItem" SortBy="e => e.LastName + ' ' + e.FirstName" InitialDirection="SortDirection.Ascending">Name</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EmployeeItem" SortBy="e => e.Email">Email</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EmployeeItem" SortBy="e => e.CurrentProjects.Count">Current projects</MudTableSortLabel></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(context.FirstName, context.LastName)</MudAvatar>
+                <MudText Typo="Typo.body2">@context.FirstName @context.LastName</MudText>
+            </MudStack>
+        </MudTd>
+        <MudTd DataLabel="Email" Class="pf-muted">@context.Email</MudTd>
+        <MudTd DataLabel="Current projects">
+            @if (context.CurrentProjects.Count == 0)
+            {
+                <span class="pf-muted">—</span>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">@string.Join(", ", context.CurrentProjects.Select(p => p.Title))</MudText>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyState Icon="@Icons.Material.Outlined.GroupOff" Title="No employees"
+                    Text="@(_search is { Length: > 0 } ? "No employee matches the filter." : "Employees show up here once they are created.")" />
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading employees…</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    private readonly List<BreadcrumbItem> _breadcrumbs = [new("Employees", href: null, disabled: true)];
+
+    private IReadOnlyList<EmployeeItem> _employees = [];
+    private string? _search;
+    private bool _loading;
+    private string? _error;
+    private CancellationTokenSource? _load;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SearchChangedAsync(string? search)
+    {
+        _search = search;
+        return LoadAsync();
+    }
+
+    /// <summary>
+    /// The API filters by name and email; a newer load cancels the one still running, so typing never shows an
+    /// older answer last.
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = new CancellationTokenSource();
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var query = new GetEmployeesQuery(string.IsNullOrWhiteSpace(_search) ? null : _search.Trim());
+            var employees = await EmployeeService.GetEmployees(query, load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _employees = employees.Items;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+    }
+
+    private async Task NewEmployeeAsync()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<NewEmployeeDialog>("New employee", options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string name })
+        {
+            Snackbar.Add($"Employee created: {name}", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+    }
+}
