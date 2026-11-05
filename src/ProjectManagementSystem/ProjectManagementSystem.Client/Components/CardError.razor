@@ -1,0 +1,15 @@
+@* The error of one card that could not load its data, with a retry. *@
+<MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
+        <span>@Text</span>
+        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="OnRetry">Try again</MudButton>
+    </MudStack>
+</MudAlert>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+}

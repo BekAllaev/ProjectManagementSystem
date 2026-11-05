@@ -1,0 +1,69 @@
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CancelWorkPackage
+@inject IWorkPackageService WorkPackageService
+
+@* Cancels a work package with a reason; its unfinished tasks are cancelled with it. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.body2" Class="pf-dialog-text">
+                    Cancelling is final. Every unfinished task of the work package is cancelled with it, and the
+                    responsible persons of their successor tasks are notified.
+                </MudText>
+                <MudTextField T="string" @bind-Value="_reason" Label="Reason" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="3" Required="true" RequiredError="Enter the reason." MaxLength="1000" AutoFocus="true" Immediate="true" />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Keep work package</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="CancelWorkPackageAsync" Disabled="_saving">
+            @(_saving ? "Cancelling…" : "Cancel work package")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid WorkPackageId { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private string? _reason;
+    private string? _error;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task CancelWorkPackageAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await WorkPackageService.CancelWorkPackage(new CancelWorkPackageCommand(WorkPackageId, _reason!.Trim()));
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

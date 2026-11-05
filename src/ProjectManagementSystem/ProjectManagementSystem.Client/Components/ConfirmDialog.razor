@@ -1,0 +1,49 @@
+@* A question before a command that cannot be undone. ShowAsync answers true only when the user confirms. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="pf-dialog-text">@Text</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@CancelLabel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm">@ConfirmLabel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = default!;
+
+    [Parameter]
+    public string ConfirmLabel { get; set; } = "OK";
+
+    [Parameter]
+    public string CancelLabel { get; set; } = "Cancel";
+
+    [Parameter]
+    public bool Danger { get; set; }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private void Confirm() => Dialog.Close(DialogResult.Ok(true));
+
+    public static async Task<bool> ShowAsync(
+        IDialogService dialogs, string title, string text, string confirmLabel, bool danger = false, string cancelLabel = "Cancel")
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { d => d.Text, text },
+            { d => d.ConfirmLabel, confirmLabel },
+            { d => d.CancelLabel, cancelLabel },
+            { d => d.Danger, danger },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
+        var dialog = await dialogs.ShowAsync<ConfirmDialog>(title, parameters, options);
+        var result = await dialog.Result;
+
+        return result is { Canceled: false };
+    }
+}
