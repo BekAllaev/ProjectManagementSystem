@@ -1,0 +1,80 @@
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@inject IProjectService ProjectService
+
+@* Picks a current member of the team of a project: only they can be responsible for work. *@
+<MudSelect T="Guid?" Value="Value" ValueChanged="OnValueChangedAsync" Label="@Label" Variant="Variant.Outlined"
+           Margin="Margin.Dense" Required="true" RequiredError="Choose the responsible person." Disabled="_members is null"
+           ToStringFunc="NameOf" AnchorOrigin="Origin.BottomCenter" HelperText="@(_error ?? HelperText)" Error="_error is not null">
+    @if (_members is not null)
+    {
+        @foreach (var member in _members)
+        {
+            <MudSelectItem T="Guid?" Value="member.Employee.Id">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(member.Employee)</MudAvatar>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body2">@Display.Name(member.Employee)</MudText>
+                        <MudText Typo="Typo.caption" Class="pf-muted">@member.RoleName</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudSelectItem>
+        }
+    }
+</MudSelect>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter]
+    public Guid? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Responsible person";
+
+    [Parameter]
+    public string HelperText { get; set; } = "Only current team members can be responsible.";
+
+    /// <summary>
+    /// Left out of the list, for example the person who is responsible already.
+    /// </summary>
+    [Parameter]
+    public Guid? Except { get; set; }
+
+    private IReadOnlyList<TeamMemberItem>? _members;
+    private string? _error;
+
+    /// <summary>
+    /// Full name of the chosen member, for the message after the command.
+    /// </summary>
+    public string? SelectedName => Value is { } id ? NameOf(id) : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await ProjectService.GetTeam(new GetTeamQuery(ProjectId));
+            _members = team.Members.Where(m => m.IsActive && m.Employee.Id != Except).ToList();
+            if (_members.Count == 0)
+                _error = "The project has no other current team members.";
+        }
+        catch (Exception exception)
+        {
+            _members = [];
+            _error = $"The team could not be loaded. {GrpcErrors.Describe(exception)}";
+        }
+    }
+
+    private Task OnValueChangedAsync(Guid? value)
+    {
+        Value = value;
+        return ValueChanged.InvokeAsync(value);
+    }
+
+    private string NameOf(Guid? id) =>
+        _members?.FirstOrDefault(m => m.Employee.Id == id) is { } member ? Display.Name(member.Employee) : string.Empty;
+}

@@ -1,0 +1,274 @@
+@page "/projects/{ProjectId:guid}/{Tab?}"
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Commands.CloseProject
+@using ProjectManagementSystem.Application.Projects.Commands.StartProject
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Domain.Projects
+@implements IDisposable
+@inject IProjectService ProjectService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* The page of one project: its header (state, dates, progress, start and close) and the tabs. Every tab has its own
+   address, /projects/{id} for the overview and /projects/{id}/work-packages for the work packages, so a tab can be
+   linked to and survives a reload. *@
+
+<PageTitle>@(_project?.Title ?? "Project") · ProjectFlow</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="pa-0 pf-breadcrumbs" />
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <span>The project could not be loaded. @_error</span>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+        </MudStack>
+    </MudAlert>
+}
+
+@if (_project is null)
+{
+    @if (_error is null)
+    {
+        <MudStack Spacing="2">
+            <MudSkeleton Width="320px" Height="40px" />
+            <MudSkeleton Width="480px" />
+            <MudSkeleton Width="720px" Height="10px" />
+        </MudStack>
+    }
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="4" Wrap="Wrap.Wrap">
+        <MudStack Spacing="2" Class="flex-grow-1" Style="min-width:280px">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+                <MudText Typo="Typo.h3" HtmlTag="h1">@_project.Title</MudText>
+                <StatusChipView Value="Display.Chip(_project.State)" />
+            </MudStack>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4" Wrap="Wrap.Wrap" Class="pf-muted pf-project-meta">
+                <span><MudIcon Icon="@Icons.Material.Outlined.CalendarToday" Size="Size.Small" /> Created @Display.ShortDate(_project.CreationDate)</span>
+                @if (_project.StartDate is { } start)
+                {
+                    <span><MudIcon Icon="@Icons.Material.Outlined.PlayArrow" Size="Size.Small" /> Started @Display.ShortDate(start)</span>
+                }
+                @if (_project.CompletionDate is { } completed)
+                {
+                    <span><MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" /> Closed @Display.ShortDate(completed)</span>
+                }
+                <span><MudIcon Icon="@Icons.Material.Outlined.Payments" Size="Size.Small" /> @_project.Currency</span>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_project.Description))
+            {
+                <MudText Typo="Typo.body2" Class="pf-project-description">@_project.Description</MudText>
+            }
+        </MudStack>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            @if (_project.State == ProjectState.Created)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.PlayArrow"
+                           OnClick="StartAsync" Disabled="_busy" Class="pf-submit">
+                    Start
+                </MudButton>
+            }
+            @if (_project.State == ProjectState.InProgress)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Lock"
+                           OnClick="CloseAsync" Disabled="_busy" Class="pf-submit">
+                    Close project
+                </MudButton>
+            }
+            <MudTooltip Text="Refresh">
+                <MudIconButton Icon="@Icons.Material.Rounded.Refresh" OnClick="RefreshAsync" Disabled="_loading" aria-label="Refresh" />
+            </MudTooltip>
+        </MudStack>
+    </MudStack>
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Style="max-width:720px">
+        <MudProgressLinear Color="Color.Primary" Value="Math.Clamp(_project.ProgressPercent, 0, 100)" Rounded="true"
+                           Size="Size.Medium" Class="flex-grow-1" />
+        <MudText Typo="Typo.body2" Class="pf-nowrap pf-tabular">
+            @_project.ProgressPercent% · @_project.TaskCounts.Completed of @_project.CountedTasks tasks completed
+        </MudText>
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+        }
+    </MudStack>
+
+    <MudTabs ActivePanelIndex="ActiveIndex" ActivePanelIndexChanged="SelectTab" Elevation="0" Rounded="false"
+             ApplyEffectsToContainer="false" Color="Color.Transparent" SliderColor="Color.Primary"
+             Class="pf-tabs" TabPanelsClass="pt-4">
+        <MudTabPanel Text="Overview">
+            <ProjectOverviewTab Project="_project" Reload="_reload" />
+        </MudTabPanel>
+        <MudTabPanel Text="Work packages">
+            <ProjectWorkPackagesTab Project="_project" Reload="_reload" Changed="LoadAsync" />
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private const string WorkPackagesTab = "work-packages";
+
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    [Parameter]
+    public string? Tab { get; set; }
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private ProjectDetails? _project;
+    private Guid _loadedId;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+
+    /// <summary>
+    /// Goes up on a refresh of the page, so the tabs load their data again too.
+    /// </summary>
+    private int _reload;
+
+    private CancellationTokenSource? _load;
+
+    private int ActiveIndex => string.Equals(Tab, WorkPackagesTab, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        UpdateBreadcrumbs();
+
+        // A change of the tab only changes Tab; the project is loaded again only for another project.
+        if (_loadedId != ProjectId)
+        {
+            _loadedId = ProjectId;
+            _project = null;
+            await LoadAsync();
+        }
+    }
+
+    private void SelectTab(int index) =>
+        Navigation.NavigateTo(index == 1 ? $"projects/{ProjectId}/{WorkPackagesTab}" : $"projects/{ProjectId}");
+
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = new CancellationTokenSource();
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var project = await ProjectService.GetProject(new GetProjectQuery(ProjectId), load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _project = project;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+        UpdateBreadcrumbs();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _reload++;
+        await LoadAsync();
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        var title = _project?.Title ?? "Project";
+        _breadcrumbs =
+        [
+            new("Projects", href: "projects"),
+            new(title, href: ActiveIndex == 0 ? null : $"projects/{ProjectId}", disabled: ActiveIndex == 0),
+        ];
+
+        if (ActiveIndex == 1)
+            _breadcrumbs.Add(new("Work packages", href: null, disabled: true));
+    }
+
+    private async Task StartAsync()
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Start project?",
+            "The project moves to In progress with today as its start date.",
+            "Start");
+        if (!confirmed)
+            return;
+
+        await RunAsync(() => ProjectService.StartProject(new StartProjectCommand(ProjectId)), "Project started");
+    }
+
+    private async Task CloseAsync()
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Close project?",
+            "Closing is final. Afterwards no work packages, milestones, dependencies or funding can be added. " +
+            "Every work package must be completed or cancelled first.",
+            "Close project", danger: true);
+        if (!confirmed)
+            return;
+
+        await RunAsync(() => ProjectService.CloseProject(new CloseProjectCommand(ProjectId)), "Project closed");
+    }
+
+    /// <summary>
+    /// Sends a command of the header; a rule the domain rejects shows as an error and leaves the page as it is.
+    /// </summary>
+    private async Task RunAsync(Func<Task> command, string success)
+    {
+        _busy = true;
+        var version = _project?.Version ?? 0;
+
+        try
+        {
+            await command();
+            Snackbar.Add(success, Severity.Success);
+            await LoadUntilNewerAsync(version);
+            _reload++;
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the header asks again until it
+    /// shows a newer version of the project, or gives up after a few tries (a refresh shows it later).
+    /// </summary>
+    private async Task LoadUntilNewerAsync(long version)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            await LoadAsync();
+            if (_error is not null || _project is null || _project.Version > version)
+                return;
+
+            StateHasChanged();
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+    }
+
+    public void Dispose()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+    }
+}

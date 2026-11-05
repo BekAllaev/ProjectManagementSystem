@@ -1,0 +1,354 @@
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteWorkPackage
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages
+@using ProjectManagementSystem.Domain.WorkPackages
+@implements IDisposable
+@inject IWorkPackageService WorkPackageService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Work packages of a project with their tasks. A row opens to list the tasks of the package. The read side catches
+   up with a command shortly after it (eventual consistency), and a new package is registered in the project only
+   then: until the list shows the change it says so and asks the API again a few times. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+        <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">
+            @(_workPackages is null ? "Loading work packages…" : _workPackages.Count == 1 ? "1 work package" : $"{_workPackages.Count} work packages")
+        </MudText>
+        @if (Project.IsOpen)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="NewWorkPackageAsync" Class="pf-submit">
+                New work package
+            </MudButton>
+        }
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The work packages could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    @if (_waitingFor is { } waitingFor)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">
+                @(_workPackages?.Any(w => w.Id == waitingFor) == true ? "Updating the list…" : "Registering the new work package in the project…")
+            </MudText>
+        </MudStack>
+    }
+
+    <MudTable T="WorkPackageListItem" Items="@(_workPackages ?? Array.Empty<WorkPackageListItem>())" Loading="_loading" LoadingProgressColor="Color.Primary"
+              Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table pf-wp-table"
+              OnRowClick="RowClicked" RowClass="pf-clickable">
+        <HeaderContent>
+            <MudTh Style="width:40px"></MudTh>
+            <MudTh>Work package</MudTh>
+            <MudTh>Responsible</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width:220px">Tasks</MudTh>
+            <MudTh Style="width:56px"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd Class="pf-caret-cell">
+                <MudIcon Icon="@(IsExpanded(context) ? Icons.Material.Rounded.ExpandMore : Icons.Material.Rounded.ChevronRight)"
+                         Size="Size.Small" Class="pf-muted" />
+            </MudTd>
+            <MudTd DataLabel="Work package">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body2">@context.Description</MudText>
+                    @if (context.Status == WorkPackageStatus.Cancelled && !string.IsNullOrWhiteSpace(context.CancellationReason))
+                    {
+                        <MudText Typo="Typo.caption" Class="pf-muted">Cancelled: @context.CancellationReason</MudText>
+                    }
+                    @if (!context.IsRegistered)
+                    {
+                        <MudText Typo="Typo.caption" Class="pf-pending">Registering in the project…</MudText>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Responsible">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(context.ResponsiblePerson)</MudAvatar>
+                    <MudText Typo="Typo.body2" Class="text-nowrap">@Display.Name(context.ResponsiblePerson)</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Status"><StatusChipView Value="Display.Chip(context.Status)" /></MudTd>
+            <MudTd DataLabel="Tasks" Class="pf-progress-cell">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudProgressLinear Color="Color.Primary" Value="Percent(context)" Rounded="true" Size="Size.Small" Class="flex-grow-1" />
+                    <MudText Typo="Typo.caption" Align="Align.Right" Class="pf-muted pf-percent">@context.CompletedTasks/@context.CountedTasks</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd Style="text-align:right">
+                @if (context.Status == WorkPackageStatus.Open)
+                {
+                    @* The menu must not open or close the row it sits in. *@
+                    <span @onclick:stopPropagation="true">
+                        <MudMenu Icon="@Icons.Material.Rounded.MoreVert" Size="Size.Small" Dense="true"
+                                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                 Disabled="_busy" aria-label="Actions of the work package">
+                            <MudMenuItem Icon="@Icons.Material.Outlined.PersonOutline" OnClick="() => ChangeResponsibleAsync(context)">Change responsible</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.CheckCircleOutline" OnClick="() => CompleteAsync(context)">Complete</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Block" OnClick="() => CancelAsync(context)">Cancel</MudMenuItem>
+                        </MudMenu>
+                    </span>
+                }
+            </MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (IsExpanded(context))
+            {
+                <MudTr Class="pf-wp-tasks-row">
+                    <td class="pf-wp-tasks-spacer"></td>
+                    <td colspan="5" class="pf-wp-tasks-cell">
+                        <div class="pf-wp-tasks">
+                            @if (context.Tasks.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Class="pf-muted pa-2">No tasks yet. Add the first task to start planning this package.</MudText>
+                            }
+                            else
+                            {
+                                @foreach (var task in context.Tasks)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="pf-wp-task">
+                                        <MudText Typo="Typo.body2" Class="flex-grow-1">@task.Name</MudText>
+                                        <MudText Typo="Typo.caption" Class="pf-muted text-nowrap">@Display.Name(task.ResponsiblePerson)</MudText>
+                                        <StatusChipView Value="Display.Chip(task.Status)" />
+                                    </MudStack>
+                                }
+                            }
+                        </div>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Outlined.Inventory2" Title="No work packages"
+                        Text="@(Project.IsOpen ? "Create the first work package to plan the tasks of the project." : "The project is closed; no work packages can be added.")" />
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading work packages…</MudText>
+        </LoadingContent>
+    </MudTable>
+</MudStack>
+
+@code {
+    /// <summary>
+    /// How often, and how far apart, the list is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RegistrationPolls = 10;
+    private static readonly TimeSpan RegistrationPollInterval = TimeSpan.FromSeconds(1);
+
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the list again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    /// <summary>
+    /// A command changed a work package; the page reloads its header (progress, counts).
+    /// </summary>
+    [Parameter]
+    public EventCallback Changed { get; set; }
+
+    private readonly HashSet<Guid> _expanded = [];
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<WorkPackageListItem>? _workPackages;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private Guid? _waitingFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _workPackages = null;
+            _expanded.Clear();
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var workPackages = await WorkPackageService.GetWorkPackages(new GetWorkPackagesQuery(Project.Id), _disposed.Token);
+            _workPackages = workPackages.Items;
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool IsExpanded(WorkPackageListItem workPackage) => _expanded.Contains(workPackage.Id);
+
+    private void RowClicked(TableRowClickEventArgs<WorkPackageListItem> args)
+    {
+        if (args.Item is not { } workPackage)
+            return;
+
+        if (!_expanded.Remove(workPackage.Id))
+            _expanded.Add(workPackage.Id);
+    }
+
+    private static double Percent(WorkPackageListItem workPackage) =>
+        workPackage.CountedTasks == 0 ? 0 : Math.Round(100.0 * workPackage.CompletedTasks / workPackage.CountedTasks);
+
+    private async Task NewWorkPackageAsync()
+    {
+        var parameters = new DialogParameters<NewWorkPackageDialog> { { d => d.ProjectId, Project.Id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<NewWorkPackageDialog>("New work package", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not { Canceled: false, Data: Guid id })
+            return;
+
+        Snackbar.Add("Work package created. It appears in the list in a moment.", Severity.Success);
+        await WaitForRegistrationAsync(id);
+        await Changed.InvokeAsync();
+    }
+
+    /// <summary>
+    /// The project registers a new work package after the event of its creation is handled.
+    /// </summary>
+    private Task WaitForRegistrationAsync(Guid id) =>
+        RefreshUntilAsync(id, items => items.Any(w => w.Id == id && w.IsRegistered));
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until
+    /// <paramref name="done"/> holds, or gives up after a few tries (a later refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilAsync(Guid id, Func<IReadOnlyList<WorkPackageListItem>, bool> done)
+    {
+        _waitingFor = id;
+
+        try
+        {
+            for (var attempt = 0; attempt < RegistrationPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await LoadAsync();
+                StateHasChanged();
+
+                if (_workPackages is { } items && done(items))
+                    return;
+
+                await Task.Delay(RegistrationPollInterval, _disposed.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _waitingFor = null;
+        }
+    }
+
+    /// <summary>
+    /// Refreshes after a command on <paramref name="workPackage"/> until the list shows a newer version of it.
+    /// </summary>
+    private Task RefreshAfterAsync(WorkPackageListItem workPackage) =>
+        RefreshUntilAsync(workPackage.Id,
+            items => items.Any(w => w.Id == workPackage.Id && w.Version > workPackage.Version));
+
+    private async Task ChangeResponsibleAsync(WorkPackageListItem workPackage)
+    {
+        var parameters = new DialogParameters<ChangeWorkPackageResponsibleDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.WorkPackageId, workPackage.Id },
+            { d => d.CurrentResponsibleId, workPackage.ResponsiblePerson.Id },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<ChangeWorkPackageResponsibleDialog>(workPackage.Description, parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string name })
+        {
+            Snackbar.Add($"{name} is now responsible for {workPackage.Description}", Severity.Success);
+            await RefreshAfterAsync(workPackage);
+        }
+    }
+
+    private async Task CompleteAsync(WorkPackageListItem workPackage)
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Complete work package?",
+            $"\"{workPackage.Description}\" is completed. Every task of it must be completed or cancelled first.",
+            "Complete");
+        if (!confirmed)
+            return;
+
+        _busy = true;
+
+        try
+        {
+            await WorkPackageService.CompleteWorkPackage(new CompleteWorkPackageCommand(workPackage.Id));
+            Snackbar.Add($"Work package completed: {workPackage.Description}", Severity.Success);
+            await RefreshAfterAsync(workPackage);
+            await Changed.InvokeAsync();
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CancelAsync(WorkPackageListItem workPackage)
+    {
+        var parameters = new DialogParameters<CancelWorkPackageDialog> { { d => d.WorkPackageId, workPackage.Id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<CancelWorkPackageDialog>($"Cancel {workPackage.Description}?", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add($"Work package cancelled: {workPackage.Description}", Severity.Success);
+            await RefreshAfterAsync(workPackage);
+            await Changed.InvokeAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

@@ -1,0 +1,327 @@
+@using ProjectManagementSystem.Application.Funding
+@using ProjectManagementSystem.Application.Funding.Queries.GetFunding
+@using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.Risks
+@using ProjectManagementSystem.Application.Risks.Queries.GetRisks
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Domain.Risks
+@implements IDisposable
+@inject IFundingService FundingService
+@inject IMilestoneService MilestoneService
+@inject IRiskService RiskService
+
+@* Overview of a project: tasks by status (from the header of the project), funding, milestones and the top open
+   risks. The three calls go out at once and every card shows its data, or its error, on its own. *@
+
+<MudGrid Spacing="4">
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Tasks by status">
+            @{
+                var counts = Project.TaskCounts;
+                var total = counts.Open + counts.InProgress + counts.Completed + counts.Cancelled;
+            }
+            @if (total == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.TaskAlt" Title="No tasks yet"
+                            Text="Tasks are added to the work packages of the project." />
+            }
+            else
+            {
+                <div class="pf-status-bar" role="img" aria-label="@StatusSummary(counts)">
+                    @foreach (var segment in Segments(counts).Where(s => s.Count > 0))
+                    {
+                        <div style="flex:@segment.Count;background:@segment.Color" title="@segment.Label: @segment.Count"></div>
+                    }
+                </div>
+                <div class="pf-status-legend">
+                    @foreach (var segment in Segments(counts))
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <span class="pf-swatch" style="background:@segment.Color"></span>
+                            <MudText Typo="Typo.body2" Class="flex-grow-1 pf-legend-label">@segment.Label</MudText>
+                            <MudText Typo="Typo.h6" Class="pf-tabular">@segment.Count</MudText>
+                        </MudStack>
+                    }
+                </div>
+            }
+            <MudText Typo="Typo.caption" Class="pf-muted">Progress counts completed of non-cancelled tasks.</MudText>
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Funding remaining" Loading="_fundingLoading">
+            @if (_fundingError is not null)
+            {
+                <CardError Text="@_fundingError" OnRetry="LoadFundingAsync" />
+            }
+            else if (_funding is null)
+            {
+                <SkeletonRows Count="2" />
+            }
+            else if (_funding.TotalFunding == 0 && _funding.ActualCost == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Savings" Title="No funding yet"
+                            Text="Funding tranches and the cost of logged time show up here." />
+            }
+            else
+            {
+                var used = Math.Clamp(_funding.UsedPercent ?? (_funding.ActualCost > 0 ? 100 : 0), 0, 100);
+                var color = FundingColor(_funding);
+                <MudText Typo="Typo.h3" Class="pf-tabular pf-funding-big" Style="@($"color:{RemainingColor(_funding)}")">
+                    @Display.Money(_funding.RemainingFunding, _funding.Currency)
+                </MudText>
+                <div class="pf-meter"><div style="width:@(Css(used))%;background:@color"></div></div>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pf-muted">
+                    <MudText Typo="Typo.caption">
+                        @(_funding.UsedPercent is { } percent ? $"{Display.Percent(percent)} used · " : string.Empty)@Display.Money(_funding.ActualCost, _funding.Currency) actual cost
+                    </MudText>
+                    <MudText Typo="Typo.caption">of @Display.Money(_funding.TotalFunding, _funding.Currency)</MudText>
+                </MudStack>
+                @if (_funding.IsOverspent)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-overspent">
+                        <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                        <MudText Typo="Typo.caption">Actual cost exceeds the total funding.</MudText>
+                    </MudStack>
+                }
+                else if (_funding.UsedPercent >= 80)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-warn">
+                        <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                        <MudText Typo="Typo.caption">80% of the funding or more is used.</MudText>
+                    </MudStack>
+                }
+            }
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Milestones" Loading="_milestonesLoading">
+            <Actions>
+                @if (_milestones is { Count: > 0 })
+                {
+                    <MudChip T="string" Size="Size.Small" Class="ma-0 pf-chip">@_milestones.Count</MudChip>
+                }
+            </Actions>
+            <ChildContent>
+                @if (_milestonesError is not null)
+                {
+                    <CardError Text="@_milestonesError" OnRetry="LoadMilestonesAsync" />
+                }
+                else if (_milestones is null)
+                {
+                    <SkeletonRows Count="3" />
+                }
+                else if (_milestones.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Outlined.Flag" Title="No milestones"
+                                Text="Milestones group tasks towards a target date." />
+                }
+                else
+                {
+                    <MudStack Spacing="3">
+                        @foreach (var milestone in _milestones.Take(MaxMilestones))
+                        {
+                            <MudStack Spacing="1">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.body2" Truncate="true" Class="flex-grow-1">@milestone.Name</MudText>
+                                    <MudText Typo="Typo.caption" Class="pf-muted text-nowrap">@Display.ShortDate(milestone.TargetDate)</MudText>
+                                    <StatusChipView Value="Display.Chip(milestone.Health)" />
+                                </MudStack>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                    <MudProgressLinear Color="Color.Primary" Value="Math.Clamp(milestone.ProgressPercent, 0, 100)"
+                                                       Rounded="true" Size="Size.Small" Class="flex-grow-1" />
+                                    <MudText Typo="Typo.caption" Align="Align.Right" Class="pf-muted pf-percent">
+                                        @milestone.CompletedTasks/@milestone.CountedTasks
+                                    </MudText>
+                                </MudStack>
+                            </MudStack>
+                        }
+                        @if (_milestones.Count > MaxMilestones)
+                        {
+                            <MudText Typo="Typo.caption" Class="pf-muted">and @(_milestones.Count - MaxMilestones) more</MudText>
+                        }
+                    </MudStack>
+                }
+            </ChildContent>
+        </DashboardCard>
+    </MudItem>
+
+    <MudItem xs="12" lg="6">
+        <DashboardCard Title="Top risks" Loading="_risksLoading">
+            @if (_risksError is not null)
+            {
+                <CardError Text="@_risksError" OnRetry="LoadRisksAsync" />
+            }
+            else if (_risks is null)
+            {
+                <SkeletonRows Count="3" />
+            }
+            else if (_risks.Count == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Shield" Title="No open risks"
+                            Text="Open risks with the highest score show up here." />
+            }
+            else
+            {
+                <MudStack Spacing="0">
+                    @foreach (var risk in _risks)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="pf-row">
+                            <div class="pf-risk-level"><StatusChipView Value="Display.Chip(risk.Level)" /></div>
+                            <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                                <MudText Typo="Typo.body2">@risk.Description</MudText>
+                                <MudText Typo="Typo.caption" Class="pf-muted">
+                                    P @risk.Probability × I @risk.Impact · @Display.Name(risk.Owner)
+                                </MudText>
+                            </MudStack>
+                        </MudStack>
+                    }
+                </MudStack>
+            }
+        </DashboardCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private const int MaxMilestones = 5;
+    private const int TopRisks = 3;
+
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the cards again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private readonly CancellationTokenSource _disposed = new();
+
+    private FundingSummary? _funding;
+    private bool _fundingLoading;
+    private string? _fundingError;
+
+    private IReadOnlyList<MilestoneItem>? _milestones;
+    private bool _milestonesLoading;
+    private string? _milestonesError;
+
+    private IReadOnlyList<RiskItem>? _risks;
+    private bool _risksLoading;
+    private string? _risksError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _funding = null;
+            _milestones = null;
+            _risks = null;
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await Task.WhenAll(LoadFundingAsync(), LoadMilestonesAsync(), LoadRisksAsync());
+    }
+
+    private async Task LoadFundingAsync()
+    {
+        _fundingLoading = true;
+        _fundingError = null;
+
+        try
+        {
+            _funding = await FundingService.GetFunding(new GetFundingQuery(Project.Id), _disposed.Token);
+        }
+        catch (Exception exception)
+        {
+            // Nothing to show once the tab is gone.
+            if (!_disposed.IsCancellationRequested)
+                _fundingError = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _fundingLoading = false;
+        }
+    }
+
+    private async Task LoadMilestonesAsync()
+    {
+        _milestonesLoading = true;
+        _milestonesError = null;
+
+        try
+        {
+            var milestones = await MilestoneService.GetMilestones(new GetMilestonesQuery(Project.Id), _disposed.Token);
+            _milestones = milestones.Items;
+        }
+        catch (Exception exception)
+        {
+            // Nothing to show once the tab is gone.
+            if (!_disposed.IsCancellationRequested)
+                _milestonesError = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _milestonesLoading = false;
+        }
+    }
+
+    private async Task LoadRisksAsync()
+    {
+        _risksLoading = true;
+        _risksError = null;
+
+        try
+        {
+            // The API orders the register by score, highest first.
+            var risks = await RiskService.GetRisks(new GetRisksQuery(Project.Id, RiskStatus.Open), _disposed.Token);
+            _risks = risks.Items.Take(TopRisks).ToList();
+        }
+        catch (Exception exception)
+        {
+            // Nothing to show once the tab is gone.
+            if (!_disposed.IsCancellationRequested)
+                _risksError = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _risksLoading = false;
+        }
+    }
+
+    private sealed record Segment(string Label, int Count, string Color);
+
+    private static IEnumerable<Segment> Segments(TaskStatusCounts counts) =>
+    [
+        new("Open", counts.Open, "var(--color-neutral-600)"),
+        new("In progress", counts.InProgress, "var(--color-accent)"),
+        new("Completed", counts.Completed, "var(--color-ok)"),
+        new("Cancelled", counts.Cancelled, "var(--color-neutral-800)"),
+    ];
+
+    private static string StatusSummary(TaskStatusCounts counts) =>
+        string.Join(", ", Segments(counts).Select(s => $"{s.Count} {s.Label.ToLowerInvariant()}"));
+
+    private static string FundingColor(FundingSummary funding) =>
+        funding.IsOverspent ? "var(--color-bad)" : funding.UsedPercent >= 80 ? "var(--color-warn)" : "var(--color-accent)";
+
+    private static string RemainingColor(FundingSummary funding) =>
+        funding.IsOverspent ? "var(--color-bad-text)" : "var(--color-text)";
+
+    private static string Css(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

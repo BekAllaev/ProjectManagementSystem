@@ -1,0 +1,70 @@
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CreateWorkPackage
+@inject IWorkPackageService WorkPackageService
+
+@* Creates a work package. A rule the API rejects keeps the dialog open with the reason, so the input is not lost.
+   Closes with the id of the new work package. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudTextField T="string" @bind-Value="_description" Label="Description" Placeholder="e.g. Contract management"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Enter the description."
+                              MaxLength="1000" AutoFocus="true" Immediate="true" />
+                <TeamMemberSelect ProjectId="ProjectId" @bind-Value="_responsibleId" />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" Disabled="_saving">
+            @(_saving ? "Creating…" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private string? _description;
+    private Guid? _responsibleId;
+    private string? _error;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task CreateAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _responsibleId is not { } responsibleId)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var created = await WorkPackageService.CreateWorkPackage(
+                new CreateWorkPackageCommand(ProjectId, _description!.Trim(), responsibleId));
+            Dialog.Close(DialogResult.Ok(created.Id));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -183,6 +183,48 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-table .pf-right .mud-table-sort-label { justify-content: flex-end; }
 .pf-progress-cell .mud-progress-linear { min-width: 80px; }
 
+.pf-clickable { cursor: pointer; }
+.pf-project-link.mud-link { color: var(--color-text); }
+
+/* — project — */
+
+.pf-tabular { font-variant-numeric: tabular-nums; }
+.pf-nowrap { white-space: nowrap; }
+.pf-project-meta { font-size: 13px; }
+.pf-project-meta > span { display: inline-flex; align-items: center; gap: 6px; }
+.pf-project-meta .mud-icon-root { font-size: 16px; }
+.pf-project-description { color: var(--color-neutral-300); max-width: 720px; text-wrap: pretty; }
+
+/* The tabs of the design are a row of text buttons on a hairline, the current one in the accent with a 2px line. */
+.pf-tabs .mud-tabs-tabbar { background: transparent; box-shadow: inset 0 -1px 0 var(--color-neutral-800); }
+.pf-tabs .mud-tab { text-transform: none; font-size: 14px; font-weight: 400; min-width: 0 !important; width: auto; padding: 10px 14px; color: var(--color-neutral-300); }
+.pf-tabs .mud-tab:hover { color: var(--color-text); background: transparent; }
+.pf-tabs .mud-tab.mud-tab-active { color: var(--color-accent); }
+
+.pf-status-bar { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; }
+.pf-status-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.pf-swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.pf-legend-label { color: var(--color-neutral-300); }
+
+.pf-funding-big { letter-spacing: -0.02em; }
+.pf-meter { height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
+.pf-meter > div { height: 100%; transition: width .6s; }
+.pf-warn { color: var(--color-warn) !important; }
+.pf-risk-level { width: 72px; flex: none; }
+.pf-risk-level .mud-chip { width: 100%; justify-content: center; }
+
+.pf-pending { color: var(--color-accent-300) !important; }
+.pf-caret-cell.mud-table-cell { padding-right: 0; }
+.pf-wp-tasks-cell { padding: 4px 16px 12px 0; border-bottom: 1px solid var(--color-neutral-800); }
+.pf-wp-tasks { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: var(--radius-md); background: var(--color-bg); }
+.pf-wp-task { padding: 6px 8px; border-radius: 6px; }
+.pf-wp-task:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+/* Below the breakpoint of the table every row is a card: the tasks of a package go full width under it. */
+@media (max-width: 599.98px) {
+    .pf-wp-tasks-row .pf-wp-tasks-spacer { display: none; }
+    .pf-wp-tasks-row .pf-wp-tasks-cell { display: block; width: 100%; padding: 0 12px 12px; }
+}
+
 /* — notifications — */
 
 .pf-notification {
@@ -196,6 +238,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 /* — dialogs — */
 
 .pf-dialog.mud-dialog { background: var(--color-surface); }
+.pf-dialog-text { color: var(--color-neutral-300); text-wrap: pretty; }
 
 /* — sign-in — */
 

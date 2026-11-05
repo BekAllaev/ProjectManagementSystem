@@ -4,6 +4,7 @@
 @using ProjectManagementSystem.Domain.Projects
 @implements IDisposable
 @inject IProjectService ProjectService
+@inject NavigationManager Navigation
 
 <PageTitle>Projects · ProjectFlow</PageTitle>
 
@@ -36,7 +37,8 @@
 }
 
 <MudTable T="ProjectListItem" Items="_projects" Loading="_loading" LoadingProgressColor="Color.Primary" Hover="true"
-          Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table">
+          Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table"
+          OnRowClick="OpenProject" RowClass="pf-clickable">
     <HeaderContent>
         <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.Title" InitialDirection="SortDirection.Ascending">Name</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel T="ProjectListItem" SortBy="p => p.State">Status</MudTableSortLabel></MudTh>
@@ -48,7 +50,7 @@
     <RowTemplate>
         <MudTd DataLabel="Name">
             <MudStack Spacing="0">
-                <MudText Typo="Typo.body2">@context.Title</MudText>
+                <MudLink Href="@($"projects/{context.Id}")" Typo="Typo.body2" Underline="Underline.Hover" Class="pf-project-link">@context.Title</MudLink>
                 @if (!string.IsNullOrWhiteSpace(context.Description))
                 {
                     <MudText Typo="Typo.caption" Class="pf-muted">@context.Description</MudText>
@@ -172,6 +174,12 @@
         }
 
         _loading = false;
+    }
+
+    private void OpenProject(TableRowClickEventArgs<ProjectListItem> args)
+    {
+        if (args.Item is { } project)
+            Navigation.NavigateTo($"projects/{project.Id}");
     }
 
     private static ProjectState? StateOf(StatusFilter status) => status switch
