@@ -1,0 +1,408 @@
+@using ProjectManagementSystem.Application.Employees
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask
+@using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages
+@using ProjectManagementSystem.Domain.WorkPackages
+@implements IDisposable
+@inject IWorkPackageService WorkPackageService
+@inject IProjectService ProjectService
+@inject ISnackbar Snackbar
+
+@* All tasks of a project, filtered by status, work package and responsible person (the API filters). Start and
+   Complete are on the row of a task the caller may change. The read side catches up with a command shortly after it
+   (eventual consistency): until the list shows the change the row says so and the list asks the API again. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+        <MudToggleGroup T="StatusFilter" Value="_status" ValueChanged="StatusChangedAsync" Outlined="true" Delimiters="false"
+                        Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+            @foreach (var option in StatusOptions)
+            {
+                <MudToggleItem Value="option.Filter">
+                    @option.Label <span class="pf-toggle-count">@Count(option.Filter)</span>
+                </MudToggleItem>
+            }
+        </MudToggleGroup>
+        <MudSelect T="Guid?" Value="_workPackageId" ValueChanged="WorkPackageChangedAsync" Label="Work package"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
+                   ToStringFunc="WorkPackageName" AnchorOrigin="Origin.BottomCenter" Class="pf-filter-select flex-grow-0" Style="width:240px">
+            @foreach (var workPackage in _workPackages)
+            {
+                <MudSelectItem T="Guid?" Value="workPackage.Id">@workPackage.Description</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="Guid?" Value="_responsibleId" ValueChanged="ResponsibleChangedAsync" Label="Responsible"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
+                   ToStringFunc="ResponsibleName" AnchorOrigin="Origin.BottomCenter" Class="pf-filter-select flex-grow-0" Style="width:210px">
+            @foreach (var member in _members)
+            {
+                <MudSelectItem T="Guid?" Value="member.Employee.Id">@Display.Name(member.Employee)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSpacer />
+        @if (_pending.Count > 0)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+                <MudText Typo="Typo.caption">Updating…</MudText>
+            </MudStack>
+        }
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The tasks could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    <MudTable T="TaskListItem" Items="@(_tasks ?? Array.Empty<TaskListItem>())" Loading="_loading && _tasks is null"
+              LoadingProgressColor="Color.Primary" Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm"
+              Class="pf-table">
+        <HeaderContent>
+            <MudTh>Task</MudTh>
+            <MudTh>Work package</MudTh>
+            <MudTh>Responsible</MudTh>
+            <MudTh Class="pf-right">Est.</MudTh>
+            <MudTh Class="pf-right">Logged</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width:120px"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Task">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.body2">@context.Name</MudText>
+                    @if (context.HasUnfinishedFinishToStartPredecessor)
+                    {
+                        <MudTooltip Text="A finish-to-start predecessor is not completed yet">
+                            <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" Class="pf-warn" aria-label="Predecessor not finished" />
+                        </MudTooltip>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Work package"><MudText Typo="Typo.body2" Class="pf-muted">@context.WorkPackageDescription</MudText></MudTd>
+            <MudTd DataLabel="Responsible">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(context.ResponsiblePerson)</MudAvatar>
+                    <MudText Typo="Typo.body2" Class="text-nowrap">@Display.Name(context.ResponsiblePerson)</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Est." Class="pf-right pf-tabular pf-nowrap">@Display.Hours(context.EstimatedEffort)</MudTd>
+            <MudTd DataLabel="Logged" Class="pf-right pf-tabular pf-nowrap">@Display.Hours(context.LoggedHours)</MudTd>
+            <MudTd DataLabel="Status">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <StatusChipView Value="Display.Chip(context.Status)" />
+                    @if (_pending.Contains(context.TaskId))
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd Class="pf-right">
+                @if (context.CanChangeStatus && !_pending.Contains(context.TaskId))
+                {
+                    @if (context.Status == ProjectTaskStatus.Open)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_busy" OnClick="() => StartAsync(context)">Start</MudButton>
+                    }
+                    else if (context.Status == ProjectTaskStatus.InProgress)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_busy" OnClick="() => CompleteAsync(context)">Complete</MudButton>
+                    }
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            @if (IsFiltered)
+            {
+                <MudStack Spacing="2" AlignItems="AlignItems.Start">
+                    <EmptyState Icon="@Icons.Material.Outlined.Checklist" Title="No tasks match these filters"
+                                Text="Try another status, work package or responsible person." />
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ClearFiltersAsync">Clear filters</MudButton>
+                </MudStack>
+            }
+            else
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Checklist" Title="No tasks yet"
+                            Text="Tasks are planned in the work packages of the project." />
+            }
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading tasks…</MudText>
+        </LoadingContent>
+    </MudTable>
+</MudStack>
+
+@code {
+    /// <summary>
+    /// How often, and how far apart, the list is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private enum StatusFilter
+    {
+        All,
+        Open,
+        InProgress,
+        Completed,
+        Cancelled,
+    }
+
+    private static readonly (StatusFilter Filter, string Label)[] StatusOptions =
+    [
+        (StatusFilter.All, "All"),
+        (StatusFilter.Open, "Open"),
+        (StatusFilter.InProgress, "In progress"),
+        (StatusFilter.Completed, "Completed"),
+        (StatusFilter.Cancelled, "Cancelled"),
+    ];
+
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the list again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    /// <summary>
+    /// A command changed a task; the page reloads its header (progress, counts).
+    /// </summary>
+    [Parameter]
+    public EventCallback Changed { get; set; }
+
+    private readonly CancellationTokenSource _disposed = new();
+    private readonly HashSet<Guid> _pending = [];
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<TaskListItem>? _tasks;
+    private TaskStatusCounts? _counts;
+    private IReadOnlyList<WorkPackageListItem> _workPackages = [];
+    private IReadOnlyList<TeamMemberItem> _members = [];
+    private StatusFilter _status = StatusFilter.All;
+    private Guid? _workPackageId;
+    private Guid? _responsibleId;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private CancellationTokenSource? _load;
+
+    private bool IsFiltered => _status != StatusFilter.All || _workPackageId is not null || _responsibleId is not null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _tasks = null;
+            _counts = null;
+            _status = StatusFilter.All;
+            _workPackageId = null;
+            _responsibleId = null;
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await Task.WhenAll(LoadAsync(), LoadFilterOptionsAsync());
+    }
+
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = CancellationTokenSource.CreateLinkedTokenSource(_disposed.Token);
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var tasks = await WorkPackageService.GetTasks(
+                new GetTasksQuery(Project.Id, ToStatus(_status), _workPackageId, _responsibleId), load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _tasks = tasks.Items;
+            _counts = tasks.Counts;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load, or the tab is gone.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+    }
+
+    /// <summary>
+    /// The work packages and the team for the filters. Without them the filters stay empty; the list still works.
+    /// </summary>
+    private async Task LoadFilterOptionsAsync()
+    {
+        try
+        {
+            var workPackages = WorkPackageService.GetWorkPackages(new GetWorkPackagesQuery(Project.Id), _disposed.Token);
+            var team = ProjectService.GetTeam(new GetTeamQuery(Project.Id), _disposed.Token);
+
+            _workPackages = (await workPackages).Items;
+            _members = (await team).Members;
+        }
+        catch (Exception)
+        {
+            // Only the options of the filters are missing.
+        }
+    }
+
+    private static ProjectTaskStatus? ToStatus(StatusFilter filter) => filter switch
+    {
+        StatusFilter.Open => ProjectTaskStatus.Open,
+        StatusFilter.InProgress => ProjectTaskStatus.InProgress,
+        StatusFilter.Completed => ProjectTaskStatus.Completed,
+        StatusFilter.Cancelled => ProjectTaskStatus.Cancelled,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Tasks of the project in a status, without the other filters.
+    /// </summary>
+    private int? Count(StatusFilter filter)
+    {
+        if (_counts is not { } counts)
+            return null;
+
+        return filter switch
+        {
+            StatusFilter.Open => counts.Open,
+            StatusFilter.InProgress => counts.InProgress,
+            StatusFilter.Completed => counts.Completed,
+            StatusFilter.Cancelled => counts.Cancelled,
+            _ => counts.Open + counts.InProgress + counts.Completed + counts.Cancelled,
+        };
+    }
+
+    private string WorkPackageName(Guid? id) =>
+        _workPackages.FirstOrDefault(w => w.Id == id)?.Description ?? string.Empty;
+
+    private string ResponsibleName(Guid? id) =>
+        _members.FirstOrDefault(m => m.Employee.Id == id) is { } member ? Display.Name(member.Employee) : string.Empty;
+
+    private async Task StatusChangedAsync(StatusFilter status)
+    {
+        _status = status;
+        await LoadAsync();
+    }
+
+    private async Task WorkPackageChangedAsync(Guid? workPackageId)
+    {
+        _workPackageId = workPackageId;
+        await LoadAsync();
+    }
+
+    private async Task ResponsibleChangedAsync(Guid? responsibleId)
+    {
+        _responsibleId = responsibleId;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _status = StatusFilter.All;
+        _workPackageId = null;
+        _responsibleId = null;
+        await LoadAsync();
+    }
+
+    private Task StartAsync(TaskListItem task) =>
+        RunAsync(task, () => WorkPackageService.StartTask(new StartTaskCommand(task.WorkPackageId, task.TaskId)),
+            $"Task started: {task.Name}");
+
+    private Task CompleteAsync(TaskListItem task) =>
+        RunAsync(task, () => WorkPackageService.CompleteTask(new CompleteTaskCommand(task.WorkPackageId, task.TaskId)),
+            $"Task completed: {task.Name}");
+
+    /// <summary>
+    /// Sends a command on <paramref name="task"/>; a rule the domain rejects shows as an error and leaves the list as
+    /// it is.
+    /// </summary>
+    private async Task RunAsync(TaskListItem task, Func<Task> command, string success)
+    {
+        _busy = true;
+
+        try
+        {
+            await command();
+            Snackbar.Add(success, Severity.Success);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+            return;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await RefreshAfterAsync(task);
+        await Changed.InvokeAsync();
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until it
+    /// shows a newer version of the work package of <paramref name="task"/> (or the task is filtered out), or gives up
+    /// after a few tries (a later refresh shows it).
+    /// </summary>
+    private async Task RefreshAfterAsync(TaskListItem task)
+    {
+        _pending.Add(task.TaskId);
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _tasks is not { } tasks ||
+                    tasks.FirstOrDefault(t => t.TaskId == task.TaskId) is not { } current || current.Version > task.Version)
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _pending.Remove(task.TaskId);
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+        _load?.Dispose();
+    }
+}

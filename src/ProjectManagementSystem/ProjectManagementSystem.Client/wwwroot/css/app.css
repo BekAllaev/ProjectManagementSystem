@@ -225,6 +225,11 @@ h1[tabindex="-1"]:focus { outline: none; }
     .pf-wp-tasks-row .pf-wp-tasks-cell { display: block; width: 100%; padding: 0 12px 12px; }
 }
 
+.pf-toggle-count { margin-left: 6px; font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.pf-toggle .mud-toggle-item.pf-toggle-selected .pf-toggle-count { color: var(--color-accent-300); }
+.pf-filter-select .mud-input.mud-input-outlined { background: var(--color-surface); }
+.pf-filter-select .mud-input-control { margin-top: 0; }
+
 /* — notifications — */
 
 .pf-notification {
