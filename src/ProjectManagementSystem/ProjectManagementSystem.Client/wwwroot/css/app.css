@@ -230,6 +230,10 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-filter-select .mud-input.mud-input-outlined { background: var(--color-surface); }
 .pf-filter-select .mud-input-control { margin-top: 0; }
 
+.pf-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.pf-dependency-legend { font-size: 12px; }
+.pf-dependency-legend b { font-weight: 500; color: var(--color-neutral-300); }
+
 /* — notifications — */
 
 .pf-notification {
