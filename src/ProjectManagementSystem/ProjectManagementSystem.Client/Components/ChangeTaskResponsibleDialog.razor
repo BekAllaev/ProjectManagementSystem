@@ -1,0 +1,75 @@
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.ChangeTaskResponsible
+@inject IWorkPackageService WorkPackageService
+
+@* Hands a task to another current member of the team. Closes with the name of the new responsible person. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <TeamMemberSelect @ref="_select" ProjectId="ProjectId" Except="CurrentResponsibleId" @bind-Value="_responsibleId"
+                                  Label="New responsible person" />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving…" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid WorkPackageId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid TaskId { get; set; }
+
+    [Parameter]
+    public Guid? CurrentResponsibleId { get; set; }
+
+    private MudForm _form = default!;
+    private TeamMemberSelect _select = default!;
+    private bool _valid;
+    private bool _saving;
+    private Guid? _responsibleId;
+    private string? _error;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _responsibleId is not { } responsibleId)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await WorkPackageService.ChangeTaskResponsible(new ChangeTaskResponsibleCommand(WorkPackageId, TaskId, responsibleId));
+            Dialog.Close(DialogResult.Ok(_select.SelectedName ?? "The new person"));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

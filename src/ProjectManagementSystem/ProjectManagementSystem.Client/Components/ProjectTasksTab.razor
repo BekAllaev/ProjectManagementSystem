@@ -3,6 +3,7 @@
 @using ProjectManagementSystem.Application.Projects.Queries.GetProject
 @using ProjectManagementSystem.Application.Projects.Queries.GetTeam
 @using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CancelTask
 @using ProjectManagementSystem.Application.WorkPackages.Commands.CompleteTask
 @using ProjectManagementSystem.Application.WorkPackages.Commands.StartTask
 @using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks
@@ -15,7 +16,8 @@
 @inject ISnackbar Snackbar
 
 @* All tasks of a project, filtered by status, work package and responsible person (the API filters). New tasks go
-   into an open work package; Start and Complete are on the row of a task the caller may change. The read side catches up with a command shortly after it
+   into an open work package; Start and Complete are on the row of a task the caller may change, the change of the
+   responsible person and Cancel in its menu. The read side catches up with a command shortly after it
    (eventual consistency): until the list shows the change the row says so and the list asks the API again. *@
 
 <MudStack Spacing="3">
@@ -83,6 +85,7 @@
             <MudTh Class="pf-right">Logged</MudTh>
             <MudTh>Status</MudTh>
             <MudTh Style="width:120px"></MudTh>
+            <MudTh Style="width:56px"></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Task">
@@ -125,6 +128,20 @@
                     {
                         <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_busy" OnClick="() => CompleteAsync(context)">Complete</MudButton>
                     }
+                }
+            </MudTd>
+            <MudTd Class="pf-right">
+                @if (IsUnfinished(context) && !_pending.Contains(context.TaskId))
+                {
+                    <MudMenu Icon="@Icons.Material.Rounded.MoreVert" Size="Size.Small" Dense="true"
+                             AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                             Disabled="_busy" aria-label="Actions of the task">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.PersonOutline" OnClick="() => ChangeResponsibleAsync(context)">Change responsible</MudMenuItem>
+                        @if (context.CanChangeStatus)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Block" OnClick="() => CancelAsync(context)">Cancel task</MudMenuItem>
+                        }
+                    </MudMenu>
                 }
             </MudTd>
         </RowTemplate>
@@ -373,6 +390,42 @@
         }
 
         await Changed.InvokeAsync();
+    }
+
+    private static bool IsUnfinished(TaskListItem task) =>
+        task.Status is ProjectTaskStatus.Open or ProjectTaskStatus.InProgress;
+
+    private async Task ChangeResponsibleAsync(TaskListItem task)
+    {
+        var parameters = new DialogParameters<ChangeTaskResponsibleDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.WorkPackageId, task.WorkPackageId },
+            { d => d.TaskId, task.TaskId },
+            { d => d.CurrentResponsibleId, task.ResponsiblePerson.Id },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<ChangeTaskResponsibleDialog>(task.Name, parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string name })
+        {
+            Snackbar.Add($"{name} is now responsible for {task.Name}", Severity.Success);
+            await RefreshAfterAsync(task);
+        }
+    }
+
+    private async Task CancelAsync(TaskListItem task)
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Cancel task?",
+            $"Cancelling \"{task.Name}\" is final. Its dependencies are removed and the responsible persons of its " +
+            "successor tasks are notified.",
+            "Cancel task", danger: true, cancelLabel: "Keep task");
+        if (!confirmed)
+            return;
+
+        await RunAsync(task, () => WorkPackageService.CancelTask(new CancelTaskCommand(task.WorkPackageId, task.TaskId)),
+            $"Task cancelled: {task.Name}");
     }
 
     private Task StartAsync(TaskListItem task) =>
