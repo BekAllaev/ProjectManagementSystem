@@ -107,6 +107,9 @@ else
         <MudTabPanel Text="@Tabs[1].Title">
             <ProjectWorkPackagesTab Project="_project" Reload="_reload" Changed="LoadAsync" />
         </MudTabPanel>
+        <MudTabPanel Text="@Tabs[2].Title">
+            <ProjectTasksTab Project="_project" Reload="_reload" Changed="LoadAsync" />
+        </MudTabPanel>
     </MudTabs>
 }
 
@@ -118,6 +121,7 @@ else
     [
         (null, "Overview"),
         ("work-packages", "Work packages"),
+        ("tasks", "Tasks"),
     ];
 
     [Parameter]
