@@ -1,0 +1,139 @@
+@using ProjectManagementSystem.Application.Schedule
+@using ProjectManagementSystem.Application.Schedule.Commands.AddDependency
+@using ProjectManagementSystem.Application.Schedule.Queries.GetDependencies
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks
+@using ProjectManagementSystem.Domain.Schedule
+@using ProjectManagementSystem.Domain.WorkPackages
+@inject IWorkPackageService WorkPackageService
+@inject IScheduleService ScheduleService
+
+@* Links two tasks of the project. The same task twice and a link that exists already are caught here; a cycle and
+   the other rules of the schedule network come back from the API, which keeps the dialog open with the reason. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid?" @bind-Value="_predecessorId" Label="Predecessor" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Required="true" RequiredError="Choose the predecessor."
+                           Disabled="_tasks is null" ToStringFunc="TaskName" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var task in _tasks ?? [])
+                    {
+                        <MudSelectItem T="Guid?" Value="task.TaskId"><TaskOption Task="task" /></MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="DependencyType" @bind-Value="_type" Label="Type" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           ToStringFunc="TypeName" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var type in Enum.GetValues<DependencyType>())
+                    {
+                        <MudSelectItem T="DependencyType" Value="type">@TypeName(type)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid?" @bind-Value="_successorId" Label="Successor" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Required="true" RequiredError="Choose the successor."
+                           Disabled="_tasks is null" ToStringFunc="TaskName" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var task in _tasks ?? [])
+                    {
+                        <MudSelectItem T="Guid?" Value="task.TaskId"><TaskOption Task="task" /></MudSelectItem>
+                    }
+                </MudSelect>
+                <MudText Typo="Typo.caption" Class="pf-muted">
+                    Tasks of any work package in this project can be linked. Cancelled tasks are not listed.
+                </MudText>
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAsync" Disabled="_saving || _tasks is null">
+            @(_saving ? "Adding…" : "Add dependency")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>
+    /// The dependencies of the project as the tab shows them, to catch a link that exists already.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<DependencyItem> Existing { get; set; } = [];
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private IReadOnlyList<TaskListItem>? _tasks;
+    private Guid? _predecessorId;
+    private Guid? _successorId;
+    private DependencyType _type = DependencyType.FinishToStart;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tasks = await WorkPackageService.GetTasks(new GetTasksQuery(ProjectId, null, null, null));
+            _tasks = tasks.Items.Where(t => t.Status != ProjectTaskStatus.Cancelled).ToList();
+            if (_tasks.Count < 2)
+                _error = "The project needs at least two tasks that are not cancelled.";
+        }
+        catch (Exception exception)
+        {
+            _error = $"The tasks could not be loaded. {GrpcErrors.Describe(exception)}";
+        }
+    }
+
+    private string TaskName(Guid? id) => _tasks?.FirstOrDefault(t => t.TaskId == id)?.Name ?? string.Empty;
+
+    private static string TypeName(DependencyType type) => $"{Display.Code(type)} · {Display.Name(type)}";
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task AddAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _tasks is null ||
+            _tasks.FirstOrDefault(t => t.TaskId == _predecessorId) is not { } predecessor ||
+            _tasks.FirstOrDefault(t => t.TaskId == _successorId) is not { } successor)
+            return;
+
+        if (predecessor.TaskId == successor.TaskId)
+        {
+            _error = "A task can't depend on itself. Pick two different tasks.";
+            return;
+        }
+
+        if (Existing.Any(d => d.Predecessor.TaskId == predecessor.TaskId && d.Successor.TaskId == successor.TaskId))
+        {
+            _error = $"\"{predecessor.Name}\" is already a predecessor of \"{successor.Name}\".";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await ScheduleService.AddDependency(new AddDependencyCommand(
+                ProjectId, predecessor.WorkPackageId, predecessor.TaskId, successor.WorkPackageId, successor.TaskId, _type));
+            Dialog.Close(DialogResult.Ok($"{predecessor.Name} → {successor.Name} · {Display.Code(_type)}"));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
