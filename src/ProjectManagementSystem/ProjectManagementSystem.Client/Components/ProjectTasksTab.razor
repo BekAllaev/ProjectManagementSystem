@@ -31,37 +31,45 @@
                 </MudToggleItem>
             }
         </MudToggleGroup>
-        <MudSelect T="Guid?" Value="_workPackageId" ValueChanged="WorkPackageChangedAsync" Label="Work package"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
-                   ToStringFunc="WorkPackageName" AnchorOrigin="Origin.BottomCenter" Class="pf-filter-select flex-grow-0" Style="width:240px">
-            @foreach (var workPackage in _workPackages)
+        @* MudSelect puts Class and Style on its inner input, not on the element in the row, so the width is set on a
+           wrapper. *@
+        <div class="pf-filter-select" style="width:240px">
+            <MudSelect T="Guid?" Value="_workPackageId" ValueChanged="WorkPackageChangedAsync" Label="Work package"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
+                       ToStringFunc="WorkPackageName" AnchorOrigin="Origin.BottomCenter" FullWidth="true">
+                @foreach (var workPackage in _workPackages)
+                {
+                    <MudSelectItem T="Guid?" Value="workPackage.Id">@workPackage.Description</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div class="pf-filter-select" style="width:210px">
+            <MudSelect T="Guid?" Value="_responsibleId" ValueChanged="ResponsibleChangedAsync" Label="Responsible"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
+                       ToStringFunc="ResponsibleName" AnchorOrigin="Origin.BottomCenter" FullWidth="true">
+                @foreach (var member in _members)
+                {
+                    <MudSelectItem T="Guid?" Value="member.Employee.Id">@Display.Name(member.Employee)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        @* On the right, also when the row wraps. *@
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="ml-auto">
+            @if (_pending.Count > 0 || _waitingForNew)
             {
-                <MudSelectItem T="Guid?" Value="workPackage.Id">@workPackage.Description</MudSelectItem>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+                    <MudText Typo="Typo.caption">@(_waitingForNew ? "Adding the new task…" : "Updating…")</MudText>
+                </MudStack>
             }
-        </MudSelect>
-        <MudSelect T="Guid?" Value="_responsibleId" ValueChanged="ResponsibleChangedAsync" Label="Responsible"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
-                   ToStringFunc="ResponsibleName" AnchorOrigin="Origin.BottomCenter" Class="pf-filter-select flex-grow-0" Style="width:210px">
-            @foreach (var member in _members)
+            @if (OpenWorkPackages.Count > 0)
             {
-                <MudSelectItem T="Guid?" Value="member.Employee.Id">@Display.Name(member.Employee)</MudSelectItem>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                           OnClick="NewTaskAsync" Class="pf-submit">
+                    New task
+                </MudButton>
             }
-        </MudSelect>
-        <MudSpacer />
-        @if (_pending.Count > 0 || _waitingForNew)
-        {
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
-                <MudText Typo="Typo.caption">@(_waitingForNew ? "Adding the new task…" : "Updating…")</MudText>
-            </MudStack>
-        }
-        @if (OpenWorkPackages.Count > 0)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
-                       OnClick="NewTaskAsync" Class="pf-submit">
-                New task
-            </MudButton>
-        }
+        </MudStack>
     </MudStack>
 
     @if (_error is not null)
