@@ -11,10 +11,11 @@
 @implements IDisposable
 @inject IWorkPackageService WorkPackageService
 @inject IProjectService ProjectService
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-@* All tasks of a project, filtered by status, work package and responsible person (the API filters). Start and
-   Complete are on the row of a task the caller may change. The read side catches up with a command shortly after it
+@* All tasks of a project, filtered by status, work package and responsible person (the API filters). New tasks go
+   into an open work package; Start and Complete are on the row of a task the caller may change. The read side catches up with a command shortly after it
    (eventual consistency): until the list shows the change the row says so and the list asks the API again. *@
 
 <MudStack Spacing="3">
@@ -45,12 +46,19 @@
             }
         </MudSelect>
         <MudSpacer />
-        @if (_pending.Count > 0)
+        @if (_pending.Count > 0 || _waitingForNew)
         {
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
                 <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
-                <MudText Typo="Typo.caption">Updating…</MudText>
+                <MudText Typo="Typo.caption">@(_waitingForNew ? "Adding the new task…" : "Updating…")</MudText>
             </MudStack>
+        }
+        @if (OpenWorkPackages.Count > 0)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="NewTaskAsync" Class="pf-submit">
+                New task
+            </MudButton>
         }
     </MudStack>
 
@@ -132,7 +140,7 @@
             else
             {
                 <EmptyState Icon="@Icons.Material.Outlined.Checklist" Title="No tasks yet"
-                            Text="Tasks are planned in the work packages of the project." />
+                            Text="@(OpenWorkPackages.Count > 0 ? "Add the first task to an open work package." : "Tasks are added to open work packages; create a work package first.")" />
             }
         </NoRecordsContent>
         <LoadingContent>
@@ -196,7 +204,11 @@
     private bool _loading;
     private bool _busy;
     private string? _error;
+    private bool _waitingForNew;
     private CancellationTokenSource? _load;
+
+    private IReadOnlyList<WorkPackageListItem> OpenWorkPackages =>
+        _workPackages.Where(w => w.Status == WorkPackageStatus.Open).ToList();
 
     private bool IsFiltered => _status != StatusFilter.All || _workPackageId is not null || _responsibleId is not null;
 
@@ -330,6 +342,39 @@
         await LoadAsync();
     }
 
+    private async Task NewTaskAsync()
+    {
+        var parameters = new DialogParameters<NewTaskDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.WorkPackages, OpenWorkPackages },
+            { d => d.WorkPackageId, _workPackageId },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<NewTaskDialog>("New task", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not { Canceled: false, Data: Guid })
+            return;
+
+        Snackbar.Add("Task created. It appears in the list in a moment.", Severity.Success);
+
+        // The counts are of the whole project, so they show the new task also when the filters hide it.
+        var total = Count(StatusFilter.All) ?? 0;
+        _waitingForNew = true;
+
+        try
+        {
+            await RefreshUntilAsync(() => Count(StatusFilter.All) > total);
+        }
+        finally
+        {
+            _waitingForNew = false;
+        }
+
+        await Changed.InvokeAsync();
+    }
+
     private Task StartAsync(TaskListItem task) =>
         RunAsync(task, () => WorkPackageService.StartTask(new StartTaskCommand(task.WorkPackageId, task.TaskId)),
             $"Task started: {task.Name}");
@@ -366,13 +411,30 @@
     }
 
     /// <summary>
-    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until it
-    /// shows a newer version of the work package of <paramref name="task"/> (or the task is filtered out), or gives up
-    /// after a few tries (a later refresh shows it).
+    /// Refreshes after a command on <paramref name="task"/> until the list shows a newer version of its work package
+    /// (or the task is filtered out).
     /// </summary>
     private async Task RefreshAfterAsync(TaskListItem task)
     {
         _pending.Add(task.TaskId);
+
+        try
+        {
+            await RefreshUntilAsync(() =>
+                _tasks?.FirstOrDefault(t => t.TaskId == task.TaskId) is not { } current || current.Version > task.Version);
+        }
+        finally
+        {
+            _pending.Remove(task.TaskId);
+        }
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until
+    /// <paramref name="done"/> holds, or gives up after a few tries (a later refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilAsync(Func<bool> done)
+    {
         StateHasChanged();
 
         try
@@ -382,8 +444,7 @@
                 await Task.Delay(RefreshPollInterval, _disposed.Token);
                 await LoadAsync();
 
-                if (_error is not null || _tasks is not { } tasks ||
-                    tasks.FirstOrDefault(t => t.TaskId == task.TaskId) is not { } current || current.Version > task.Version)
+                if (_error is not null || done())
                     return;
 
                 StateHasChanged();
@@ -392,10 +453,6 @@
         catch (OperationCanceledException)
         {
             // The tab is gone.
-        }
-        finally
-        {
-            _pending.Remove(task.TaskId);
         }
     }
 

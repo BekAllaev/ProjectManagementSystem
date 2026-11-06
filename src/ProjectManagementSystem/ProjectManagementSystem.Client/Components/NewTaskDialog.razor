@@ -1,0 +1,109 @@
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Commands.CreateTask
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetWorkPackages
+@inject IWorkPackageService WorkPackageService
+
+@* Creates a task in an open work package. A rule the API rejects keeps the dialog open with the reason, so the input
+   is not lost. Closes with the id of the new task. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid?" @bind-Value="_workPackageId" Label="Work package" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Required="true" RequiredError="Choose the work package."
+                           ToStringFunc="WorkPackageName" AnchorOrigin="Origin.BottomCenter"
+                           HelperText="Tasks are added only to open work packages.">
+                    @foreach (var workPackage in WorkPackages)
+                    {
+                        <MudSelectItem T="Guid?" Value="workPackage.Id">@workPackage.Description</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField T="string" @bind-Value="_name" Label="Name" Placeholder="e.g. Draft the contract template"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Enter the name."
+                              MaxLength="200" AutoFocus="true" Immediate="true" />
+                <MudTextField T="string" @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Lines="3" MaxLength="2000" />
+                <TeamMemberSelect ProjectId="ProjectId" @bind-Value="_responsibleId" />
+                <MudNumericField T="decimal?" @bind-Value="_estimatedEffort" Label="Estimated effort (hours)"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="0.5m"
+                                 Required="true" RequiredError="Enter the estimated effort." />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" Disabled="_saving">
+            @(_saving ? "Creating…" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>
+    /// The open work packages of the project.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<WorkPackageListItem> WorkPackages { get; set; } = [];
+
+    /// <summary>
+    /// Chosen at first, for example the work package the list is filtered by.
+    /// </summary>
+    [Parameter]
+    public Guid? WorkPackageId { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private Guid? _workPackageId;
+    private string? _name;
+    private string? _description;
+    private Guid? _responsibleId;
+    private decimal? _estimatedEffort;
+    private string? _error;
+
+    protected override void OnInitialized() =>
+        _workPackageId = WorkPackages.Any(w => w.Id == WorkPackageId) ? WorkPackageId
+            : WorkPackages.Count == 1 ? WorkPackages[0].Id
+            : null;
+
+    private string WorkPackageName(Guid? id) => WorkPackages.FirstOrDefault(w => w.Id == id)?.Description ?? string.Empty;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task CreateAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _workPackageId is not { } workPackageId || _responsibleId is not { } responsibleId ||
+            _estimatedEffort is not { } estimatedEffort)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var created = await WorkPackageService.CreateTask(new CreateTaskCommand(
+                workPackageId, _name!.Trim(), string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+                responsibleId, estimatedEffort));
+            Dialog.Close(DialogResult.Ok(created.Id));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
