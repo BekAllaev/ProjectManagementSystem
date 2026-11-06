@@ -11,7 +11,7 @@
 @inject NavigationManager Navigation
 
 @* The page of one project: its header (state, dates, progress, start and close) and the tabs. Every tab has its own
-   address, /projects/{id} for the overview and /projects/{id}/work-packages for the work packages, so a tab can be
+   address, /projects/{id} for the overview and /projects/{id}/{tab} for the others (see Tabs), so a tab can be
    linked to and survives a reload. *@
 
 <PageTitle>@(_project?.Title ?? "Project") · ProjectFlow</PageTitle>
@@ -101,17 +101,24 @@ else
     <MudTabs ActivePanelIndex="ActiveIndex" ActivePanelIndexChanged="SelectTab" Elevation="0" Rounded="false"
              ApplyEffectsToContainer="false" Color="Color.Transparent" SliderColor="Color.Primary"
              Class="pf-tabs" TabPanelsClass="pt-4">
-        <MudTabPanel Text="Overview">
+        <MudTabPanel Text="@Tabs[0].Title">
             <ProjectOverviewTab Project="_project" Reload="_reload" />
         </MudTabPanel>
-        <MudTabPanel Text="Work packages">
+        <MudTabPanel Text="@Tabs[1].Title">
             <ProjectWorkPackagesTab Project="_project" Reload="_reload" Changed="LoadAsync" />
         </MudTabPanel>
     </MudTabs>
 }
 
 @code {
-    private const string WorkPackagesTab = "work-packages";
+    /// <summary>
+    /// The tabs in their order: the segment of the address (null for the overview, at /projects/{id}) and the title.
+    /// </summary>
+    private static readonly (string? Segment, string Title)[] Tabs =
+    [
+        (null, "Overview"),
+        ("work-packages", "Work packages"),
+    ];
 
     [Parameter]
     public Guid ProjectId { get; set; }
@@ -133,7 +140,11 @@ else
 
     private CancellationTokenSource? _load;
 
-    private int ActiveIndex => string.Equals(Tab, WorkPackagesTab, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+    /// <summary>
+    /// The tab of the address; an unknown segment shows the overview.
+    /// </summary>
+    private int ActiveIndex => Math.Max(0,
+        Array.FindIndex(Tabs, t => t.Segment is not null && string.Equals(t.Segment, Tab, StringComparison.OrdinalIgnoreCase)));
 
     protected override async Task OnParametersSetAsync()
     {
@@ -149,7 +160,7 @@ else
     }
 
     private void SelectTab(int index) =>
-        Navigation.NavigateTo(index == 1 ? $"projects/{ProjectId}/{WorkPackagesTab}" : $"projects/{ProjectId}");
+        Navigation.NavigateTo(Tabs[index].Segment is { } segment ? $"projects/{ProjectId}/{segment}" : $"projects/{ProjectId}");
 
     private async Task LoadAsync()
     {
@@ -197,8 +208,8 @@ else
             new(title, href: ActiveIndex == 0 ? null : $"projects/{ProjectId}", disabled: ActiveIndex == 0),
         ];
 
-        if (ActiveIndex == 1)
-            _breadcrumbs.Add(new("Work packages", href: null, disabled: true));
+        if (ActiveIndex != 0)
+            _breadcrumbs.Add(new(Tabs[ActiveIndex].Title, href: null, disabled: true));
     }
 
     private async Task StartAsync()
