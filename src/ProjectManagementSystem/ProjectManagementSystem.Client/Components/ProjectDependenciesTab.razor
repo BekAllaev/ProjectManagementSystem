@@ -1,0 +1,202 @@
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.Schedule
+@using ProjectManagementSystem.Application.Schedule.Queries.GetDependencies
+@using ProjectManagementSystem.Domain.WorkPackages
+@implements IDisposable
+@inject IScheduleService ScheduleService
+
+@* Dependencies between the tasks of a project: predecessor, type and successor, with a warning where a finish-to-start
+   predecessor is not completed while its successor is not finished. Filters (all, warnings, across work packages) are
+   on the list the API returns. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+        <MudToggleGroup T="DependencyFilter" @bind-Value="_filter" Outlined="true" Delimiters="false"
+                        Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+            @foreach (var option in FilterOptions)
+            {
+                <MudToggleItem Value="option.Filter">
+                    @option.Label <span class="pf-toggle-count">@Matching(option.Filter).Count()</span>
+                </MudToggleItem>
+            }
+        </MudToggleGroup>
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The dependencies could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    <MudTable T="DependencyItem" Items="@Matching(_filter)" Loading="_loading && _dependencies is null"
+              LoadingProgressColor="Color.Primary" Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm"
+              Class="pf-table">
+        <HeaderContent>
+            <MudTh>Predecessor</MudTh>
+            <MudTh Style="width:190px">Type</MudTh>
+            <MudTh>Successor</MudTh>
+            <MudTh>Schedule</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Predecessor"><DependencyTaskView Task="context.Predecessor" /></MudTd>
+            <MudTd DataLabel="Type">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Rounded.ArrowForward" Size="Size.Small" Class="pf-muted" />
+                    <MudTooltip Text="@Display.Name(context.Type)">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Class="ma-0 pf-chip pf-code">@Display.Code(context.Type)</MudChip>
+                    </MudTooltip>
+                    <MudText Typo="Typo.caption" Class="pf-muted pf-nowrap">@Display.Arrow(context.Type)</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Successor">
+                <DependencyTaskView Task="context.Successor" Note="@(context.IsAcrossWorkPackages ? "other package" : null)" />
+            </MudTd>
+            <MudTd DataLabel="Schedule">
+                @if (context.HasWarning)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="pf-warn">
+                        <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Class="pf-nowrap">Predecessor not finished</MudText>
+                    </MudStack>
+                }
+                else
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="pf-muted">
+                        <MudIcon Icon="@Icons.Material.Rounded.Check" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Class="pf-nowrap">@(context.Successor.Status == ProjectTaskStatus.Completed ? "Done" : "On track")</MudText>
+                    </MudStack>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            @if (_dependencies is { Count: > 0 })
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.AccountTree" Title="No dependencies match this filter" Text="Pick another filter above." />
+            }
+            else
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.AccountTree" Title="No dependencies yet"
+                            Text="Link tasks to describe the order they must happen in." />
+            }
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading dependencies…</MudText>
+        </LoadingContent>
+    </MudTable>
+
+    <MudStack Row="true" Spacing="4" Wrap="Wrap.Wrap" Class="pf-muted pf-dependency-legend">
+        <span><b>FS</b> finish-to-start</span>
+        <span><b>SS</b> start-to-start</span>
+        <span><b>FF</b> finish-to-finish</span>
+        <span><b>SF</b> start-to-finish</span>
+        <span>Cancelling a task removes its dependencies.</span>
+    </MudStack>
+</MudStack>
+
+@code {
+    private enum DependencyFilter
+    {
+        All,
+        Warnings,
+        AcrossWorkPackages,
+    }
+
+    private static readonly (DependencyFilter Filter, string Label)[] FilterOptions =
+    [
+        (DependencyFilter.All, "All"),
+        (DependencyFilter.Warnings, "Warnings"),
+        (DependencyFilter.AcrossWorkPackages, "Across packages"),
+    ];
+
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the list again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<DependencyItem>? _dependencies;
+    private DependencyFilter _filter = DependencyFilter.All;
+    private bool _loading;
+    private string? _error;
+
+    private string Summary
+    {
+        get
+        {
+            if (_dependencies is not { } dependencies)
+                return "Loading dependencies…";
+
+            var across = dependencies.Count(d => d.IsAcrossWorkPackages);
+            var warnings = dependencies.Count(d => d.HasWarning);
+
+            return $"{Plural(dependencies.Count, "dependency", "dependencies")} · {across} across work packages · " +
+                   (warnings == 0 ? "no schedule warnings" : $"{warnings} with an unfinished FS predecessor");
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _dependencies = null;
+            _filter = DependencyFilter.All;
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var dependencies = await ScheduleService.GetDependencies(new GetDependenciesQuery(Project.Id), _disposed.Token);
+            _dependencies = dependencies.Items;
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<DependencyItem> Matching(DependencyFilter filter) =>
+        (_dependencies ?? []).Where(d => filter switch
+        {
+            DependencyFilter.Warnings => d.HasWarning,
+            DependencyFilter.AcrossWorkPackages => d.IsAcrossWorkPackages,
+            _ => true,
+        });
+
+    private static string Plural(int count, string one, string many) => count == 1 ? $"1 {one}" : $"{count} {many}";
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

@@ -1,0 +1,21 @@
+@using ProjectManagementSystem.Application.Schedule.Queries.GetDependencies
+
+@* One end of a dependency: the task, its work package and its status. *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+    <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+        <MudText Typo="Typo.body2">@Task.Name</MudText>
+        <MudText Typo="Typo.caption" Class="pf-muted">@Task.WorkPackageDescription@(Note is null ? null : $" · {Note}")</MudText>
+    </MudStack>
+    <StatusChipView Value="Display.Chip(Task.Status)" />
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public DependencyTaskItem Task { get; set; } = default!;
+
+    /// <summary>
+    /// Shown after the work package, for example that it is another package than the one of the predecessor.
+    /// </summary>
+    [Parameter]
+    public string? Note { get; set; }
+}

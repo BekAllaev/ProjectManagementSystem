@@ -4,6 +4,7 @@ using ProjectManagementSystem.Application.Employees;
 using ProjectManagementSystem.Application.Milestones;
 using ProjectManagementSystem.Domain.Projects;
 using ProjectManagementSystem.Domain.Risks;
+using ProjectManagementSystem.Domain.Schedule;
 using ProjectManagementSystem.Domain.WorkPackages;
 
 namespace ProjectManagementSystem.Client.Formatting;
@@ -114,6 +115,39 @@ public static class Display
         ProjectTaskStatus.Completed => new("Completed", Color.Success),
         ProjectTaskStatus.Cancelled => new("Cancelled", Color.Default, Variant.Outlined),
         _ => new(status.ToString(), Color.Default),
+    };
+
+    /// <summary>
+    /// Short code of a dependency type: FS, SS, FF or SF.
+    /// </summary>
+    public static string Code(DependencyType type) => type switch
+    {
+        DependencyType.FinishToStart => "FS",
+        DependencyType.StartToStart => "SS",
+        DependencyType.FinishToFinish => "FF",
+        DependencyType.StartToFinish => "SF",
+        _ => type.ToString(),
+    };
+
+    /// <summary>
+    /// What the predecessor and the successor of a dependency type wait for, e.g. "Finish → start".
+    /// </summary>
+    public static string Arrow(DependencyType type) => type switch
+    {
+        DependencyType.FinishToStart => "Finish → start",
+        DependencyType.StartToStart => "Start → start",
+        DependencyType.FinishToFinish => "Finish → finish",
+        DependencyType.StartToFinish => "Start → finish",
+        _ => type.ToString(),
+    };
+
+    public static string Name(DependencyType type) => type switch
+    {
+        DependencyType.FinishToStart => "Finish-to-start",
+        DependencyType.StartToStart => "Start-to-start",
+        DependencyType.FinishToFinish => "Finish-to-finish",
+        DependencyType.StartToFinish => "Start-to-finish",
+        _ => type.ToString(),
     };
 
     public static StatusChip Chip(ProjectState state) => state switch
