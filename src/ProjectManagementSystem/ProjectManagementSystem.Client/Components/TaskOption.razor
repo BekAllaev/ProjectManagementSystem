@@ -1,0 +1,12 @@
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks
+
+@* A task in a list to pick from: its name over its work package. *@
+<MudStack Spacing="0">
+    <MudText Typo="Typo.body2">@Task.Name</MudText>
+    <MudText Typo="Typo.caption" Class="pf-muted">@Task.WorkPackageDescription</MudText>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskListItem Task { get; set; } = default!;
+}

@@ -1,13 +1,18 @@
 @using ProjectManagementSystem.Application.Projects.Queries.GetProject
 @using ProjectManagementSystem.Application.Schedule
+@using ProjectManagementSystem.Application.Schedule.Commands.RemoveDependency
 @using ProjectManagementSystem.Application.Schedule.Queries.GetDependencies
 @using ProjectManagementSystem.Domain.WorkPackages
 @implements IDisposable
 @inject IScheduleService ScheduleService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @* Dependencies between the tasks of a project: predecessor, type and successor, with a warning where a finish-to-start
    predecessor is not completed while its successor is not finished. Filters (all, warnings, across work packages) are
-   on the list the API returns. *@
+   on the list the API returns. Dependencies are added and removed while the project is open; the read side catches up
+   with a command shortly after it (eventual consistency), so the list asks again until it shows a newer version of
+   the schedule network. *@
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
@@ -21,7 +26,22 @@
                 </MudToggleItem>
             }
         </MudToggleGroup>
+        @if (Project.IsOpen)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="AddAsync" Disabled="_busy || _dependencies is null" Class="pf-submit">
+                Add dependency
+            </MudButton>
+        }
     </MudStack>
+
+    @if (_updating)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">Updating the dependencies…</MudText>
+        </MudStack>
+    }
 
     @if (_error is not null)
     {
@@ -41,6 +61,10 @@
             <MudTh Style="width:190px">Type</MudTh>
             <MudTh>Successor</MudTh>
             <MudTh>Schedule</MudTh>
+            @if (Project.IsOpen)
+            {
+                <MudTh Style="width:56px"></MudTh>
+            }
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Predecessor"><DependencyTaskView Task="context.Predecessor" /></MudTd>
@@ -72,6 +96,15 @@
                     </MudStack>
                 }
             </MudTd>
+            @if (Project.IsOpen)
+            {
+                <MudTd Class="pf-right">
+                    <MudTooltip Text="Remove dependency">
+                        <MudIconButton Icon="@Icons.Material.Outlined.LinkOff" Size="Size.Small" Disabled="_busy"
+                                       OnClick="() => RemoveAsync(context)" aria-label="Remove dependency" />
+                    </MudTooltip>
+                </MudTd>
+            }
         </RowTemplate>
         <NoRecordsContent>
             @if (_dependencies is { Count: > 0 })
@@ -81,7 +114,7 @@
             else
             {
                 <EmptyState Icon="@Icons.Material.Outlined.AccountTree" Title="No dependencies yet"
-                            Text="Link tasks to describe the order they must happen in." />
+                            Text="@(Project.IsOpen ? "Link tasks to describe the order they must happen in." : "The project is closed; no dependencies can be added.")" />
             }
         </NoRecordsContent>
         <LoadingContent>
@@ -122,11 +155,20 @@
     [Parameter]
     public int Reload { get; set; }
 
+    /// <summary>
+    /// How often, and how far apart, the list is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
     private readonly CancellationTokenSource _disposed = new();
 
     private Guid _loadedId;
     private int _loadedReload = -1;
     private IReadOnlyList<DependencyItem>? _dependencies;
+    private long _version;
+    private bool _busy;
+    private bool _updating;
     private DependencyFilter _filter = DependencyFilter.All;
     private bool _loading;
     private string? _error;
@@ -172,6 +214,7 @@
         {
             var dependencies = await ScheduleService.GetDependencies(new GetDependenciesQuery(Project.Id), _disposed.Token);
             _dependencies = dependencies.Items;
+            _version = dependencies.Version;
         }
         catch (Exception exception)
         {
@@ -191,6 +234,88 @@
             DependencyFilter.AcrossWorkPackages => d.IsAcrossWorkPackages,
             _ => true,
         });
+
+    private async Task AddAsync()
+    {
+        var parameters = new DialogParameters<AddDependencyDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Existing, _dependencies ?? [] },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<AddDependencyDialog>("Add dependency", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string link })
+        {
+            Snackbar.Add($"Dependency added: {link}", Severity.Success);
+            await RefreshUntilNewerAsync(_version);
+        }
+    }
+
+    private async Task RemoveAsync(DependencyItem dependency)
+    {
+        var link = $"{dependency.Predecessor.Name} → {dependency.Successor.Name}";
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Remove dependency?",
+            $"{link}. The tasks stay as they are. Only the link between them is removed.",
+            "Remove", danger: true);
+        if (!confirmed)
+            return;
+
+        _busy = true;
+        var version = _version;
+
+        try
+        {
+            await ScheduleService.RemoveDependency(
+                new RemoveDependencyCommand(Project.Id, dependency.Predecessor.TaskId, dependency.Successor.TaskId));
+            Snackbar.Add($"Dependency removed: {link}", Severity.Success);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+            return;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await RefreshUntilNewerAsync(version);
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until it
+    /// shows a newer version of the schedule network than <paramref name="version"/>, or gives up after a few tries (a
+    /// later refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilNewerAsync(long version)
+    {
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _version > version)
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _updating = false;
+        }
+    }
 
     private static string Plural(int count, string one, string many) => count == 1 ? $"1 {one}" : $"{count} {many}";
 
