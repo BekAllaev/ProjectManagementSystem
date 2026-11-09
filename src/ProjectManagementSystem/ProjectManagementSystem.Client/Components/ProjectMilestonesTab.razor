@@ -1,20 +1,45 @@
 @using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Commands.CompleteMilestone
+@using ProjectManagementSystem.Application.Milestones.Commands.DeleteMilestone
+@using ProjectManagementSystem.Application.Milestones.Commands.RemoveTaskFromMilestone
 @using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
 @using ProjectManagementSystem.Application.Projects.Queries.GetProject
 @using ProjectManagementSystem.Domain.Milestones
 @using ProjectManagementSystem.Domain.WorkPackages
 @implements IDisposable
 @inject IMilestoneService MilestoneService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @* The milestones of a project: a timeline of their target dates and today, then a card per milestone, ordered by
    target date, with its state, progress (cancelled tasks are not counted) and its tasks. A note on a card tells why
    a milestone needs attention: it is late, it was completed with unfinished tasks, it is empty, or it is completed
-   and so frozen. *@
+   and so frozen.
+
+   While the project is open milestones are created and tasks added to them. An open milestone is renamed, moved to
+   another target date, completed and its tasks removed; a completed one is frozen. Any milestone can be deleted. The
+   read side catches up with a command shortly after it (eventual consistency), so the tab asks again until it shows
+   the change. *@
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
         <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+        @if (Project.IsOpen)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                       OnClick="CreateAsync" Disabled="_busy || _milestones is null" Class="pf-submit">
+                New milestone
+            </MudButton>
+        }
     </MudStack>
+
+    @if (_updating)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">Updating the milestones…</MudText>
+        </MudStack>
+    }
 
     @if (_error is not null)
     {
@@ -55,22 +80,43 @@
             @foreach (var milestone in _milestones)
             {
                 var note = Note(milestone);
+                var open = milestone.Status == MilestoneStatus.Open;
 
                 <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-3">
-                    <MudStack Spacing="1">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
-                            <MudText Typo="Typo.h6">@milestone.Name</MudText>
-                            <StatusChipView Value="Display.Chip(milestone.Health)" />
+                    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                        <MudStack Spacing="1" Class="flex-grow-1" Style="min-width:0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                                <MudText Typo="Typo.h6">@milestone.Name</MudText>
+                                <StatusChipView Value="Display.Chip(milestone.Health)" />
+                            </MudStack>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1"
+                                      Class="@(milestone.Health == MilestoneHealth.Late ? "pf-bad pf-ms-date" : "pf-muted pf-ms-date")">
+                                <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
+                                <span>Target @Display.ShortDate(milestone.TargetDate)</span>
+                                @if (milestone.CompletedAt is { } completedAt)
+                                {
+                                    <span class="pf-muted">· completed @Display.ShortDate(completedAt)</span>
+                                }
+                            </MudStack>
                         </MudStack>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1"
-                                  Class="@(milestone.Health == MilestoneHealth.Late ? "pf-bad pf-ms-date" : "pf-muted pf-ms-date")">
-                            <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
-                            <span>Target @Display.ShortDate(milestone.TargetDate)</span>
-                            @if (milestone.CompletedAt is { } completedAt)
+                        @if (open)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Outlined.CheckCircleOutline" Disabled="_busy"
+                                       OnClick="() => CompleteAsync(milestone)">
+                                Complete
+                            </MudButton>
+                        }
+                        <MudMenu Icon="@Icons.Material.Rounded.MoreVert" Size="Size.Small" Dense="true"
+                                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                 Disabled="_busy" aria-label="Actions of the milestone">
+                            @if (open)
                             {
-                                <span class="pf-muted">· completed @Display.ShortDate(completedAt)</span>
+                                <MudMenuItem Icon="@Icons.Material.Outlined.EditCalendar" OnClick="() => EditAsync(milestone, MilestoneDialogMode.ChangeTargetDate)">Change target date</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => EditAsync(milestone, MilestoneDialogMode.Rename)">Rename</MudMenuItem>
                             }
-                        </MudStack>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteAsync(milestone)" Class="pf-danger">Delete milestone</MudMenuItem>
+                        </MudMenu>
                     </MudStack>
 
                     @if (!string.IsNullOrWhiteSpace(milestone.Description))
@@ -108,7 +154,22 @@
                                     </MudText>
                                 </MudStack>
                                 <StatusChipView Value="Display.Chip(task.Status)" />
+                                @if (open)
+                                {
+                                    <MudTooltip Text="Remove from milestone">
+                                        <MudIconButton Icon="@Icons.Material.Rounded.Close" Size="Size.Small" Disabled="_busy"
+                                                       OnClick="() => RemoveTaskAsync(milestone, task)" aria-label="Remove from milestone" />
+                                    </MudTooltip>
+                                }
                             </MudStack>
+                        }
+                        @if (open && Project.IsOpen)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="_busy"
+                                       StartIcon="@Icons.Material.Outlined.Add" Class="align-self-start"
+                                       OnClick="() => AddTaskAsync(milestone)">
+                                Add task
+                            </MudButton>
                         }
                     </div>
                 </MudPaper>
@@ -132,12 +193,22 @@
     [Parameter]
     public int Reload { get; set; }
 
+    /// <summary>
+    /// How often, and how far apart, the list is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
     private readonly CancellationTokenSource _disposed = new();
 
     private Guid _loadedId;
     private int _loadedReload = -1;
     private IReadOnlyList<MilestoneItem>? _milestones;
     private bool _loading;
+    private bool _busy;
+    private bool _updating;
     private string? _error;
 
     private string Summary
@@ -187,6 +258,153 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var parameters = new DialogParameters<MilestoneDialog>
+        {
+            { d => d.Mode, MilestoneDialogMode.Create },
+            { d => d.ProjectId, Project.Id },
+        };
+        var dialog = await DialogService.ShowAsync<MilestoneDialog>("New milestone", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: Guid id })
+        {
+            Snackbar.Add("Milestone created", Severity.Success);
+            await RefreshUntilAsync(milestones => milestones.Any(m => m.Id == id));
+        }
+    }
+
+    private async Task EditAsync(MilestoneItem milestone, MilestoneDialogMode mode)
+    {
+        var parameters = new DialogParameters<MilestoneDialog>
+        {
+            { d => d.Mode, mode },
+            { d => d.Milestone, milestone },
+        };
+        var dialog = await DialogService.ShowAsync<MilestoneDialog>(
+            mode == MilestoneDialogMode.Rename ? "Rename milestone" : "Change target date", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add(mode == MilestoneDialogMode.Rename ? "Milestone renamed" : $"Target date of {milestone.Name} changed",
+                Severity.Success);
+            await RefreshUntilNewerAsync(milestone);
+        }
+    }
+
+    private async Task CompleteAsync(MilestoneItem milestone)
+    {
+        var unfinished = milestone.Tasks.Count(t => t.IsCounted && t.Status != ProjectTaskStatus.Completed);
+        var text = milestone.CountedTasks == 0
+            ? "This milestone has no tasks. It can be completed, but an empty milestone is not considered reached."
+            : "After completion the milestone is frozen: no tasks can be added or removed and the target date can't change." +
+              (unfinished > 0
+                  ? $" {(unfinished == 1 ? "1 task is" : $"{unfinished} tasks are")} not finished, so it will be closed with loose ends."
+                  : string.Empty);
+
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Complete milestone?", $"{milestone.Name}. {text}", "Complete");
+        if (!confirmed)
+            return;
+
+        await RunAsync(() => MilestoneService.CompleteMilestone(new CompleteMilestoneCommand(milestone.Id)),
+            $"Milestone completed: {milestone.Name}", () => RefreshUntilNewerAsync(milestone));
+    }
+
+    private async Task DeleteAsync(MilestoneItem milestone)
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Delete milestone?",
+            $"{milestone.Name}. The tasks stay in their work packages. Only the milestone is deleted.",
+            "Delete", danger: true);
+        if (!confirmed)
+            return;
+
+        await RunAsync(() => MilestoneService.DeleteMilestone(new DeleteMilestoneCommand(milestone.Id)),
+            $"Milestone deleted: {milestone.Name}", () => RefreshUntilAsync(milestones => milestones.All(m => m.Id != milestone.Id)));
+    }
+
+    private async Task AddTaskAsync(MilestoneItem milestone)
+    {
+        var parameters = new DialogParameters<AddTaskToMilestoneDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Milestone, milestone },
+        };
+        var dialog = await DialogService.ShowAsync<AddTaskToMilestoneDialog>("Add task to milestone", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string task })
+        {
+            Snackbar.Add($"Task added: {task} → {milestone.Name}", Severity.Success);
+            await RefreshUntilNewerAsync(milestone);
+        }
+    }
+
+    private Task RemoveTaskAsync(MilestoneItem milestone, MilestoneTaskItem task) =>
+        RunAsync(() => MilestoneService.RemoveTaskFromMilestone(new RemoveTaskFromMilestoneCommand(milestone.Id, task.TaskId)),
+            $"Task removed from {milestone.Name}: {task.Name}", () => RefreshUntilNewerAsync(milestone));
+
+    /// <summary>
+    /// Sends a command of a card; a rule the domain rejects shows as an error and leaves the list as it is.
+    /// </summary>
+    private async Task RunAsync(Func<Task> command, string success, Func<Task> refresh)
+    {
+        _busy = true;
+
+        try
+        {
+            await command();
+            Snackbar.Add(success, Severity.Success);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+            _busy = false;
+            return;
+        }
+
+        await refresh();
+    }
+
+    private Task RefreshUntilNewerAsync(MilestoneItem milestone) =>
+        RefreshUntilAsync(milestones => milestones.FirstOrDefault(m => m.Id == milestone.Id) is not { } current ||
+                                        current.Version > milestone.Version);
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until
+    /// <paramref name="caughtUp"/> holds for it, or gives up after a few tries (a later refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilAsync(Func<IReadOnlyList<MilestoneItem>, bool> caughtUp)
+    {
+        _busy = true;
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _milestones is not null && caughtUp(_milestones))
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _busy = false;
+            _updating = false;
         }
     }
 
