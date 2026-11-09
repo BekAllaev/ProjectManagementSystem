@@ -34,6 +34,18 @@ public static class Display
             : $"{sign}{value} {currency}";
     }
 
+    /// <summary>
+    /// An hourly rate, e.g. "€62.50/h": unlike <see cref="Money"/> it keeps the cents.
+    /// </summary>
+    public static string Rate(decimal amount, string currency)
+    {
+        var value = amount.ToString(amount % 1 == 0 ? "#,0" : "#,0.00", Culture);
+
+        return CurrencySymbols.TryGetValue(currency, out var symbol)
+            ? $"{symbol}{value}/h"
+            : $"{value} {currency}/h";
+    }
+
     public static string Hours(decimal hours) => $"{Math.Round(hours, 2).ToString("#,0.##", Culture)} h";
 
     public static string Date(DateTime date) => date.ToString("dddd, d MMMM yyyy", Culture);
