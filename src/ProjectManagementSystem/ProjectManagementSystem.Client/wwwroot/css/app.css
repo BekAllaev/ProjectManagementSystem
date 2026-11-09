@@ -245,10 +245,11 @@ h1[tabindex="-1"]:focus { outline: none; }
 /* — milestones — */
 
 /* The timeline (see MilestoneTimeline): the track scrolls on narrow screens; the scale is drawn over the timeline. The
-   line of the timeline runs through the middle of its 176px; month labels and "Today" go in the 24px below. */
+   line of the timeline runs through the middle of its height (--pf-ms-h, taller when the far lanes of the labels are
+   used); month labels and "Today" go in the 24px below. */
 .pf-ms-timeline-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
-.pf-ms-timeline-track { position: relative; min-width: 720px; height: 200px; }
-.pf-ms-timeline.mud-timeline { height: 176px; box-sizing: border-box; }
+.pf-ms-timeline-track { position: relative; min-width: 720px; height: calc(var(--pf-ms-h) + 24px); }
+.pf-ms-timeline.mud-timeline { height: var(--pf-ms-h); box-sizing: border-box; }
 .pf-ms-timeline.mud-timeline-horizontal::before { left: 0; background: var(--color-neutral-800); }
 .pf-ms-timeline .mud-timeline-item { padding: 0; width: auto; overflow: visible; }
 /* The dot is centred on the start of its item, which is its date. */
@@ -262,18 +263,22 @@ h1[tabindex="-1"]:focus { outline: none; }
     background: var(--color-surface); box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 .pf-ms-timeline .mud-timeline-item .mud-timeline-item-content { display: flex; flex-direction: column; overflow: visible; }
-.pf-ms-timeline .mud-timeline-item:nth-child(odd) .mud-timeline-item-content { justify-content: flex-end; }
+/* The lane of a label decides its side, instead of the alternation of MudTimeline by odd and even items. A near
+   label is next to the line, a far one at the outer edge. */
+.pf-ms-timeline.mud-timeline.mud-timeline-horizontal .mud-timeline-item.pf-ms-up { flex-direction: column; }
+.pf-ms-timeline.mud-timeline.mud-timeline-horizontal .mud-timeline-item.pf-ms-down { flex-direction: column-reverse; }
+.pf-ms-up .pf-ms-timeline-label:not(.pf-ms-far), .pf-ms-down .pf-ms-timeline-label.pf-ms-far { margin-top: auto; }
 .pf-ms-timeline-label {
     width: max-content; max-width: 220px; transform: translateX(-50%);
     display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px;
 }
 .pf-ms-timeline-label .mud-typography { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .pf-ms-timeline-scale { position: absolute; inset: 0; pointer-events: none; }
-.pf-ms-timeline-tick { position: absolute; top: 82px; width: 1px; height: 12px; background: var(--color-neutral-700); }
-.pf-ms-timeline-month { position: absolute; top: 180px; font-size: 11px; padding-left: 4px; white-space: nowrap; }
+.pf-ms-timeline-tick { position: absolute; top: calc(var(--pf-ms-h) / 2 - 6px); width: 1px; height: 12px; background: var(--color-neutral-700); }
+.pf-ms-timeline-month { position: absolute; top: calc(var(--pf-ms-h) + 4px); font-size: 11px; padding-left: 4px; white-space: nowrap; }
 .pf-ms-timeline-today { position: absolute; top: 16px; bottom: 24px; border-left: 1px dashed var(--color-accent); }
 .pf-ms-timeline-today-label {
-    position: absolute; top: 180px; transform: translateX(-50%); padding: 0 4px;
+    position: absolute; top: calc(var(--pf-ms-h) + 4px); transform: translateX(-50%); padding: 0 4px;
     font-size: 11px; color: var(--color-accent-300); background: var(--color-surface);
 }
 
