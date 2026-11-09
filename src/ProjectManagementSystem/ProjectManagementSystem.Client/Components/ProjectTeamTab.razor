@@ -1,0 +1,194 @@
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@implements IDisposable
+@inject IProjectService ProjectService
+
+@* The team of a project: one row per employee with their role, all their membership periods and the hourly rate valid
+   today; current members first, former members dimmed. A row opens to show the history of the rates. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The team could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    <MudTable T="TeamMemberItem" Items="@(_members ?? Array.Empty<TeamMemberItem>())" Loading="_loading && _members is null"
+              LoadingProgressColor="Color.Primary" Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm"
+              Class="pf-table" OnRowClick="RowClicked" RowClass="pf-clickable" RowClassFunc="RowClass">
+        <HeaderContent>
+            <MudTh Style="width:40px"></MudTh>
+            <MudTh>Member</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh>Membership</MudTh>
+            <MudTh Class="pf-right">Hourly rate</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd Class="pf-caret-cell">
+                <MudIcon Icon="@(IsExpanded(context) ? Icons.Material.Rounded.ExpandMore : Icons.Material.Rounded.ChevronRight)"
+                         Size="Size.Small" Class="pf-muted" />
+            </MudTd>
+            <MudTd DataLabel="Member">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudAvatar Class="pf-avatar">@Display.Initials(context.Employee)</MudAvatar>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body2">@Display.Name(context.Employee)</MudText>
+                        <MudText Typo="Typo.caption" Class="pf-muted">@context.Email</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Role">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ma-0 pf-chip">@context.RoleName</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Membership">
+                <MudStack Spacing="0">
+                    @foreach (var period in context.Periods.OrderBy(p => p.From))
+                    {
+                        <MudText Typo="Typo.body2" Class="pf-nowrap">@Period(period)</MudText>
+                    }
+                    @if (!context.IsActive)
+                    {
+                        <MudText Typo="Typo.caption" Class="pf-muted">Former member</MudText>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Hourly rate" Class="pf-right">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body2" Class="pf-tabular">@Display.Rate(context.CurrentHourlyRate, Project.Currency)</MudText>
+                    <MudText Typo="Typo.caption" Class="pf-muted pf-nowrap">since @Display.ShortDate(context.CurrentHourlyRateFrom)</MudText>
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (IsExpanded(context))
+            {
+                <MudTr Class="pf-wp-tasks-row">
+                    <td class="pf-wp-tasks-spacer"></td>
+                    <td colspan="4" class="pf-wp-tasks-cell">
+                        <MudStack Spacing="1" Class="pf-team-rates">
+                            <MudText Typo="Typo.overline" Class="pf-muted">Rate history</MudText>
+                            @foreach (var rate in context.HourlyRates)
+                            {
+                                <MudText Typo="Typo.body2" Class="pf-tabular">
+                                    @Display.Rate(rate.Amount, Project.Currency) from @Display.ShortDate(rate.From)
+                                </MudText>
+                            }
+                        </MudStack>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Outlined.Groups" Title="No team members yet"
+                        Text="Add the people who work on the project. Only current members can be responsible for work." />
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading the team…</MudText>
+        </LoadingContent>
+    </MudTable>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the list again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private readonly HashSet<Guid> _expanded = [];
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<TeamMemberItem>? _members;
+    private bool _loading;
+    private string? _error;
+
+    private string Summary
+    {
+        get
+        {
+            if (_members is not { } members)
+                return "Loading the team…";
+
+            var current = members.Count(m => m.IsActive);
+            var former = members.Count - current;
+
+            return (current == 1 ? "1 current member" : $"{current} current members") +
+                   (former > 0 ? $" · {former} former" : string.Empty) +
+                   " · roles from this project's catalog";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _members = null;
+            _expanded.Clear();
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var team = await ProjectService.GetTeam(new GetTeamQuery(Project.Id), _disposed.Token);
+            _members = team.Members;
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool IsExpanded(TeamMemberItem member) => _expanded.Contains(member.Employee.Id);
+
+    private void RowClicked(TableRowClickEventArgs<TeamMemberItem> args)
+    {
+        if (args.Item is not { } member)
+            return;
+
+        if (!_expanded.Remove(member.Employee.Id))
+            _expanded.Add(member.Employee.Id);
+    }
+
+    private static string RowClass(TeamMemberItem member, int index) => member.IsActive ? string.Empty : "pf-former";
+
+    private static string Period(MembershipPeriod period) =>
+        $"{Display.ShortDate(period.From)} – {(period.To is { } to ? Display.ShortDate(to) : "present")}";
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}
