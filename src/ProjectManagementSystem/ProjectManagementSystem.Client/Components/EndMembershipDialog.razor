@@ -1,0 +1,92 @@
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Commands.RemoveTeamMember
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@inject IProjectService ProjectService
+
+@* Ends the open membership of a team member on a date. The history stays: the member shows as former, with their
+   periods and rates. The API rejects it while the member is responsible for an open work package or task, and before
+   the start of the last hourly rate; the dialog stays open with the reason. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">End membership?</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">@Display.Name(Member.Employee)</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.body2" Class="pf-dialog-text">
+                    The member stays in the history of the team. Responsibility for open work packages and tasks must be
+                    handed over first.
+                </MudText>
+                <MudDatePicker @bind-Date="_to" Label="Last day on the project" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Required="true" RequiredError="Pick the date." DateFormat="dd MMM yyyy"
+                               MinDate="_earliest" HelperText="Not before the start of the last hourly rate." />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="EndAsync" Disabled="_saving">
+            @(_saving ? "Ending…" : "End membership")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public TeamMemberItem Member { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private DateTime _earliest;
+    private DateTime? _to;
+    private string? _error;
+
+    /// <summary>
+    /// The membership can't end before the start of its last hourly rate, which may lie in the future.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        var lastRate = Member.HourlyRates.Count > 0 ? Member.HourlyRates.Max(r => r.From) : Member.CurrentHourlyRateFrom;
+        _earliest = lastRate.ToDateTime(TimeOnly.MinValue);
+        _to = _earliest > DateTime.Today ? _earliest : DateTime.Today;
+    }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task EndAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _to is not { } to)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await ProjectService.RemoveTeamMember(
+                new RemoveTeamMemberCommand(ProjectId, Member.Employee.Id, DateOnly.FromDateTime(to)));
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

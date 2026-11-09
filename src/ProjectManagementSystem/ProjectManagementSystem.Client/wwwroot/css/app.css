@@ -239,6 +239,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 /* A former member of the team stays in the list, dimmed. */
 .pf-table tr.pf-former > td { opacity: 0.6; }
 .pf-team-rates { padding: 6px 8px; }
+.pf-danger.mud-menu-item, .pf-danger .mud-menu-item-text, .pf-danger .mud-icon-root { color: var(--color-bad-text); }
 
 /* — notifications — */
 

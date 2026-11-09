@@ -3,14 +3,31 @@
 @using ProjectManagementSystem.Application.Projects.Queries.GetTeam
 @implements IDisposable
 @inject IProjectService ProjectService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @* The team of a project: one row per employee with their role, all their membership periods and the hourly rate valid
-   today; current members first, former members dimmed. A row opens to show the history of the rates. *@
+   today; current members first, former members dimmed. A row opens to show the history of the rates. Members are added,
+   get a new hourly rate and leave the project here; the team belongs to the project, so the read side catches up with
+   a command shortly after it (eventual consistency) and the list asks again until it shows a newer version of the
+   project. *@
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
         <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.PersonAddAlt"
+                   OnClick="AddAsync" Disabled="_busy || _members is null" Class="pf-submit">
+            Add member
+        </MudButton>
     </MudStack>
+
+    @if (_updating)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">Updating the team…</MudText>
+        </MudStack>
+    }
 
     @if (_error is not null)
     {
@@ -31,6 +48,7 @@
             <MudTh>Role</MudTh>
             <MudTh>Membership</MudTh>
             <MudTh Class="pf-right">Hourly rate</MudTh>
+            <MudTh Style="width:56px"></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd Class="pf-caret-cell">
@@ -67,13 +85,26 @@
                     <MudText Typo="Typo.caption" Class="pf-muted pf-nowrap">since @Display.ShortDate(context.CurrentHourlyRateFrom)</MudText>
                 </MudStack>
             </MudTd>
+            <MudTd Class="pf-right">
+                @if (context.IsActive)
+                {
+                    <span @onclick:stopPropagation="true">
+                        <MudMenu Icon="@Icons.Material.Rounded.MoreVert" Size="Size.Small" Dense="true"
+                                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                 Disabled="_busy" aria-label="Actions of the team member">
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Payments" OnClick="() => ChangeRateAsync(context)">Add hourly rate</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.PersonRemove" OnClick="() => EndAsync(context)" Class="pf-danger">End membership</MudMenuItem>
+                        </MudMenu>
+                    </span>
+                }
+            </MudTd>
         </RowTemplate>
         <ChildRowContent>
             @if (IsExpanded(context))
             {
                 <MudTr Class="pf-wp-tasks-row">
                     <td class="pf-wp-tasks-spacer"></td>
-                    <td colspan="4" class="pf-wp-tasks-cell">
+                    <td colspan="5" class="pf-wp-tasks-cell">
                         <MudStack Spacing="1" Class="pf-team-rates">
                             <MudText Typo="Typo.overline" Class="pf-muted">Rate history</MudText>
                             @foreach (var rate in context.HourlyRates)
@@ -107,13 +138,24 @@
     [Parameter]
     public int Reload { get; set; }
 
+    /// <summary>
+    /// How often, and how far apart, the list is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
     private readonly HashSet<Guid> _expanded = [];
     private readonly CancellationTokenSource _disposed = new();
 
     private Guid _loadedId;
     private int _loadedReload = -1;
     private IReadOnlyList<TeamMemberItem>? _members;
+    private long _version;
     private bool _loading;
+    private bool _busy;
+    private bool _updating;
     private string? _error;
 
     private string Summary
@@ -158,6 +200,7 @@
         {
             var team = await ProjectService.GetTeam(new GetTeamQuery(Project.Id), _disposed.Token);
             _members = team.Members;
+            _version = team.Version;
         }
         catch (Exception exception)
         {
@@ -185,6 +228,94 @@
 
     private static string Period(MembershipPeriod period) =>
         $"{Display.ShortDate(period.From)} – {(period.To is { } to ? Display.ShortDate(to) : "present")}";
+
+    private async Task AddAsync()
+    {
+        var parameters = new DialogParameters<AddTeamMemberDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Currency, Project.Currency },
+            { d => d.Members, _members ?? [] },
+        };
+        var dialog = await DialogService.ShowAsync<AddTeamMemberDialog>("Add team member", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string name })
+        {
+            Snackbar.Add($"Member added: {name}", Severity.Success);
+            await RefreshUntilNewerAsync(_version);
+        }
+    }
+
+    private async Task ChangeRateAsync(TeamMemberItem member)
+    {
+        var parameters = new DialogParameters<ChangeHourlyRateDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Currency, Project.Currency },
+            { d => d.Member, member },
+        };
+        var dialog = await DialogService.ShowAsync<ChangeHourlyRateDialog>("Add hourly rate", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string rate })
+        {
+            Snackbar.Add($"Hourly rate of {Display.Name(member.Employee)}: {rate}", Severity.Success);
+            await RefreshUntilNewerAsync(_version);
+        }
+    }
+
+    private async Task EndAsync(TeamMemberItem member)
+    {
+        var parameters = new DialogParameters<EndMembershipDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Member, member },
+        };
+        var dialog = await DialogService.ShowAsync<EndMembershipDialog>("End membership", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add($"Membership ended: {Display.Name(member.Employee)}", Severity.Success);
+            await RefreshUntilNewerAsync(_version);
+        }
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the list asks again until it
+    /// shows a newer version of the project than <paramref name="version"/>, or gives up after a few tries (a later
+    /// refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilNewerAsync(long version)
+    {
+        _busy = true;
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _version > version)
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _busy = false;
+            _updating = false;
+        }
+    }
 
     public void Dispose()
     {
