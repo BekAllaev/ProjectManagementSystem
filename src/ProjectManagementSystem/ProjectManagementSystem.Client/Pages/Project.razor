@@ -114,6 +114,9 @@ else
             <ProjectDependenciesTab Project="_project" Reload="_reload" />
         </MudTabPanel>
         <MudTabPanel Text="@Tabs[4].Title">
+            <ProjectMilestonesTab Project="_project" Reload="_reload" />
+        </MudTabPanel>
+        <MudTabPanel Text="@Tabs[5].Title">
             <ProjectTeamTab Project="_project" Reload="_reload" />
         </MudTabPanel>
     </MudTabs>
@@ -129,6 +132,7 @@ else
         ("work-packages", "Work packages"),
         ("tasks", "Tasks"),
         ("dependencies", "Dependencies"),
+        ("milestones", "Milestones"),
         ("team", "Team"),
     ];
 

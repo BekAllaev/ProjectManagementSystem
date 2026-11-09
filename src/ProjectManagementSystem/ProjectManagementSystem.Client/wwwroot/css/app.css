@@ -210,6 +210,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-meter { height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
 .pf-meter > div { height: 100%; transition: width .6s; }
 .pf-warn { color: var(--color-warn) !important; }
+.pf-bad { color: var(--color-bad-text) !important; }
 .pf-risk-level { width: 72px; flex: none; }
 .pf-risk-level .mud-chip { width: 100%; justify-content: center; }
 
@@ -240,6 +241,49 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pf-table tr.pf-former > td { opacity: 0.6; }
 .pf-team-rates { padding: 6px 8px; }
 .pf-danger.mud-menu-item, .pf-danger .mud-menu-item-text, .pf-danger .mud-icon-root { color: var(--color-bad-text); }
+
+/* — milestones — */
+
+/* The timeline (see MilestoneTimeline): the track scrolls on narrow screens; the scale is drawn over the timeline. The
+   line of the timeline runs through the middle of its 176px; month labels and "Today" go in the 24px below. */
+.pf-ms-timeline-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.pf-ms-timeline-track { position: relative; min-width: 720px; height: 200px; }
+.pf-ms-timeline.mud-timeline { height: 176px; box-sizing: border-box; }
+.pf-ms-timeline.mud-timeline-horizontal::before { left: 0; background: var(--color-neutral-800); }
+.pf-ms-timeline .mud-timeline-item { padding: 0; width: auto; overflow: visible; }
+/* The dot is centred on the start of its item, which is its date. */
+.pf-ms-timeline .mud-timeline-item .mud-timeline-item-divider { width: 0; overflow: visible; justify-content: center; }
+.pf-ms-timeline .mud-timeline-item-dot.mud-timeline-dot-size-small {
+    flex: none; width: 16px; height: 16px; z-index: 1; box-shadow: 0 0 0 3px var(--color-surface);
+}
+.pf-ms-timeline .mud-timeline-item-dot.mud-timeline-dot-size-small .mud-timeline-item-dot-inner { width: 100%; height: 100%; }
+/* DotClass goes on the inner circle. */
+.pf-ms-timeline .mud-timeline-item-dot-inner.pf-ms-dot-open {
+    background: var(--color-surface); box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.pf-ms-timeline .mud-timeline-item .mud-timeline-item-content { display: flex; flex-direction: column; overflow: visible; }
+.pf-ms-timeline .mud-timeline-item:nth-child(odd) .mud-timeline-item-content { justify-content: flex-end; }
+.pf-ms-timeline-label {
+    width: max-content; max-width: 220px; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px;
+}
+.pf-ms-timeline-label .mud-typography { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pf-ms-timeline-scale { position: absolute; inset: 0; pointer-events: none; }
+.pf-ms-timeline-tick { position: absolute; top: 82px; width: 1px; height: 12px; background: var(--color-neutral-700); }
+.pf-ms-timeline-month { position: absolute; top: 180px; font-size: 11px; padding-left: 4px; white-space: nowrap; }
+.pf-ms-timeline-today { position: absolute; top: 16px; bottom: 24px; border-left: 1px dashed var(--color-accent); }
+.pf-ms-timeline-today-label {
+    position: absolute; top: 180px; transform: translateX(-50%); padding: 0 4px;
+    font-size: 11px; color: var(--color-accent-300); background: var(--color-surface);
+}
+
+.pf-ms-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.pf-ms-date { font-size: 12px; }
+.pf-ms-date .mud-icon-root { font-size: 16px; }
+.pf-ms-description { color: var(--color-neutral-300); text-wrap: pretty; }
+.pf-ms-note { font-size: 12px; }
+.pf-ms-note .mud-icon-root { font-size: 16px; }
+.pf-ms-task-uncounted { opacity: 0.55; }
 
 /* — notifications — */
 
