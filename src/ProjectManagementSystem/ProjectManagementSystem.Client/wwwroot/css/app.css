@@ -179,6 +179,8 @@ h1[tabindex="-1"]:focus { outline: none; }
     background: var(--color-accent-900) !important; color: var(--color-accent-200) !important;
     box-shadow: inset 0 0 0 1px var(--color-accent);
 }
+/* MudTable gives the cell of NoRecordsContent no padding; the empty state lines up with the cells above it. */
+.mud-table .mud-table-empty-row { padding: 0 16px; }
 .pf-table .pf-right { text-align: right; }
 .pf-table .pf-right .mud-table-sort-label { justify-content: flex-end; }
 .pf-progress-cell .mud-progress-linear { min-width: 80px; }
