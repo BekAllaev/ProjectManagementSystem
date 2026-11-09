@@ -1,0 +1,464 @@
+@using ProjectManagementSystem.Application.TimeTracking
+@using ProjectManagementSystem.Application.TimeTracking.Commands.RemoveTimeEntry
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetTask
+@using ProjectManagementSystem.Domain.Schedule
+@using ProjectManagementSystem.Domain.WorkPackages
+@implements IDisposable
+@inject IWorkPackageService WorkPackageService
+@inject ITimeTrackingService TimeTrackingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* One task on the right of the page: its status, details, dependencies and time log. A dependency opens that task in
+   the drawer. The current user logs their own time while the task is in progress and removes the entries they logged
+   (the API decides it: CanLogTime and CanRemove). The read side catches up with a command shortly after it (eventual
+   consistency): until the task shows a newer version of its time log the drawer says so and asks the API again. *@
+<MudDrawer Open="Open" OpenChanged="OpenChanged" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Elevation="2"
+           Width="min(520px, 100vw)" Class="pf-task-drawer">
+    <div class="pf-task-drawer-body">
+        <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2" Class="pf-task-drawer-header">
+            <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                <MudText Typo="Typo.caption" Class="pf-muted">Task@(_details is null ? null : $" · {_details.WorkPackageDescription}")</MudText>
+                <MudText Typo="Typo.h6" Class="pf-task-name">@(_details?.Name ?? "Loading…")</MudText>
+            </MudStack>
+            <MudIconButton Icon="@Icons.Material.Rounded.Close" Size="Size.Small" aria-label="Close" OnClick="CloseAsync" />
+        </MudStack>
+
+        @if (_loading && _details is null)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+        }
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                    <span>The task could not be loaded. @_error</span>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+                </MudStack>
+            </MudAlert>
+        }
+
+        @if (_details is { } task)
+        {
+            <section class="pf-task-section">
+                @if (task.Status == ProjectTaskStatus.Cancelled)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-muted">
+                        <MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Cancelled. No further transitions or time entries are possible.</MudText>
+                    </MudStack>
+                }
+                else
+                {
+                    <div class="pf-steps" aria-label="Status: @Display.Chip(task.Status).Label">
+                        @for (var i = 0; i < Steps.Length; i++)
+                        {
+                            var step = i;
+                            <div class="pf-step @StepClass(task.Status, step)">
+                                <span class="pf-step-dot">
+                                    @if (IsStepDone(task.Status, step))
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Rounded.Check" Style="font-size:14px" />
+                                    }
+                                    else
+                                    {
+                                        @(step + 1)
+                                    }
+                                </span>
+                                <span class="pf-step-label">@Steps[step]</span>
+                                @if (step < Steps.Length - 1)
+                                {
+                                    <span class="pf-step-line"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <section class="pf-task-section pf-task-facts">
+                <div>
+                    <MudText Typo="Typo.caption" Class="pf-muted">Responsible</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(task.ResponsiblePerson)</MudAvatar>
+                        <MudText Typo="Typo.body2">@Display.Name(task.ResponsiblePerson)</MudText>
+                    </MudStack>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Class="pf-muted">Work package</MudText>
+                    <MudText Typo="Typo.body2">@task.WorkPackageDescription</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Class="pf-muted">Estimated effort</MudText>
+                    <MudText Typo="Typo.body2" Class="pf-tabular">@Display.Hours(task.EstimatedEffort)</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Class="pf-muted">Logged</MudText>
+                    <MudText Typo="Typo.body2" Class="@($"pf-tabular {(IsOverEstimate(task) ? "pf-warn" : null)}")">@LoggedText(task)</MudText>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(task.Description))
+                {
+                    <div class="pf-task-facts-wide">
+                        <MudText Typo="Typo.caption" Class="pf-muted">Description</MudText>
+                        <MudText Typo="Typo.body2" Class="pf-task-description">@task.Description</MudText>
+                    </div>
+                }
+            </section>
+
+            <section class="pf-task-section">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Dependencies</MudText>
+                @if (task.Status == ProjectTaskStatus.Open && task.HasUnfinishedFinishToStartPredecessor)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-warn mb-2">
+                        <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                        <MudText Typo="Typo.caption">A finish-to-start predecessor isn't finished yet. Starting is allowed.</MudText>
+                    </MudStack>
+                }
+                @foreach (var (label, items) in new[] { ("Predecessors", task.Predecessors), ("Successors", task.Successors) })
+                {
+                    <MudText Typo="Typo.caption" Class="pf-muted">@label</MudText>
+                    @if (items.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="pf-muted mb-2">None</MudText>
+                    }
+                    else
+                    {
+                        <div class="pf-task-deps mb-2">
+                            @foreach (var item in items)
+                            {
+                                <div class="pf-task-dep pf-clickable" role="button" tabindex="0"
+                                     @onclick="() => OpenTaskAsync(item)" title="Open this task">
+                                    <MudTooltip Text="@Display.Name(item.Type)">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="ma-0 pf-chip">@Display.Code(item.Type)</MudChip>
+                                    </MudTooltip>
+                                    <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                                        <MudText Typo="Typo.body2">@item.Name</MudText>
+                                        <MudText Typo="Typo.caption" Class="pf-muted">
+                                            @item.WorkPackageDescription@(item.IsInOtherWorkPackage ? " · other work package" : null)
+                                        </MudText>
+                                    </MudStack>
+                                    <StatusChipView Value="Display.Chip(item.Status)" />
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </section>
+
+            <section class="pf-task-section">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.subtitle2" Class="flex-grow-1">Time log</MudText>
+                    @if (_updating)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+                            <MudText Typo="Typo.caption">Updating…</MudText>
+                        </MudStack>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Outlined.MoreTime" Disabled="!task.CanLogTime || _busy || _updating"
+                               OnClick="LogTimeAsync">
+                        Log time
+                    </MudButton>
+                </MudStack>
+                @if (!task.CanLogTime && CannotLogReason(task) is { } reason)
+                {
+                    <MudText Typo="Typo.caption" Class="pf-muted d-block mb-2">@reason</MudText>
+                }
+
+                @if (task.TimeEntries.Count == 0)
+                {
+                    <EmptyState Icon="@Icons.Material.Outlined.Schedule" Title="No time logged yet"
+                                Text="@(task.Status == ProjectTaskStatus.Open ? "Start the task to log time on it." : null)" />
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Elevation="0" Outlined="true" Class="pf-table pf-time-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Employee</th>
+                                <th class="pf-right">Hours</th>
+                                <th class="pf-right pf-time-rate">Rate</th>
+                                <th class="pf-right">Cost</th>
+                                <th style="width:40px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in task.TimeEntries)
+                            {
+                                <tr>
+                                    <td class="pf-nowrap">@Display.ShortDate(entry.WorkDate)</td>
+                                    <td>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(entry.Employee)</MudAvatar>
+                                            <MudText Typo="Typo.body2" Class="text-nowrap">@Display.Name(entry.Employee)</MudText>
+                                        </MudStack>
+                                    </td>
+                                    <td class="pf-right pf-tabular pf-nowrap">@Display.Hours(entry.Hours)</td>
+                                    <td class="pf-right pf-tabular pf-nowrap pf-time-rate">@Display.Rate(entry.HourlyRate, task.Currency)</td>
+                                    <td class="pf-right pf-tabular pf-nowrap">@Display.Money(entry.Cost, task.Currency)</td>
+                                    <td class="pf-right">
+                                        @if (entry.CanRemove)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                                           Disabled="_busy || _updating" aria-label="Remove the time entry"
+                                                           OnClick="() => RemoveAsync(task, entry)" />
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2"><MudText Typo="Typo.body2" Class="pf-muted">Total</MudText></td>
+                                <td class="pf-right pf-tabular pf-nowrap">@Display.Hours(task.LoggedHours)</td>
+                                <td class="pf-time-rate"></td>
+                                <td class="pf-right pf-tabular pf-nowrap">@Display.Money(task.LoggedCost, task.Currency)</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </MudSimpleTable>
+                }
+            </section>
+        }
+    </div>
+</MudDrawer>
+
+@code {
+    /// <summary>
+    /// How often, and how far apart, the task is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly string[] Steps = ["Open", "In progress", "Completed"];
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>
+    /// The task the drawer opens with; a dependency may then open another task in the drawer.
+    /// </summary>
+    [Parameter]
+    public Guid WorkPackageId { get; set; }
+
+    [Parameter]
+    public Guid TaskId { get; set; }
+
+    /// <summary>
+    /// The time log of a task changed; the list and the page reload their totals.
+    /// </summary>
+    [Parameter]
+    public EventCallback Changed { get; set; }
+
+    private readonly CancellationTokenSource _disposed = new();
+
+    private (Guid WorkPackageId, Guid TaskId) _requested;
+    private (Guid WorkPackageId, Guid TaskId) _shown;
+    private bool _wasOpen;
+    private TaskDetails? _details;
+    private bool _loading;
+    private bool _busy;
+    private bool _updating;
+    private string? _error;
+    private CancellationTokenSource? _load;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var requested = (WorkPackageId, TaskId);
+        var opened = Open && !_wasOpen;
+        _wasOpen = Open;
+
+        if (!Open || TaskId == Guid.Empty || (!opened && requested == _requested))
+            return;
+
+        _requested = requested;
+        await ShowAsync(requested);
+    }
+
+    private async Task ShowAsync((Guid WorkPackageId, Guid TaskId) task)
+    {
+        if (task != _shown)
+            _details = null;
+
+        _shown = task;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = _load = CancellationTokenSource.CreateLinkedTokenSource(_disposed.Token);
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var details = await WorkPackageService.GetTask(new GetTaskQuery(_shown.WorkPackageId, _shown.TaskId), load.Token);
+            if (load.IsCancellationRequested)
+                return;
+
+            _details = details;
+        }
+        catch (Exception) when (load.IsCancellationRequested)
+        {
+            // Replaced by a newer load, or the drawer is gone.
+            return;
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+
+        _loading = false;
+    }
+
+    private Task CloseAsync() => OpenChanged.InvokeAsync(false);
+
+    private Task OpenTaskAsync(TaskDependencyItem item) => ShowAsync((item.WorkPackageId, item.TaskId));
+
+    private static bool IsStepDone(ProjectTaskStatus status, int step) => (status, step) switch
+    {
+        (ProjectTaskStatus.InProgress, 0) => true,
+        (ProjectTaskStatus.Completed, _) => true,
+        _ => false,
+    };
+
+    private static string StepClass(ProjectTaskStatus status, int step)
+    {
+        if (IsStepDone(status, step))
+            return "pf-step-done";
+
+        var current = status switch
+        {
+            ProjectTaskStatus.Open => 0,
+            ProjectTaskStatus.InProgress => 1,
+            _ => -1,
+        };
+
+        return step == current ? "pf-step-current" : string.Empty;
+    }
+
+    private static bool IsOverEstimate(TaskDetails task) => task.EstimatedEffort > 0 && task.LoggedHours > task.EstimatedEffort;
+
+    private static string LoggedText(TaskDetails task) =>
+        task.EstimatedEffort > 0
+            ? $"{Display.Hours(task.LoggedHours)} ({Math.Round(task.LoggedHours / task.EstimatedEffort * 100)}% of estimate)"
+            : Display.Hours(task.LoggedHours);
+
+    /// <summary>
+    /// Why the current user can't log time; CanLogTime is false when the task is not in progress or the user is not on
+    /// the team today.
+    /// </summary>
+    private static string? CannotLogReason(TaskDetails task) => task.Status switch
+    {
+        ProjectTaskStatus.Open or ProjectTaskStatus.Completed => "Time can be logged only while the task is In progress.",
+        ProjectTaskStatus.Cancelled => null,
+        _ => "You can log time only while you are on the team of this project.",
+    };
+
+    private async Task LogTimeAsync()
+    {
+        if (_details is not { } task)
+            return;
+
+        var parameters = new DialogParameters<LogTimeDialog>
+        {
+            { d => d.ProjectId, task.ProjectId },
+            { d => d.WorkPackageId, task.WorkPackageId },
+            { d => d.TaskId, task.TaskId },
+            { d => d.TaskName, task.Name },
+            { d => d.Currency, task.Currency },
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<LogTimeDialog>("Log time", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not { Canceled: false, Data: decimal hours })
+            return;
+
+        Snackbar.Add($"Logged {Display.Hours(hours)} on {task.Name}. The totals update in a moment.", Severity.Success);
+        await RefreshAfterAsync(task);
+    }
+
+    private async Task RemoveAsync(TaskDetails task, TimeEntryItem entry)
+    {
+        var confirmed = await ConfirmDialog.ShowAsync(DialogService, "Remove time entry?",
+            $"{Display.Hours(entry.Hours)} on {Display.ShortDate(entry.WorkDate)} are removed from \"{task.Name}\" and " +
+            "from the actual cost of the project.",
+            "Remove", danger: true, cancelLabel: "Keep entry");
+        if (!confirmed)
+            return;
+
+        _busy = true;
+
+        try
+        {
+            await TimeTrackingService.RemoveTimeEntry(new RemoveTimeEntryCommand(task.TaskId, entry.EntryId));
+            Snackbar.Add($"Time entry removed: {Display.Hours(entry.Hours)} on {Display.ShortDate(entry.WorkDate)}", Severity.Success);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(GrpcErrors.Describe(exception), Severity.Error);
+            return;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await RefreshAfterAsync(task);
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the drawer asks again until the
+    /// task shows a newer version of its time log, or gives up after a few tries (a later refresh shows it). Then the
+    /// list and the page reload their totals.
+    /// </summary>
+    private async Task RefreshAfterAsync(TaskDetails before)
+    {
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _details is not { } current || current.TaskId != before.TaskId ||
+                    current.TimeLogVersion > before.TimeLogVersion)
+                    break;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The drawer is gone.
+            return;
+        }
+        finally
+        {
+            _updating = false;
+        }
+
+        await Changed.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+        _load?.Dispose();
+    }
+}

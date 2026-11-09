@@ -17,7 +17,8 @@
 
 @* All tasks of a project, filtered by status, work package and responsible person (the API filters). New tasks go
    into an open work package; Start and Complete are on the row of a task the caller may change, the change of the
-   responsible person and Cancel in its menu. The read side catches up with a command shortly after it
+   responsible person and Cancel in its menu. A click on a row opens the task in the drawer (details, dependencies,
+   time log). The read side catches up with a command shortly after it
    (eventual consistency): until the list shows the change the row says so and the list asks the API again. *@
 
 <MudStack Spacing="3">
@@ -84,7 +85,7 @@
 
     <MudTable T="TaskListItem" Items="@(_tasks ?? Array.Empty<TaskListItem>())" Loading="_loading && _tasks is null"
               LoadingProgressColor="Color.Primary" Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm"
-              Class="pf-table">
+              Class="pf-table" OnRowClick="RowClicked" RowClass="pf-clickable">
         <HeaderContent>
             <MudTh>Task</MudTh>
             <MudTh>Work package</MudTh>
@@ -126,6 +127,7 @@
                 </MudStack>
             </MudTd>
             <MudTd Class="pf-right">
+                <span @onclick:stopPropagation="true">
                 @if (context.CanChangeStatus && !_pending.Contains(context.TaskId))
                 {
                     @if (context.Status == ProjectTaskStatus.Open)
@@ -137,10 +139,12 @@
                         <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_busy" OnClick="() => CompleteAsync(context)">Complete</MudButton>
                     }
                 }
+                </span>
             </MudTd>
             <MudTd Class="pf-right">
                 @if (IsUnfinished(context) && !_pending.Contains(context.TaskId))
                 {
+                    <span @onclick:stopPropagation="true">
                     <MudMenu Icon="@Icons.Material.Rounded.MoreVert" Size="Size.Small" Dense="true"
                              AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
                              Disabled="_busy" aria-label="Actions of the task">
@@ -150,6 +154,7 @@
                             <MudMenuItem Icon="@Icons.Material.Outlined.Block" OnClick="() => CancelAsync(context)">Cancel task</MudMenuItem>
                         }
                     </MudMenu>
+                    </span>
                 }
             </MudTd>
         </RowTemplate>
@@ -173,6 +178,8 @@
         </LoadingContent>
     </MudTable>
 </MudStack>
+
+<TaskDrawer @bind-Open="_drawerOpen" WorkPackageId="_drawerWorkPackageId" TaskId="_drawerTaskId" Changed="TimeLogChangedAsync" />
 
 @code {
     /// <summary>
@@ -231,6 +238,9 @@
     private string? _error;
     private bool _waitingForNew;
     private CancellationTokenSource? _load;
+    private bool _drawerOpen;
+    private Guid _drawerWorkPackageId;
+    private Guid _drawerTaskId;
 
     private IReadOnlyList<WorkPackageListItem> OpenWorkPackages =>
         _workPackages.Where(w => w.Status == WorkPackageStatus.Open).ToList();
@@ -397,6 +407,30 @@
             _waitingForNew = false;
         }
 
+        await Changed.InvokeAsync();
+    }
+
+    /// <summary>
+    /// A row opens its task in the drawer; the buttons and the menu of the row stop the click.
+    /// </summary>
+    private void RowClicked(TableRowClickEventArgs<TaskListItem> args)
+    {
+        if (args.Item is not { } task)
+            return;
+
+        _drawerWorkPackageId = task.WorkPackageId;
+        _drawerTaskId = task.TaskId;
+        _drawerOpen = true;
+    }
+
+    /// <summary>
+    /// Time was logged or removed in the drawer, and the read side has caught up: the logged hours of the list and
+    /// the totals of the page change.
+    /// </summary>
+    private async Task TimeLogChangedAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
         await Changed.InvokeAsync();
     }
 
