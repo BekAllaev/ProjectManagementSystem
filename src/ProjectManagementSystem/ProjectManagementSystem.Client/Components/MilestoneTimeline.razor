@@ -10,11 +10,14 @@
    start of its item (TimelineAlign.Start, centred on that point by the CSS), and the items grow with the days up to the
    next target date (the last one up to the end of the range). The left padding of the timeline is the share of the
    range before the first target date. So the start of every item, and its dot, is at its date. The month ticks and the
-   line of today are drawn over the timeline on the same scale. Labels alternate above and below the line, so close
-   dates stay readable. *@
+   line of today are drawn over the timeline on the same scale.
+
+   Close dates would make their labels run into each other, so every label gets a lane (see AssignLanes): above or
+   below the line, next to it or further out. The far lanes, and the height they need, are only used when the near
+   ones are taken. *@
 
 <div class="pf-ms-timeline-scroll">
-    <div class="pf-ms-timeline-track">
+    <div class="pf-ms-timeline-track" style="--pf-ms-h:@(_far ? 248 : 176)px">
         <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Alternate"
                      TimelineAlign="TimelineAlign.Start" Class="pf-ms-timeline"
                      Style="@($"padding-left:{Percent(Offset(_sorted[0].TargetDate))}")">
@@ -23,12 +26,15 @@
                 var milestone = _sorted[i];
                 var days = (i + 1 < _sorted.Count ? _sorted[i + 1].TargetDate : _end).DayNumber - milestone.TargetDate.DayNumber;
                 var dot = Dot(milestone.Health);
+                var lane = _lanes[i];
 
                 <MudTimelineItem Color="dot" Size="Size.Small" Elevation="0"
+                                 Class="@(lane is Lane.AboveNear or Lane.AboveFar ? "pf-ms-up" : "pf-ms-down")"
                                  DotClass="@(milestone.Status == MilestoneStatus.Open && milestone.Health != MilestoneHealth.Late ? "pf-ms-dot-open" : null)"
                                  Style="@($"flex:{days} 1 0px")">
                     <ItemContent>
-                        <div class="pf-ms-timeline-label">
+                        <div class="@(lane is Lane.AboveFar or Lane.BelowFar ? "pf-ms-timeline-label pf-ms-far" : "pf-ms-timeline-label")"
+                             title="@($"{milestone.Name} · {Display.ShortDate(milestone.TargetDate)}")">
                             <MudText Typo="Typo.body2" Class="pf-nowrap">@milestone.Name</MudText>
                             <MudText Typo="Typo.caption" Class="@(milestone.Health == MilestoneHealth.Late ? "pf-bad pf-nowrap" : "pf-muted pf-nowrap")">
                                 @ShortDate(milestone.TargetDate)
@@ -66,6 +72,29 @@
     /// </summary>
     private const int TodayClearance = 12;
 
+    /// <summary>
+    /// Width in pixels the lanes are worked out for: the narrowest the track gets before it scrolls. A wider track
+    /// only leaves more room between the labels.
+    /// </summary>
+    private const double ReferenceWidth = 720;
+
+    /// <summary>
+    /// Widest a label gets (see .pf-ms-timeline-label), and the room kept between two labels in a lane, in pixels.
+    /// </summary>
+    private const double MaxLabelWidth = 220;
+    private const double LabelGap = 12;
+
+    /// <summary>
+    /// Where the label of a milestone goes: above or below the line, next to it or further out.
+    /// </summary>
+    private enum Lane
+    {
+        AboveNear,
+        BelowNear,
+        AboveFar,
+        BelowFar,
+    }
+
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-US");
 
     /// <summary>
@@ -81,6 +110,8 @@
     private DateOnly _start;
     private DateOnly _end;
     private int _days;
+    private Lane[] _lanes = [];
+    private bool _far;
 
     protected override void OnParametersSet()
     {
@@ -91,7 +122,47 @@
         _start = first.AddDays(-Margin);
         _end = last.AddDays(Margin);
         _days = _end.DayNumber - _start.DayNumber;
+
+        AssignLanes();
     }
+
+    /// <summary>
+    /// Puts every label, by date, into the first lane where it clears the last label of that lane: the near lane on
+    /// the other side than the previous label first (so they alternate), then the near lane on the same side, then the
+    /// far lanes. When none is free, the lane whose last label ends first.
+    /// </summary>
+    private void AssignLanes()
+    {
+        var pixelsPerDay = ReferenceWidth / _days;
+        var ends = new Dictionary<Lane, double>();
+        var above = true;
+
+        _lanes = new Lane[_sorted.Count];
+        for (var i = 0; i < _sorted.Count; i++)
+        {
+            var x = (_sorted[i].TargetDate.DayNumber - _start.DayNumber) * pixelsPerDay;
+            var half = LabelWidth(_sorted[i]) / 2;
+
+            Lane[] candidates = above
+                ? [Lane.BelowNear, Lane.AboveNear, Lane.BelowFar, Lane.AboveFar]
+                : [Lane.AboveNear, Lane.BelowNear, Lane.AboveFar, Lane.BelowFar];
+
+            var lane = candidates.FirstOrDefault(l => !ends.TryGetValue(l, out var end) || end + LabelGap <= x - half,
+                candidates.MinBy(l => ends.GetValueOrDefault(l, double.MinValue)));
+
+            ends[lane] = x + half;
+            _lanes[i] = lane;
+            above = lane is Lane.AboveNear or Lane.AboveFar;
+        }
+
+        _far = _lanes.Any(l => l is Lane.AboveFar or Lane.BelowFar);
+    }
+
+    /// <summary>
+    /// About how wide the label of a milestone is: its name in body2, or its date, whichever is longer.
+    /// </summary>
+    private static double LabelWidth(MilestoneItem milestone) =>
+        Math.Min(MaxLabelWidth, Math.Max(milestone.Name.Length * 7.4, 6 * 6.4) + 8);
 
     /// <summary>
     /// Where <paramref name="date"/> is on the range, from 0 at its start to 1 at its end.
