@@ -339,3 +339,38 @@ h1[tabindex="-1"]:focus { outline: none; }
     display: none; left: 0; padding: 0.6rem 1.25rem 0.7rem 1.25rem; position: fixed; width: 100%; z-index: 1000;
 }
 #blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: 0.75rem; top: 0.5rem; }
+
+/* Task drawer: details, dependencies and time log of one task, on the right of the page. */
+.mud-drawer.pf-task-drawer { background: var(--color-surface); border-left: 1px solid var(--color-neutral-800); }
+.pf-task-drawer-body { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+.pf-task-drawer-header { padding: 16px 16px 12px 20px; border-bottom: 1px solid var(--color-neutral-800); }
+.pf-task-name { overflow-wrap: anywhere; }
+.pf-task-section { padding: 16px 20px; border-bottom: 1px solid var(--color-neutral-800); }
+.pf-task-section:last-child { border-bottom: 0; }
+.pf-task-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.pf-task-facts-wide { grid-column: 1 / -1; }
+.pf-task-description { white-space: pre-wrap; color: var(--color-neutral-300); }
+.pf-task-deps { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.pf-task-dep { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; }
+.pf-task-dep:hover, .pf-task-dep:focus-visible { background: color-mix(in srgb, var(--color-text) 6%, transparent); outline: none; }
+.pf-time-table .mud-table-container { overflow-x: auto; }
+.pf-time-table td, .pf-time-table th { padding: 6px 10px !important; }
+.pf-time-table tfoot td { border-top: 1px solid var(--color-neutral-800); border-bottom: 0; font-weight: 500; }
+.pf-steps { display: flex; align-items: center; }
+.pf-step { display: flex; align-items: center; gap: 8px; color: var(--color-neutral-400); font-size: 13px; }
+.pf-step:not(:last-child) { flex: 1; }
+.pf-step-dot {
+    width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--color-neutral-700); font-size: 11px; font-weight: 600; color: var(--color-neutral-500);
+}
+.pf-step-line { flex: 1; height: 1.5px; background: var(--color-neutral-700); margin-right: 8px; }
+.pf-step-current { color: var(--color-text); }
+.pf-step-current .pf-step-dot { border-color: var(--color-accent); color: var(--color-accent); }
+.pf-step-done { color: var(--color-text); }
+.pf-step-done .pf-step-dot { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg); }
+.pf-step-done .pf-step-line { background: var(--color-accent); }
+@media (max-width: 600px) {
+    .pf-task-facts { grid-template-columns: 1fr; }
+    .pf-step-label { display: none; }
+    .pf-time-table .pf-time-rate { display: none !important; }
+}

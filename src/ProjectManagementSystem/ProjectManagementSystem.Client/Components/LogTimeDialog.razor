@@ -1,0 +1,158 @@
+@using ProjectManagementSystem.Application.Employees
+@using ProjectManagementSystem.Application.Employees.Queries.GetCurrentEmployee
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@using ProjectManagementSystem.Application.TimeTracking
+@using ProjectManagementSystem.Application.TimeTracking.Commands.LogTime
+@inject ITimeTrackingService TimeTrackingService
+@inject IEmployeeService EmployeeService
+@inject IProjectService ProjectService
+
+@* Logs time of the current user on a task in progress: an employee logs only their own time, so there is no choice of
+   the employee. The work date is today or earlier. The hint shows the hourly rate of the user valid on the work date,
+   which the entry keeps; the API checks the rules again (the task is in progress, the user is on the team on that date).
+   A rule the API rejects keeps the dialog open with the reason. Closes with the logged hours. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Log time</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">@TaskName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudDatePicker Date="_date" DateChanged="DateChanged" Label="Work date" Variant="Variant.Outlined"
+                               Margin="Margin.Dense" Required="true" RequiredError="Pick the work date."
+                               DateFormat="dd MMM yyyy" MaxDate="DateTime.Today"
+                               HelperText="Today or an earlier date." />
+                <MudNumericField T="decimal?" @bind-Value="_hours" Label="Hours" Placeholder="e.g. 2.5"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="24" Step="0.25m"
+                                 AutoFocus="true" Immediate="true" Required="true" RequiredError="Enter the hours."
+                                 Validation="@(new Func<decimal?, string?>(ValidateHours))" />
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2" Class="pf-muted">
+                    <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">@Hint</MudText>
+                </MudStack>
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Logging…" : "Log time")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid WorkPackageId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid TaskId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string TaskName { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Currency { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private DateTime? _date = DateTime.Today;
+    private decimal? _hours;
+    private string? _error;
+
+    /// <summary>
+    /// The current user as a member of the team; null until loaded, or when the user is not on the team.
+    /// </summary>
+    private TeamMemberItem? _me;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var me = EmployeeService.GetCurrentEmployee(new GetCurrentEmployeeQuery());
+            var team = ProjectService.GetTeam(new GetTeamQuery(ProjectId));
+            var id = (await me).Id;
+
+            _me = (await team).Members.FirstOrDefault(m => m.Employee.Id == id);
+        }
+        catch (Exception)
+        {
+            // Only the hint about the rate is missing; the API applies the rate anyway.
+        }
+    }
+
+    private void DateChanged(DateTime? date) => _date = date;
+
+    private static string? ValidateHours(decimal? hours) => hours switch
+    {
+        null => null,
+        <= 0 => "The hours must be greater than 0.",
+        > 24 => "At most 24 hours a day.",
+        _ => null,
+    };
+
+    /// <summary>
+    /// The rate of the user on the work date, and the cost of the entry once the hours are entered.
+    /// </summary>
+    private string Hint
+    {
+        get
+        {
+            const string general = "The time is logged for you. The hourly rate valid on the work date is applied and never changes later.";
+
+            if (_me is null || _date is not { } date)
+                return general;
+
+            var workDate = DateOnly.FromDateTime(date);
+
+            if (!_me.Periods.Any(p => p.From <= workDate && (p.To is null || workDate <= p.To)))
+                return $"You are not on the team of this project on {Display.ShortDate(workDate)}, so time can't be logged for that date.";
+
+            if (_me.HourlyRates.Where(r => r.From <= workDate).MaxBy(r => r.From) is not { } rate)
+                return general;
+
+            var text = $"Your rate on {Display.ShortDate(workDate)}: {Display.Rate(rate.Amount, Currency)}";
+
+            return _hours is > 0 and <= 24 ? $"{text} · Cost {Display.Money(_hours.Value * rate.Amount, Currency)}" : text;
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _date is not { } date || _hours is not { } hours)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await TimeTrackingService.LogTime(new LogTimeCommand(WorkPackageId, TaskId, DateOnly.FromDateTime(date), hours));
+            Dialog.Close(DialogResult.Ok(hours));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
