@@ -1,0 +1,221 @@
+@using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Domain.Milestones
+@using ProjectManagementSystem.Domain.WorkPackages
+@implements IDisposable
+@inject IMilestoneService MilestoneService
+
+@* The milestones of a project: a timeline of their target dates and today, then a card per milestone, ordered by
+   target date, with its state, progress (cancelled tasks are not counted) and its tasks. A note on a card tells why
+   a milestone needs attention: it is late, it was completed with unfinished tasks, it is empty, or it is completed
+   and so frozen. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The milestones could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    @if (_milestones is null)
+    {
+        @if (_error is null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4">
+                <MudSkeleton Width="120px" />
+                <MudSkeleton Height="160px" SkeletonType="SkeletonType.Rectangle" Class="mt-2" />
+            </MudPaper>
+        }
+    }
+    else if (_milestones.Count == 0)
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pf-card px-4 pb-2">
+            <EmptyState Icon="@Icons.Material.Outlined.Flag" Title="No milestones yet"
+                        Text="@(Project.IsOpen ? "Milestones group tasks towards a target date." : "The project is closed; no milestones can be added.")" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-2">
+            <LoadingBar Visible="_loading" />
+            <MudText Typo="Typo.h6">Timeline</MudText>
+            <MilestoneTimeline Milestones="_milestones" />
+        </MudPaper>
+
+        <div class="pf-ms-cards">
+            @foreach (var milestone in _milestones)
+            {
+                var note = Note(milestone);
+
+                <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-3">
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                            <MudText Typo="Typo.h6">@milestone.Name</MudText>
+                            <StatusChipView Value="Display.Chip(milestone.Health)" />
+                        </MudStack>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1"
+                                  Class="@(milestone.Health == MilestoneHealth.Late ? "pf-bad pf-ms-date" : "pf-muted pf-ms-date")">
+                            <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
+                            <span>Target @Display.ShortDate(milestone.TargetDate)</span>
+                            @if (milestone.CompletedAt is { } completedAt)
+                            {
+                                <span class="pf-muted">· completed @Display.ShortDate(completedAt)</span>
+                            }
+                        </MudStack>
+                    </MudStack>
+
+                    @if (!string.IsNullOrWhiteSpace(milestone.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="pf-ms-description">@milestone.Description</MudText>
+                    }
+
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                        <MudProgressLinear Color="Color.Primary" Value="Math.Clamp(milestone.ProgressPercent, 0, 100)"
+                                           Rounded="true" Size="Size.Medium" Class="flex-grow-1" />
+                        <MudText Typo="Typo.body2" Class="pf-nowrap pf-tabular">@milestone.CompletedTasks/@milestone.CountedTasks done</MudText>
+                    </MudStack>
+
+                    @if (note is not null)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="@($"pf-ms-note {note.Class}")">
+                            <MudIcon Icon="@note.Icon" Size="Size.Small" />
+                            <span>@note.Text</span>
+                        </MudStack>
+                    }
+
+                    <div class="pf-wp-tasks">
+                        @if (milestone.Tasks.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="pf-muted pa-2">No tasks in this milestone yet.</MudText>
+                        }
+                        @foreach (var task in milestone.Tasks)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3"
+                                      Class="@(task.IsCounted ? "pf-wp-task" : "pf-wp-task pf-ms-task-uncounted")">
+                                <MudStack Spacing="0" Class="flex-grow-1" Style="min-width:0">
+                                    <MudText Typo="Typo.body2" Truncate="true">@task.Name</MudText>
+                                    <MudText Typo="Typo.caption" Class="pf-muted">
+                                        @task.WorkPackageDescription@(task.IsCounted ? null : " · not counted")
+                                    </MudText>
+                                </MudStack>
+                                <StatusChipView Value="Display.Chip(task.Status)" />
+                            </MudStack>
+                        }
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+</MudStack>
+
+@code {
+    /// <summary>
+    /// Why a milestone needs attention, under its progress.
+    /// </summary>
+    private sealed record MilestoneNote(string Text, string Icon, string Class);
+
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the list again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<MilestoneItem>? _milestones;
+    private bool _loading;
+    private string? _error;
+
+    private string Summary
+    {
+        get
+        {
+            if (_milestones is not { } milestones)
+                return "Loading milestones…";
+
+            var open = milestones.Count(m => m.Status == MilestoneStatus.Open);
+            var late = milestones.Count(m => m.Health == MilestoneHealth.Late);
+
+            return (milestones.Count == 1 ? "1 milestone" : $"{milestones.Count} milestones") +
+                   $" · {open} open" + (late > 0 ? $" · {late} late" : string.Empty);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+            _milestones = null;
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var milestones = await MilestoneService.GetMilestones(new GetMilestonesQuery(Project.Id), _disposed.Token);
+            _milestones = milestones.Items;
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static MilestoneNote? Note(MilestoneItem milestone)
+    {
+        var unfinished = milestone.Tasks.Count(t => t.IsCounted && t.Status != ProjectTaskStatus.Completed);
+
+        return milestone.Health switch
+        {
+            MilestoneHealth.Late => new(
+                $"Target passed {(milestone.DaysLate == 1 ? "1 day" : $"{milestone.DaysLate} days")} ago and the milestone is still open.",
+                Icons.Material.Outlined.WarningAmber, "pf-bad"),
+            MilestoneHealth.CompletedWithLooseEnds => new(
+                $"Closed with {(unfinished == 1 ? "1 unfinished task" : $"{unfinished} unfinished tasks")}.",
+                Icons.Material.Outlined.WarningAmber, "pf-warn"),
+            MilestoneHealth.CompletedEmpty => new(
+                "Completed without tasks: an empty milestone is not considered reached.",
+                Icons.Material.Outlined.Info, "pf-muted"),
+            MilestoneHealth.Reached => new(
+                "Frozen: tasks and target date can no longer change.", Icons.Material.Outlined.Lock, "pf-muted"),
+            _ when milestone.CountedTasks == 0 => new(
+                "Empty milestones are not considered reached.", Icons.Material.Outlined.Info, "pf-muted"),
+            _ => null,
+        };
+    }
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

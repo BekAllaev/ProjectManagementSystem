@@ -1,0 +1,133 @@
+@using System.Globalization
+@using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
+@using ProjectManagementSystem.Domain.Milestones
+
+@* The milestones of a project on a horizontal MudTimeline, on a linear scale of time: the gaps between the dots are
+   the gaps between the target dates.
+
+   A horizontal MudTimeline gives every item an equal share of the width and centres its dot. Here the dot sits at the
+   start of its item (TimelineAlign.Start, centred on that point by the CSS), and the items grow with the days up to the
+   next target date (the last one up to the end of the range). The left padding of the timeline is the share of the
+   range before the first target date. So the start of every item, and its dot, is at its date. The month ticks and the
+   line of today are drawn over the timeline on the same scale. Labels alternate above and below the line, so close
+   dates stay readable. *@
+
+<div class="pf-ms-timeline-scroll">
+    <div class="pf-ms-timeline-track">
+        <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Alternate"
+                     TimelineAlign="TimelineAlign.Start" Class="pf-ms-timeline"
+                     Style="@($"padding-left:{Percent(Offset(_sorted[0].TargetDate))}")">
+            @for (var i = 0; i < _sorted.Count; i++)
+            {
+                var milestone = _sorted[i];
+                var days = (i + 1 < _sorted.Count ? _sorted[i + 1].TargetDate : _end).DayNumber - milestone.TargetDate.DayNumber;
+                var dot = Dot(milestone.Health);
+
+                <MudTimelineItem Color="dot" Size="Size.Small" Elevation="0"
+                                 DotClass="@(milestone.Status == MilestoneStatus.Open && milestone.Health != MilestoneHealth.Late ? "pf-ms-dot-open" : null)"
+                                 Style="@($"flex:{days} 1 0px")">
+                    <ItemContent>
+                        <div class="pf-ms-timeline-label">
+                            <MudText Typo="Typo.body2" Class="pf-nowrap">@milestone.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="@(milestone.Health == MilestoneHealth.Late ? "pf-bad pf-nowrap" : "pf-muted pf-nowrap")">
+                                @ShortDate(milestone.TargetDate)
+                            </MudText>
+                        </div>
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+        </MudTimeline>
+
+        <div class="pf-ms-timeline-scale" aria-hidden="true">
+            @foreach (var month in Months())
+            {
+                <div class="pf-ms-timeline-tick" style="left:@Percent(Offset(month))"></div>
+                @* A month too close to today would run into the label of today. *@
+                @if (Math.Abs(Offset(month) - Offset(Today)) * _days >= TodayClearance)
+                {
+                    <div class="pf-ms-timeline-month pf-muted" style="left:@Percent(Offset(month))">@MonthLabel(month)</div>
+                }
+            }
+            <div class="pf-ms-timeline-today" style="left:@Percent(Offset(Today))"></div>
+            <div class="pf-ms-timeline-today-label" style="left:@Percent(Offset(Today))">Today</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Days of the range before the first and after the last date, so the dots at the ends and their labels fit.
+    /// </summary>
+    private const int Margin = 24;
+
+    /// <summary>
+    /// Days around today without a month label.
+    /// </summary>
+    private const int TodayClearance = 12;
+
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-US");
+
+    /// <summary>
+    /// At least one milestone.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<MilestoneItem> Milestones { get; set; } = [];
+
+    [Parameter]
+    public DateOnly Today { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+    private List<MilestoneItem> _sorted = [];
+    private DateOnly _start;
+    private DateOnly _end;
+    private int _days;
+
+    protected override void OnParametersSet()
+    {
+        _sorted = Milestones.OrderBy(m => m.TargetDate).ToList();
+
+        var first = _sorted[0].TargetDate < Today ? _sorted[0].TargetDate : Today;
+        var last = _sorted[^1].TargetDate > Today ? _sorted[^1].TargetDate : Today;
+        _start = first.AddDays(-Margin);
+        _end = last.AddDays(Margin);
+        _days = _end.DayNumber - _start.DayNumber;
+    }
+
+    /// <summary>
+    /// Where <paramref name="date"/> is on the range, from 0 at its start to 1 at its end.
+    /// </summary>
+    private double Offset(DateOnly date) => (double)(date.DayNumber - _start.DayNumber) / _days;
+
+    private static string Percent(double offset) => (offset * 100).ToString("0.###", CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>
+    /// The first days of the months within the range.
+    /// </summary>
+    private IEnumerable<DateOnly> Months()
+    {
+        for (var month = new DateOnly(_start.Year, _start.Month, 1).AddMonths(1); month < _end; month = month.AddMonths(1))
+            yield return month;
+    }
+
+    /// <summary>
+    /// The month, with the year in January and when the range spans more than one year.
+    /// </summary>
+    private string MonthLabel(DateOnly month) =>
+        month.Month == 1 || _start.Year != _end.Year && month == Months().First()
+            ? month.ToString("MMM yyyy", Culture)
+            : month.ToString("MMM", Culture);
+
+    private static string ShortDate(DateOnly date) => date.ToString("d MMM", Culture);
+
+    /// <summary>
+    /// The colour of the dot. A completed or a late milestone is filled with it; an open one is a ring (pf-ms-dot-open).
+    /// </summary>
+    private static Color Dot(MilestoneHealth health) => health switch
+    {
+        MilestoneHealth.Reached => Color.Success,
+        MilestoneHealth.CompletedWithLooseEnds => Color.Warning,
+        MilestoneHealth.CompletedEmpty => Color.Default,
+        MilestoneHealth.Late => Color.Error,
+        _ => Color.Primary,
+    };
+}
