@@ -1,0 +1,196 @@
+@using ProjectManagementSystem.Application.Employees
+@using ProjectManagementSystem.Application.Employees.Queries.GetEmployees
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Commands.AddTeamMember
+@using ProjectManagementSystem.Application.Projects.Queries.GetRoles
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@inject IEmployeeService EmployeeService
+@inject IProjectService ProjectService
+
+@* Adds an employee to the team of a project with a role from the catalog of the project, the start of the membership
+   and the first hourly rate. Current members are not offered; a former member can join again with a new period, after
+   the end of the last one. A rule the API rejects (an overlapping period) keeps the dialog open with the reason.
+   Closes with the full name of the new member. *@
+<MudDialog Class="pf-dialog">
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid?" @bind-Value="_employeeId" Label="Employee" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Required="true" RequiredError="Choose the employee."
+                           Disabled="_candidates is null" ToStringFunc="EmployeeName" AnchorOrigin="Origin.BottomCenter"
+                           HelperText="@(_employeesError ?? "Current members of the team are not listed.")"
+                           Error="_employeesError is not null">
+                    @foreach (var employee in _candidates ?? [])
+                    {
+                        <MudSelectItem T="Guid?" Value="employee.Id">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(employee.FirstName, employee.LastName)</MudAvatar>
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2">
+                                        @employee.FirstName @employee.LastName
+                                        @if (IsFormerMember(employee.Id))
+                                        {
+                                            <span class="pf-muted"> (rejoining)</span>
+                                        }
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Class="pf-muted">@employee.Email</MudText>
+                                </MudStack>
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid?" @bind-Value="_roleId" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Required="true" RequiredError="Choose the role." Disabled="_roles is null"
+                           ToStringFunc="RoleName" AnchorOrigin="Origin.BottomCenter"
+                           HelperText="@(_rolesError ?? "Roles come from the catalog of this project.")"
+                           Error="_rolesError is not null">
+                    @foreach (var role in _roles ?? [])
+                    {
+                        <MudSelectItem T="Guid?" Value="role.Id">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.body2">@role.Name</MudText>
+                                @if (!string.IsNullOrWhiteSpace(role.Description))
+                                {
+                                    <MudText Typo="Typo.caption" Class="pf-muted">@role.Description</MudText>
+                                }
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudDatePicker @bind-Date="_from" Label="Member from" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Required="true" RequiredError="Pick the start date." DateFormat="dd MMM yyyy"
+                               HelperText="@FromHelperText" />
+                <MudNumericField T="decimal?" @bind-Value="_hourlyRate" Label="@($"Hourly rate ({Currency})")"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="0.5m" Placeholder="e.g. 60"
+                                 Required="true" RequiredError="Enter the hourly rate."
+                                 Validation="@(new Func<decimal?, string?>(ValidateRate))" />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAsync" Disabled="_saving">
+            @(_saving ? "Adding…" : "Add member")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Currency { get; set; } = default!;
+
+    /// <summary>
+    /// The team as the tab shows it: current members are left out, former members are marked as rejoining.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TeamMemberItem> Members { get; set; } = [];
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private IReadOnlyList<EmployeeItem>? _candidates;
+    private IReadOnlyList<RoleItem>? _roles;
+    private Guid? _employeeId;
+    private Guid? _roleId;
+    private DateTime? _from = DateTime.Today;
+    private decimal? _hourlyRate;
+    private string? _employeesError;
+    private string? _rolesError;
+    private string? _error;
+
+    /// <summary>
+    /// A former member can join again only after the end of their last period.
+    /// </summary>
+    private string FromHelperText =>
+        _employeeId is { } id && LastEnd(id) is { } end
+            ? $"The last membership ended on {Display.ShortDate(end)}; the new one must start after that."
+            : "The first hourly rate starts on this date too.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadEmployeesAsync(), LoadRolesAsync());
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        try
+        {
+            var employees = await EmployeeService.GetEmployees(new GetEmployeesQuery(null));
+            var current = Members.Where(m => m.IsActive).Select(m => m.Employee.Id).ToHashSet();
+            _candidates = employees.Items.Where(e => !current.Contains(e.Id)).ToList();
+            if (_candidates.Count == 0)
+                _employeesError = "Every employee is on the team already.";
+        }
+        catch (Exception exception)
+        {
+            _candidates = [];
+            _employeesError = $"The employees could not be loaded. {GrpcErrors.Describe(exception)}";
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var roles = await ProjectService.GetRoles(new GetRolesQuery(ProjectId));
+            _roles = roles.Items;
+            if (_roles.Count == 0)
+                _rolesError = "The project has no roles yet.";
+        }
+        catch (Exception exception)
+        {
+            _roles = [];
+            _rolesError = $"The roles could not be loaded. {GrpcErrors.Describe(exception)}";
+        }
+    }
+
+    private bool IsFormerMember(Guid employeeId) => Members.Any(m => m.Employee.Id == employeeId);
+
+    private DateOnly? LastEnd(Guid employeeId) =>
+        Members.FirstOrDefault(m => m.Employee.Id == employeeId)?.Periods.Max(p => p.To);
+
+    private string EmployeeName(Guid? id) =>
+        _candidates?.FirstOrDefault(e => e.Id == id) is { } employee ? $"{employee.FirstName} {employee.LastName}" : string.Empty;
+
+    private string RoleName(Guid? id) => _roles?.FirstOrDefault(r => r.Id == id)?.Name ?? string.Empty;
+
+    private static string? ValidateRate(decimal? rate) => rate is > 0 ? null : "The hourly rate must be greater than 0.";
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task AddAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _employeeId is not { } employeeId || _roleId is not { } roleId || _from is not { } from ||
+            _hourlyRate is not { } hourlyRate)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await ProjectService.AddTeamMember(
+                new AddTeamMemberCommand(ProjectId, employeeId, roleId, DateOnly.FromDateTime(from), hourlyRate));
+            Dialog.Close(DialogResult.Ok(EmployeeName(employeeId)));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

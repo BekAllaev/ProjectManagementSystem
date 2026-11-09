@@ -1,0 +1,100 @@
+@using ProjectManagementSystem.Application.Projects
+@using ProjectManagementSystem.Application.Projects.Commands.ChangeHourlyRate
+@using ProjectManagementSystem.Application.Projects.Queries.GetTeam
+@inject IProjectService ProjectService
+
+@* Adds an hourly rate to a team member from a date on: rates are never changed retroactively, so the date is today or
+   later and after the start of the current rate. A rule the API rejects keeps the dialog open with the reason. Closes
+   with the new rate as text. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add hourly rate</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">@Display.Name(Member.Employee)</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudNumericField T="decimal?" @bind-Value="_amount" Label="@($"Hourly rate ({Currency})")"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="0.5m" AutoFocus="true"
+                                 Required="true" RequiredError="Enter the hourly rate."
+                                 Validation="@(new Func<decimal?, string?>(ValidateAmount))"
+                                 HelperText="@($"Current: {Display.Rate(Member.CurrentHourlyRate, Currency)} since {Display.ShortDate(Member.CurrentHourlyRateFrom)}")" />
+                <MudDatePicker @bind-Date="_from" Label="Valid from" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Required="true" RequiredError="Pick the date." DateFormat="dd MMM yyyy"
+                               MinDate="_earliest" HelperText="Rates can't change retroactively: today or later, after the start of the last rate." />
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving…" : "Add rate")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Currency { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public TeamMemberItem Member { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private decimal? _amount;
+    private DateTime _earliest = DateTime.Today;
+    private DateTime? _from;
+    private string? _error;
+
+    /// <summary>
+    /// A new rate starts today or later, and after the start of the last one, which may lie in the future.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        var lastRate = Member.HourlyRates.Count > 0 ? Member.HourlyRates.Max(r => r.From) : Member.CurrentHourlyRateFrom;
+        var afterCurrent = lastRate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        _earliest = afterCurrent > DateTime.Today ? afterCurrent : DateTime.Today;
+        _from = _earliest;
+    }
+
+    private static string? ValidateAmount(decimal? amount) => amount is > 0 ? null : "The hourly rate must be greater than 0.";
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _amount is not { } amount || _from is not { } from)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var start = DateOnly.FromDateTime(from);
+            await ProjectService.ChangeHourlyRate(new ChangeHourlyRateCommand(ProjectId, Member.Employee.Id, amount, start));
+            Dialog.Close(DialogResult.Ok($"{Display.Rate(amount, Currency)} from {Display.ShortDate(start)}"));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
