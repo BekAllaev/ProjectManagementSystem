@@ -1,0 +1,115 @@
+@using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Commands.AddTaskToMilestone
+@using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
+@using ProjectManagementSystem.Application.WorkPackages
+@using ProjectManagementSystem.Application.WorkPackages.Queries.GetTasks
+@using ProjectManagementSystem.Domain.WorkPackages
+@inject IWorkPackageService WorkPackageService
+@inject IMilestoneService MilestoneService
+
+@* Adds a task of the project, from any work package, to a milestone. Tasks already in the milestone and cancelled
+   tasks are not offered; completed tasks are. A rule the API rejects keeps the dialog open with the reason. Closes with
+   the name of the task. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add task to milestone</MudText>
+        <MudText Typo="Typo.body2" Class="pf-muted">@Milestone.Name</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudSelect T="Guid?" @bind-Value="_taskId" Label="Task" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Required="true" RequiredError="Choose the task." Disabled="_tasks is null"
+                           ToStringFunc="TaskName" AnchorOrigin="Origin.BottomCenter"
+                           HelperText="@(_loadError ?? "Completed tasks can be added too; cancelled tasks can't.")"
+                           Error="_loadError is not null">
+                    @foreach (var task in _tasks ?? [])
+                    {
+                        <MudSelectItem T="Guid?" Value="task.TaskId">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                <div class="flex-grow-1"><TaskOption Task="task" /></div>
+                                <StatusChipView Value="Display.Chip(task.Status)" />
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAsync" Disabled="_saving || _tasks is not { Count: > 0 }">
+            @(_saving ? "Adding…" : "Add task")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public MilestoneItem Milestone { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private IReadOnlyList<TaskListItem>? _tasks;
+    private Guid? _taskId;
+    private string? _loadError;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tasks = await WorkPackageService.GetTasks(new GetTasksQuery(ProjectId, null, null, null));
+            var inMilestone = Milestone.Tasks.Select(t => t.TaskId).ToHashSet();
+            _tasks = tasks.Items
+                .Where(t => t.Status != ProjectTaskStatus.Cancelled && !inMilestone.Contains(t.TaskId))
+                .ToList();
+            if (_tasks.Count == 0)
+                _loadError = "Every task that isn't cancelled is in this milestone already.";
+        }
+        catch (Exception exception)
+        {
+            _tasks = [];
+            _loadError = $"The tasks could not be loaded. {GrpcErrors.Describe(exception)}";
+        }
+    }
+
+    private string TaskName(Guid? id) => _tasks?.FirstOrDefault(t => t.TaskId == id)?.Name ?? string.Empty;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task AddAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _tasks?.FirstOrDefault(t => t.TaskId == _taskId) is not { } task)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            await MilestoneService.AddTaskToMilestone(new AddTaskToMilestoneCommand(Milestone.Id, task.WorkPackageId, task.TaskId));
+            Dialog.Close(DialogResult.Ok(task.Name));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

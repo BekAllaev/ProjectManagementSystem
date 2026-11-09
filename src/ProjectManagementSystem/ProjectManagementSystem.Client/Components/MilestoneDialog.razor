@@ -1,0 +1,143 @@
+@using ProjectManagementSystem.Application.Milestones
+@using ProjectManagementSystem.Application.Milestones.Commands.ChangeMilestoneTargetDate
+@using ProjectManagementSystem.Application.Milestones.Commands.CreateMilestone
+@using ProjectManagementSystem.Application.Milestones.Commands.RenameMilestone
+@using ProjectManagementSystem.Application.Milestones.Queries.GetMilestones
+@inject IMilestoneService MilestoneService
+
+@* Creates a milestone (name, description, target date), renames one or changes its target date: the API has a command
+   for each. A rule the API rejects keeps the dialog open with the reason, so the input is not lost. Closes with the
+   id of the milestone (the new one when it creates it). *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+        @if (Milestone is not null)
+        {
+            <MudText Typo="Typo.body2" Class="pf-muted">@Milestone.Name</MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                @if (Mode is MilestoneDialogMode.Create or MilestoneDialogMode.Rename)
+                {
+                    <MudTextField T="string" @bind-Value="_name" Label="Name" Placeholder="e.g. Pilot customers onboarded"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Enter the name."
+                                  MaxLength="200" AutoFocus="true" Immediate="true" />
+                }
+                @if (Mode == MilestoneDialogMode.Create)
+                {
+                    <MudTextField T="string" @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Lines="2" MaxLength="2000" />
+                }
+                @if (Mode is MilestoneDialogMode.Create or MilestoneDialogMode.ChangeTargetDate)
+                {
+                    <MudDatePicker @bind-Date="_targetDate" Label="Target date" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Required="true" RequiredError="Pick the target date." DateFormat="dd MMM yyyy"
+                                   HelperText="@(Milestone is null ? null : $"Current target {Display.ShortDate(Milestone.TargetDate)}.")" />
+                }
+                @if (Mode == MilestoneDialogMode.Create)
+                {
+                    <MudText Typo="Typo.caption" Class="pf-muted">
+                        Add tasks after creating it. An empty milestone is not considered reached.
+                    </MudText>
+                }
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving…" : Mode == MilestoneDialogMode.Create ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter]
+    public MilestoneDialogMode Mode { get; set; }
+
+    /// <summary>
+    /// The project of a new milestone.
+    /// </summary>
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>
+    /// The milestone to rename or to move; null to create one.
+    /// </summary>
+    [Parameter]
+    public MilestoneItem? Milestone { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private string? _name;
+    private string? _description;
+    private DateTime? _targetDate;
+    private string? _error;
+
+    private string Title => Mode switch
+    {
+        MilestoneDialogMode.Rename => "Rename milestone",
+        MilestoneDialogMode.ChangeTargetDate => "Change target date",
+        _ => "New milestone",
+    };
+
+    protected override void OnInitialized()
+    {
+        _name = Milestone?.Name;
+        _targetDate = Milestone?.TargetDate.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var id = Milestone?.Id ?? Guid.Empty;
+
+            switch (Mode)
+            {
+                case MilestoneDialogMode.Create:
+                    var created = await MilestoneService.CreateMilestone(new CreateMilestoneCommand(
+                        ProjectId, _name!.Trim(), string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+                        DateOnly.FromDateTime(_targetDate!.Value)));
+                    id = created.Id;
+                    break;
+                case MilestoneDialogMode.Rename:
+                    await MilestoneService.RenameMilestone(new RenameMilestoneCommand(id, _name!.Trim()));
+                    break;
+                case MilestoneDialogMode.ChangeTargetDate:
+                    await MilestoneService.ChangeMilestoneTargetDate(
+                        new ChangeMilestoneTargetDateCommand(id, DateOnly.FromDateTime(_targetDate!.Value)));
+                    break;
+            }
+
+            Dialog.Close(DialogResult.Ok(id));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
