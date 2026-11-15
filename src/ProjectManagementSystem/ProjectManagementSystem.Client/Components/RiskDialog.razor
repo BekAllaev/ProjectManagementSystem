@@ -1,0 +1,159 @@
+@using ProjectManagementSystem.Application.Risks
+@using ProjectManagementSystem.Application.Risks.Commands.RegisterRisk
+@using ProjectManagementSystem.Application.Risks.Commands.UpdateRisk
+@using ProjectManagementSystem.Application.Risks.Queries.GetRisks
+@using ProjectManagementSystem.Domain.Risks
+@inject IRiskService RiskService
+
+@* Registers a risk, or edits one of the register (Risk is set): description, probability, impact, owner and, when
+   editing, the status; closing a risk keeps it in the register. The level follows from probability × impact. A rule
+   the API rejects keeps the dialog open with the reason. Closes with the id of the risk. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(Risk is null ? "New risk" : "Edit risk")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudTextField T="string" @bind-Value="_description" Label="Description"
+                              Placeholder="e.g. Key supplier misses delivery date" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Lines="2" Sizing="InputSizing.Auto" MaxLines="6" MaxLength="2000" AutoFocus="true"
+                              Required="true" RequiredError="Describe the risk." />
+                <MudStack Row="true" Spacing="3">
+                    <div style="flex:1;min-width:0">
+                        <MudSelect T="RiskLevel" @bind-Value="_probability" Label="Probability" Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" ToStringFunc="Display.Name" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (var level in Levels)
+                            {
+                                <MudSelectItem T="RiskLevel" Value="level">@Display.Name(level)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                    <div style="flex:1;min-width:0">
+                        <MudSelect T="RiskLevel" @bind-Value="_impact" Label="Impact" Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" ToStringFunc="Display.Name" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (var level in Levels)
+                            {
+                                <MudSelectItem T="RiskLevel" Value="level">@Display.Name(level)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.body2" Class="pf-muted">Level</MudText>
+                    <StatusChipView Value="Display.Chip(Level)" />
+                    <MudText Typo="Typo.caption" Class="pf-muted">probability × impact</MudText>
+                </MudStack>
+                <TeamMemberSelect ProjectId="ProjectId" @bind-Value="_ownerId" Label="Owner"
+                                  RequiredError="Choose the owner of the risk."
+                                  HelperText="Who watches the risk: a current team member." />
+                @if (Risk is not null)
+                {
+                    <MudSelect T="RiskStatus" @bind-Value="_status" Label="Status" Variant="Variant.Outlined"
+                               Margin="Margin.Dense" ToStringFunc="@(s => Display.Chip(s).Label)" AnchorOrigin="Origin.BottomCenter"
+                               HelperText="A closed risk stays in the register.">
+                        <MudSelectItem T="RiskStatus" Value="RiskStatus.Open">Open</MudSelectItem>
+                        <MudSelectItem T="RiskStatus" Value="RiskStatus.Closed">Closed</MudSelectItem>
+                    </MudSelect>
+                }
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving…" : Risk is null ? "Add risk" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static readonly RiskLevel[] Levels = [RiskLevel.High, RiskLevel.Medium, RiskLevel.Low];
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>
+    /// The risk to edit; empty for a new one.
+    /// </summary>
+    [Parameter]
+    public RiskItem? Risk { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private string? _description;
+    private RiskLevel _probability = RiskLevel.Medium;
+    private RiskLevel _impact = RiskLevel.Medium;
+    private Guid? _ownerId;
+    private RiskStatus _status = RiskStatus.Open;
+    private string? _error;
+
+    /// <summary>
+    /// Level of the risk as the read side computes it: probability × impact, each counted 1 to 3.
+    /// </summary>
+    private RiskLevel Level => (((int)_probability + 1) * ((int)_impact + 1)) switch
+    {
+        >= 6 => RiskLevel.High,
+        >= 3 => RiskLevel.Medium,
+        _ => RiskLevel.Low,
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Risk is not { } risk)
+            return;
+
+        _description = risk.Description;
+        _probability = risk.Probability;
+        _impact = risk.Impact;
+        _ownerId = risk.Owner.Id;
+        _status = risk.Status;
+    }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || string.IsNullOrWhiteSpace(_description) || _ownerId is not { } ownerId)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var description = _description.Trim();
+            Guid id;
+
+            if (Risk is { } risk)
+            {
+                await RiskService.UpdateRisk(new UpdateRiskCommand(risk.Id, description, _probability, _impact, ownerId, _status));
+                id = risk.Id;
+            }
+            else
+            {
+                var created = await RiskService.RegisterRisk(new RegisterRiskCommand(ProjectId, description, _probability, _impact, ownerId));
+                id = created.Id;
+            }
+
+            Dialog.Close(DialogResult.Ok(id));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

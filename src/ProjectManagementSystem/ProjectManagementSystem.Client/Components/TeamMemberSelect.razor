@@ -4,7 +4,7 @@
 
 @* Picks a current member of the team of a project: only they can be responsible for work. *@
 <MudSelect T="Guid?" Value="Value" ValueChanged="OnValueChangedAsync" Label="@Label" Variant="Variant.Outlined"
-           Margin="Margin.Dense" Required="true" RequiredError="Choose the responsible person." Disabled="_members is null"
+           Margin="Margin.Dense" Required="true" RequiredError="@RequiredError" Disabled="_members is null"
            ToStringFunc="NameOf" AnchorOrigin="Origin.BottomCenter" HelperText="@(_error ?? HelperText)" Error="_error is not null">
     @if (_members is not null)
     {
@@ -35,6 +35,9 @@
 
     [Parameter]
     public string Label { get; set; } = "Responsible person";
+
+    [Parameter]
+    public string RequiredError { get; set; } = "Choose the responsible person.";
 
     [Parameter]
     public string HelperText { get; set; } = "Only current team members can be responsible.";
