@@ -120,6 +120,24 @@ public static class Display
         _ => new(level.ToString(), Color.Default),
     };
 
+    public static StatusChip Chip(RiskStatus status) => status switch
+    {
+        RiskStatus.Open => new("Open", Color.Default),
+        RiskStatus.Closed => new("Closed", Color.Default, Variant.Outlined),
+        _ => new(status.ToString(), Color.Default),
+    };
+
+    /// <summary>
+    /// Probability or impact of a risk.
+    /// </summary>
+    public static string Name(RiskLevel level) => level switch
+    {
+        RiskLevel.Low => "Low",
+        RiskLevel.Medium => "Medium",
+        RiskLevel.High => "High",
+        _ => level.ToString(),
+    };
+
     public static StatusChip Chip(ProjectTaskStatus status) => status switch
     {
         ProjectTaskStatus.Open => new("Open", Color.Default),

@@ -1,0 +1,307 @@
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@using ProjectManagementSystem.Application.Risks
+@using ProjectManagementSystem.Application.Risks.Queries.GetRisks
+@using ProjectManagementSystem.Domain.Risks
+@implements IDisposable
+@inject IRiskService RiskService
+
+@* The risk register of a project: a probability × impact matrix of the open risks and the register itself, open risks
+   first, then by score, highest first (the API orders them). A cell of the matrix filters the register to the open
+   risks of that cell; the status filter shows open, closed or all risks. A risk is a plain record (CRUD) without
+   domain rules. *@
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap" Style="min-height:40px">
+        <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The risks could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    <div class="pf-risk-panels">
+        <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-3">
+            <LoadingBar Visible="_loading && _risks is not null" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="min-height:30px">
+                <MudText Typo="Typo.h6" Class="flex-grow-1">Probability × impact</MudText>
+                @if (_cell is not null)
+                {
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearCell">Clear</MudButton>
+                }
+            </MudStack>
+
+            <div class="pf-risk-matrix" role="group" aria-label="Open risks by probability and impact">
+                @foreach (var impact in Levels.Reverse())
+                {
+                    <div class="pf-risk-matrix-label pf-risk-matrix-row">@Display.Name(impact)</div>
+                    @foreach (var probability in Levels)
+                    {
+                        var cell = new Cell(probability, impact);
+                        var count = OpenIn(cell);
+                        var selected = _cell == cell;
+                        <button type="button" class="@CellClass(cell, count, selected)" aria-pressed="@(selected ? "true" : "false")"
+                                title="@CellTitle(cell, count)" aria-label="@CellTitle(cell, count)"
+                                disabled="@(_risks is null)" @onclick="() => SelectCell(cell)">
+                            @(count > 0 ? count : string.Empty)
+                        </button>
+                    }
+                }
+                <div></div>
+                @foreach (var probability in Levels)
+                {
+                    <div class="pf-risk-matrix-label pf-risk-matrix-col">@Display.Name(probability)</div>
+                }
+            </div>
+            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="pf-muted">
+                <MudText Typo="Typo.caption">Rows: impact</MudText>
+                <MudText Typo="Typo.caption">Columns: probability</MudText>
+            </MudStack>
+            <MudText Typo="Typo.caption" Class="pf-muted">Open risks only. Click a cell to filter the register.</MudText>
+        </MudPaper>
+
+        <MudStack Spacing="2" Style="min-width:0">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                <MudToggleGroup T="StatusFilter" Value="_status" ValueChanged="SelectStatus" Outlined="true" Delimiters="false"
+                                Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+                    @foreach (var option in StatusOptions)
+                    {
+                        <MudToggleItem Value="option.Filter">
+                            @option.Label <span class="pf-toggle-count">@CountOf(option.Filter)</span>
+                        </MudToggleItem>
+                    }
+                </MudToggleGroup>
+                @if (_cell is { } selectedCell)
+                {
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" OnClose="ClearCell" Class="ma-0">
+                        P @Display.Name(selectedCell.Probability) × I @Display.Name(selectedCell.Impact)
+                    </MudChip>
+                }
+            </MudStack>
+
+            <MudTable T="RiskItem" Items="Matching()" Loading="_loading && _risks is null" LoadingProgressColor="Color.Primary"
+                      Hover="true" Elevation="0" Outlined="true" Breakpoint="Breakpoint.Sm" Class="pf-table"
+                      RowClassFunc="RowClass">
+                <HeaderContent>
+                    <MudTh Style="width:96px">Level</MudTh>
+                    <MudTh>Risk</MudTh>
+                    <MudTh>Owner</MudTh>
+                    <MudTh Style="width:100px">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Level"><div class="pf-risk-level"><StatusChipView Value="Display.Chip(context.Level)" /></div></MudTd>
+                    <MudTd DataLabel="Risk">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2" Class="pf-risk-description">@context.Description</MudText>
+                            <MudText Typo="Typo.caption" Class="pf-muted">
+                                Probability @Display.Name(context.Probability) · Impact @Display.Name(context.Impact)
+                            </MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Owner">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudAvatar Size="Size.Small" Class="pf-avatar">@Display.Initials(context.Owner)</MudAvatar>
+                            <MudText Typo="Typo.body2" Class="pf-nowrap">@Display.Name(context.Owner)</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Status"><StatusChipView Value="Display.Chip(context.Status)" /></MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    @if (_risks is { Count: 0 })
+                    {
+                        <EmptyState Icon="@Icons.Material.Outlined.Shield" Title="No risks yet"
+                                    Text="Register what could go wrong, how likely it is and how much it would hurt." />
+                    }
+                    else
+                    {
+                        <MudStack Spacing="1" AlignItems="AlignItems.Start" Class="pt-4 pb-2">
+                            <MudIcon Icon="@Icons.Material.Outlined.GppGood" Class="pf-empty-icon mb-1" />
+                            <MudText Typo="Typo.body2">No risks match these filters</MudText>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ClearFilters" Class="mt-1">Clear filters</MudButton>
+                        </MudStack>
+                    }
+                </NoRecordsContent>
+                <LoadingContent>
+                    <MudText Typo="Typo.body2" Class="pf-muted pa-4">Loading the risks…</MudText>
+                </LoadingContent>
+            </MudTable>
+        </MudStack>
+    </div>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the register again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private enum StatusFilter
+    {
+        Open,
+        Closed,
+        All,
+    }
+
+    private static readonly (StatusFilter Filter, string Label)[] StatusOptions =
+    [
+        (StatusFilter.Open, "Open"),
+        (StatusFilter.Closed, "Closed"),
+        (StatusFilter.All, "All"),
+    ];
+
+    private static readonly RiskLevel[] Levels = [RiskLevel.Low, RiskLevel.Medium, RiskLevel.High];
+
+    /// <summary>
+    /// A cell of the matrix: the open risks with this probability and impact.
+    /// </summary>
+    private sealed record Cell(RiskLevel Probability, RiskLevel Impact);
+
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private IReadOnlyList<RiskItem>? _risks;
+    private StatusFilter _status = StatusFilter.Open;
+    private Cell? _cell;
+    private bool _loading;
+    private string? _error;
+
+    private string Summary
+    {
+        get
+        {
+            if (_risks is not { } risks)
+                return "Loading the risks…";
+
+            var open = risks.Count(r => r.Status == RiskStatus.Open);
+            var high = risks.Count(r => r.Status == RiskStatus.Open && r.Level == RiskLevel.High);
+
+            return $"{open} open · {high} high · {risks.Count - open} closed";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+        {
+            _risks = null;
+            _cell = null;
+            _status = StatusFilter.Open;
+        }
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            // All statuses: the filters and the counts are on the whole register.
+            var risks = await RiskService.GetRisks(new GetRisksQuery(Project.Id, null), _disposed.Token);
+            _risks = risks.Items;
+        }
+        catch (Exception exception)
+        {
+            // Nothing to show once the tab is gone.
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static bool Matches(RiskItem risk, StatusFilter filter) => filter switch
+    {
+        StatusFilter.Open => risk.Status == RiskStatus.Open,
+        StatusFilter.Closed => risk.Status == RiskStatus.Closed,
+        _ => true,
+    };
+
+    private int CountOf(StatusFilter filter) => _risks?.Count(r => Matches(r, filter)) ?? 0;
+
+    private IEnumerable<RiskItem> Matching() =>
+        (_risks ?? []).Where(r => Matches(r, _status) && (_cell is null || (r.Probability == _cell.Probability && r.Impact == _cell.Impact)));
+
+    private int OpenIn(Cell cell) =>
+        _risks?.Count(r => r.Status == RiskStatus.Open && r.Probability == cell.Probability && r.Impact == cell.Impact) ?? 0;
+
+    /// <summary>
+    /// A cell selects the open risks in it; a click on the selected cell clears it.
+    /// </summary>
+    private void SelectCell(Cell cell)
+    {
+        if (_cell == cell)
+        {
+            _cell = null;
+            return;
+        }
+
+        _cell = cell;
+        _status = StatusFilter.Open;
+    }
+
+    /// <summary>
+    /// The matrix counts open risks only, so a cell is dropped when the filter leaves open risks out.
+    /// </summary>
+    private void SelectStatus(StatusFilter status)
+    {
+        _status = status;
+        if (status == StatusFilter.Closed)
+            _cell = null;
+    }
+
+    private void ClearCell() => _cell = null;
+
+    private void ClearFilters()
+    {
+        _cell = null;
+        _status = StatusFilter.All;
+    }
+
+    /// <summary>
+    /// Level of a cell, as the read side computes it for a risk: probability × impact, each counted 1 to 3.
+    /// </summary>
+    private static RiskLevel LevelOf(Cell cell) =>
+        (((int)cell.Probability + 1) * ((int)cell.Impact + 1)) switch
+        {
+            >= 6 => RiskLevel.High,
+            >= 3 => RiskLevel.Medium,
+            _ => RiskLevel.Low,
+        };
+
+    private static string CellClass(Cell cell, int count, bool selected) =>
+        $"pf-risk-cell pf-risk-cell-{LevelOf(cell).ToString().ToLowerInvariant()}" +
+        (count > 0 ? " pf-risk-cell-filled" : string.Empty) +
+        (selected ? " pf-risk-cell-selected" : string.Empty);
+
+    private static string CellTitle(Cell cell, int count) =>
+        $"Probability {Display.Name(cell.Probability)} × impact {Display.Name(cell.Impact)}: {count} open";
+
+    private static string RowClass(RiskItem risk, int index) => risk.Status == RiskStatus.Closed ? "pf-former" : string.Empty;
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

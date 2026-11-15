@@ -397,3 +397,28 @@ h1[tabindex="-1"]:focus { outline: none; }
     .pf-cost-row { grid-template-columns: minmax(0, 120px) minmax(0, 1fr) 84px; }
     .pf-cost-hours { display: none; }
 }
+
+/* — risks — */
+
+.pf-risk-panels { display: grid; grid-template-columns: minmax(min(100%, 300px), 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .pf-risk-panels { grid-template-columns: minmax(0, 1fr); } }
+.pf-risk-description { text-wrap: pretty; overflow-wrap: anywhere; }
+/* The matrix: impact from high (top) to low in the rows, probability from low to high in the columns. A cell is tinted
+   by the level of its score, stronger when it holds open risks. */
+.pf-risk-matrix { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 4px; align-items: stretch; }
+.pf-risk-matrix-label { font-size: 11px; color: var(--color-neutral-400); }
+.pf-risk-matrix-row { display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
+.pf-risk-matrix-col { text-align: center; padding-top: 2px; }
+.pf-risk-cell {
+    --pf-risk: var(--color-ok); --pf-risk-text: var(--color-text);
+    aspect-ratio: 1.25; border: 0; border-radius: 6px; cursor: pointer; font: inherit; font-size: 18px;
+    font-variant-numeric: tabular-nums; display: grid; place-items: center; color: var(--pf-risk-text);
+    background: color-mix(in srgb, var(--pf-risk) 9%, transparent);
+}
+.pf-risk-cell-medium { --pf-risk: var(--color-warn); }
+.pf-risk-cell-high { --pf-risk: var(--color-bad); }
+.pf-risk-cell-filled { background: color-mix(in srgb, var(--pf-risk) 30%, transparent); }
+.pf-risk-cell:hover:not(:disabled) { background: color-mix(in srgb, var(--pf-risk) 40%, transparent); }
+.pf-risk-cell:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.pf-risk-cell-selected { box-shadow: inset 0 0 0 2px var(--color-accent); }
+.pf-risk-cell:disabled { cursor: default; }
