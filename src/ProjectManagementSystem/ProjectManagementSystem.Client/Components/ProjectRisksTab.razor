@@ -4,16 +4,31 @@
 @using ProjectManagementSystem.Domain.Risks
 @implements IDisposable
 @inject IRiskService RiskService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @* The risk register of a project: a probability × impact matrix of the open risks and the register itself, open risks
    first, then by score, highest first (the API orders them). A cell of the matrix filters the register to the open
    risks of that cell; the status filter shows open, closed or all risks. A risk is a plain record (CRUD) without
-   domain rules. *@
+   domain rules: risks are registered and edited (closed and opened again) here. The read side catches up with a
+   command shortly after it (eventual consistency), so the register asks again until it shows the change. *@
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap" Style="min-height:40px">
         <MudText Typo="Typo.body2" Class="pf-muted flex-grow-1">@Summary</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                   OnClick="() => EditAsync(null)" Disabled="_busy || _risks is null" Class="pf-submit">
+            New risk
+        </MudButton>
     </MudStack>
+
+    @if (_updating)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">Updating the risks…</MudText>
+        </MudStack>
+    }
 
     @if (_error is not null)
     {
@@ -92,6 +107,7 @@
                     <MudTh>Risk</MudTh>
                     <MudTh>Owner</MudTh>
                     <MudTh Style="width:100px">Status</MudTh>
+                    <MudTh Style="width:56px"></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Level"><div class="pf-risk-level"><StatusChipView Value="Display.Chip(context.Level)" /></div></MudTd>
@@ -110,6 +126,12 @@
                         </MudStack>
                     </MudTd>
                     <MudTd DataLabel="Status"><StatusChipView Value="Display.Chip(context.Status)" /></MudTd>
+                    <MudTd Class="pf-right">
+                        <MudTooltip Text="Edit risk">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Disabled="_busy"
+                                           OnClick="() => EditAsync(context)" aria-label="Edit risk" />
+                        </MudTooltip>
+                    </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
                     @if (_risks is { Count: 0 })
@@ -165,6 +187,14 @@
     /// </summary>
     private sealed record Cell(RiskLevel Probability, RiskLevel Impact);
 
+    /// <summary>
+    /// How often, and how far apart, the register is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+
     private readonly CancellationTokenSource _disposed = new();
 
     private Guid _loadedId;
@@ -173,6 +203,8 @@
     private StatusFilter _status = StatusFilter.Open;
     private Cell? _cell;
     private bool _loading;
+    private bool _busy;
+    private bool _updating;
     private string? _error;
 
     private string Summary
@@ -298,6 +330,63 @@
         $"Probability {Display.Name(cell.Probability)} × impact {Display.Name(cell.Impact)}: {count} open";
 
     private static string RowClass(RiskItem risk, int index) => risk.Status == RiskStatus.Closed ? "pf-former" : string.Empty;
+
+    /// <summary>
+    /// Registers a risk (<paramref name="risk"/> empty) or edits one.
+    /// </summary>
+    private async Task EditAsync(RiskItem? risk)
+    {
+        var parameters = new DialogParameters<RiskDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Risk, risk },
+        };
+        var dialog = await DialogService.ShowAsync<RiskDialog>(risk is null ? "New risk" : "Edit risk", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is not { Canceled: false, Data: Guid id })
+            return;
+
+        Snackbar.Add(risk is null ? "Risk added" : "Risk updated", Severity.Success);
+
+        // A new risk shows up in the register; an edited one gets a newer version.
+        var version = risk?.Version ?? -1;
+        await RefreshUntilAsync(() => _risks?.FirstOrDefault(r => r.Id == id) is { } item && item.Version > version);
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the register asks again until
+    /// <paramref name="caughtUp"/> holds, or gives up after a few tries (a later refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilAsync(Func<bool> caughtUp)
+    {
+        _busy = true;
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || caughtUp())
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _busy = false;
+            _updating = false;
+        }
+    }
 
     public void Dispose()
     {
