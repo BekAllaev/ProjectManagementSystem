@@ -1,0 +1,268 @@
+@using ProjectManagementSystem.Application.Funding
+@using ProjectManagementSystem.Application.Funding.Queries.GetFunding
+@using ProjectManagementSystem.Application.Projects.Queries.GetProject
+@implements IDisposable
+@inject IFundingService FundingService
+
+@* Funding of a project: the totals (funding, actual cost, remaining), the tranches, newest first, and the actual cost
+   broken down by member or by work package. Funding only grows: tranches are never edited or removed. Actual cost is
+   hours × the hourly rate of the member on the work date, so past entries keep their rate. *@
+
+<MudStack Spacing="3">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <span>The funding could not be loaded. @_error</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LoadAsync">Try again</MudButton>
+            </MudStack>
+        </MudAlert>
+    }
+
+    <div class="pf-fund-cards">
+        @foreach (var card in Cards())
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-1">
+                <LoadingBar Visible="_loading && _funding is not null" />
+                <MudText Typo="Typo.overline" Class="pf-muted">@card.Label</MudText>
+                @if (_funding is null)
+                {
+                    <MudSkeleton Width="60%" Height="40px" />
+                    <MudSkeleton Width="40%" />
+                }
+                else
+                {
+                    <MudText Typo="Typo.h3" Class="@($"pf-tabular pf-funding-big {card.Class}")">@card.Value</MudText>
+                    <MudText Typo="Typo.caption" Class="@($"pf-muted {card.SubClass}")">@card.Sub</MudText>
+                }
+            </MudPaper>
+        }
+    </div>
+
+    <div class="pf-fund-panels">
+        <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-2">
+            <LoadingBar Visible="_loading && _funding is not null" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="min-height:36px">
+                <MudText Typo="Typo.h6" Class="flex-grow-1">Funding tranches</MudText>
+            </MudStack>
+            <MudText Typo="Typo.caption" Class="pf-muted">
+                @(Project.IsOpen
+                    ? "Funding only grows. Tranches can't be edited or removed."
+                    : "The project is closed; it gets no new funding.")
+            </MudText>
+
+            @if (_funding is null)
+            {
+                @if (_error is null)
+                {
+                    <SkeletonRows Count="3" />
+                }
+            }
+            else if (_funding.Tranches.Count == 0)
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Savings" Title="No funding yet"
+                            Text="@(Project.IsOpen ? "Add the first tranche when money is released for the project." : null)" />
+            }
+            else
+            {
+                <MudSimpleTable Dense="true" Elevation="0" Class="pf-fund-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Reason</th>
+                            <th class="pf-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tranche in _funding.Tranches)
+                        {
+                            <tr>
+                                <td class="pf-nowrap">@Display.ShortDate(tranche.Date)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(tranche.Reason))
+                                    {
+                                        <span class="pf-muted">—</span>
+                                    }
+                                    else
+                                    {
+                                        @tranche.Reason
+                                    }
+                                </td>
+                                <td class="pf-right pf-tabular pf-nowrap">@Display.Money(tranche.Amount, _funding.Currency)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total</td>
+                            <td class="pf-right pf-tabular pf-nowrap">@Display.Money(_funding.TotalFunding, _funding.Currency)</td>
+                        </tr>
+                    </tfoot>
+                </MudSimpleTable>
+            }
+        </MudPaper>
+
+        <MudPaper Elevation="0" Outlined="true" Class="pf-card pa-4 d-flex flex-column gap-3">
+            <LoadingBar Visible="_loading && _funding is not null" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap" Style="min-height:36px">
+                <MudText Typo="Typo.h6" Class="flex-grow-1">Actual cost breakdown</MudText>
+                <MudToggleGroup T="Breakdown" @bind-Value="_breakdown" Outlined="true" Delimiters="false"
+                                Color="Color.Primary" SelectedClass="pf-toggle-selected" Class="pf-toggle">
+                    <MudToggleItem Value="Breakdown.Member">By member</MudToggleItem>
+                    <MudToggleItem Value="Breakdown.WorkPackage">By work package</MudToggleItem>
+                </MudToggleGroup>
+            </MudStack>
+
+            @if (_funding is null)
+            {
+                @if (_error is null)
+                {
+                    <SkeletonRows Count="3" />
+                }
+            }
+            else if (BreakdownRows() is { Count: > 0 } rows)
+            {
+                var highest = rows.Max(r => r.Cost);
+                <MudStack Spacing="2">
+                    @foreach (var row in rows)
+                    {
+                        <div class="pf-cost-row" title="@($"{row.Label}: {Display.Hours(row.Hours)} · {Display.Money(row.Cost, _funding.Currency)}")">
+                            <MudText Typo="Typo.body2" Class="pf-cost-label">@row.Label</MudText>
+                            <div class="pf-cost-bar"><div style="width:@(Css(highest > 0 ? row.Cost / highest * 100 : 0))%"></div></div>
+                            <MudText Typo="Typo.body2" Class="pf-right pf-tabular pf-nowrap">@Display.Money(row.Cost, _funding.Currency)</MudText>
+                            <MudText Typo="Typo.caption" Class="pf-right pf-tabular pf-nowrap pf-muted pf-cost-hours">@Display.Hours(row.Hours)</MudText>
+                        </div>
+                    }
+                </MudStack>
+            }
+            else
+            {
+                <EmptyState Icon="@Icons.Material.Outlined.Schedule" Title="No cost yet"
+                            Text="Time logged on the tasks of the project shows up here." />
+            }
+            <MudText Typo="Typo.caption" Class="pf-muted">
+                Hours × the member's hourly rate on the work date. Past entries keep their rate.
+            </MudText>
+        </MudPaper>
+    </div>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectDetails Project { get; set; } = default!;
+
+    /// <summary>
+    /// The page raises it to load the funding again.
+    /// </summary>
+    [Parameter]
+    public int Reload { get; set; }
+
+    private enum Breakdown
+    {
+        Member,
+        WorkPackage,
+    }
+
+    private sealed record Card(string Label, string Value, string Sub, string Class = "", string SubClass = "");
+
+    private sealed record CostRow(string Label, decimal Hours, decimal Cost);
+
+    private readonly CancellationTokenSource _disposed = new();
+
+    private Guid _loadedId;
+    private int _loadedReload = -1;
+    private FundingSummary? _funding;
+    private Breakdown _breakdown = Breakdown.Member;
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Project.Id && _loadedReload == Reload)
+            return;
+
+        if (_loadedId != Project.Id)
+            _funding = null;
+
+        _loadedId = Project.Id;
+        _loadedReload = Reload;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _funding = await FundingService.GetFunding(new GetFundingQuery(Project.Id), _disposed.Token);
+        }
+        catch (Exception exception)
+        {
+            // Nothing to show once the tab is gone.
+            if (!_disposed.IsCancellationRequested)
+                _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// The three totals; placeholders while the funding loads.
+    /// </summary>
+    private IEnumerable<Card> Cards()
+    {
+        if (_funding is not { } funding)
+        {
+            yield return new("Total funding", string.Empty, string.Empty);
+            yield return new("Actual cost", string.Empty, string.Empty);
+            yield return new("Remaining", string.Empty, string.Empty);
+            yield break;
+        }
+
+        var tranches = funding.Tranches.Count == 1 ? "1 tranche" : $"{funding.Tranches.Count} tranches";
+        yield return new("Total funding", Display.Money(funding.TotalFunding, funding.Currency), tranches);
+
+        yield return new("Actual cost", Display.Money(funding.ActualCost, funding.Currency), "From time logs × hourly rates");
+
+        if (funding.IsOverspent)
+        {
+            yield return new("Remaining", Display.Money(funding.RemainingFunding, funding.Currency),
+                "Overspent · spending is still allowed", "pf-bad", "pf-bad");
+        }
+        else if (funding.UsedPercent is { } used)
+        {
+            yield return new("Remaining", Display.Money(funding.RemainingFunding, funding.Currency),
+                $"{Display.Percent(used)} of funding used", string.Empty, used >= 80 ? "pf-warn" : string.Empty);
+        }
+        else
+        {
+            yield return new("Remaining", Display.Money(funding.RemainingFunding, funding.Currency), "No funding yet");
+        }
+    }
+
+    /// <summary>
+    /// The actual cost by member or by work package, highest first (the API orders them).
+    /// </summary>
+    private IReadOnlyList<CostRow> BreakdownRows()
+    {
+        if (_funding is not { } funding)
+            return [];
+
+        return _breakdown == Breakdown.Member
+            ? funding.CostByMember.Select(m => new CostRow(Display.Name(m.Employee), m.Hours, m.Cost)).ToList()
+            : funding.CostByWorkPackage.Select(w => new CostRow(w.Description, w.Hours, w.Cost)).ToList();
+    }
+
+    private static string Css(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}
