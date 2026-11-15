@@ -3,12 +3,24 @@
 @using ProjectManagementSystem.Application.Projects.Queries.GetProject
 @implements IDisposable
 @inject IFundingService FundingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @* Funding of a project: the totals (funding, actual cost, remaining), the tranches, newest first, and the actual cost
-   broken down by member or by work package. Funding only grows: tranches are never edited or removed. Actual cost is
-   hours × the hourly rate of the member on the work date, so past entries keep their rate. *@
+   broken down by member or by work package. Funding only grows: tranches are added while the project is open and are
+   never edited or removed. Actual cost is hours × the hourly rate of the member on the work date, so past entries keep
+   their rate. The read side catches up with a command shortly after it (eventual consistency), so the tab asks again
+   until it shows a newer version of the funding. *@
 
 <MudStack Spacing="3">
+    @if (_updating)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pf-pending">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" Style="width:14px;height:14px" />
+            <MudText Typo="Typo.body2">Updating the funding…</MudText>
+        </MudStack>
+    }
+
     @if (_error is not null)
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Start">
@@ -44,6 +56,13 @@
             <LoadingBar Visible="_loading && _funding is not null" />
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="min-height:36px">
                 <MudText Typo="Typo.h6" Class="flex-grow-1">Funding tranches</MudText>
+                @if (Project.IsOpen)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add"
+                               OnClick="AddAsync" Disabled="_busy || _funding is null" Class="pf-submit">
+                        Add tranche
+                    </MudButton>
+                }
             </MudStack>
             <MudText Typo="Typo.caption" Class="pf-muted">
                 @(Project.IsOpen
@@ -157,6 +176,14 @@
     [Parameter]
     public int Reload { get; set; }
 
+    /// <summary>
+    /// How often, and how far apart, the funding is asked again while the read side has not caught up with a command.
+    /// </summary>
+    private const int RefreshPolls = 10;
+    private static readonly TimeSpan RefreshPollInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
     private enum Breakdown
     {
         Member,
@@ -174,6 +201,8 @@
     private FundingSummary? _funding;
     private Breakdown _breakdown = Breakdown.Member;
     private bool _loading;
+    private bool _busy;
+    private bool _updating;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -259,6 +288,61 @@
     }
 
     private static string Css(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task AddAsync()
+    {
+        if (_funding is not { } funding)
+            return;
+
+        var parameters = new DialogParameters<AddFundingDialog>
+        {
+            { d => d.ProjectId, Project.Id },
+            { d => d.Currency, funding.Currency },
+        };
+        var dialog = await DialogService.ShowAsync<AddFundingDialog>("Add funding tranche", parameters, Options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string amount })
+        {
+            Snackbar.Add($"Funding added: {amount}", Severity.Success);
+            await RefreshUntilNewerAsync(funding.Version);
+        }
+    }
+
+    /// <summary>
+    /// The read side catches up with a command shortly after it (eventual consistency): the tab asks again until it
+    /// shows a newer version of the funding than <paramref name="version"/>, or gives up after a few tries (a later
+    /// refresh shows it).
+    /// </summary>
+    private async Task RefreshUntilNewerAsync(long version)
+    {
+        _busy = true;
+        _updating = true;
+        StateHasChanged();
+
+        try
+        {
+            for (var attempt = 0; attempt < RefreshPolls && !_disposed.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(RefreshPollInterval, _disposed.Token);
+                await LoadAsync();
+
+                if (_error is not null || _funding?.Version > version)
+                    return;
+
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab is gone.
+        }
+        finally
+        {
+            _busy = false;
+            _updating = false;
+        }
+    }
 
     public void Dispose()
     {
