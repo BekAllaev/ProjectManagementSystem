@@ -119,6 +119,9 @@ else
         <MudTabPanel Text="@Tabs[5].Title">
             <ProjectTeamTab Project="_project" Reload="_reload" />
         </MudTabPanel>
+        <MudTabPanel Text="@Tabs[6].Title">
+            <ProjectFundingTab Project="_project" Reload="_reload" />
+        </MudTabPanel>
     </MudTabs>
 }
 
@@ -134,6 +137,7 @@ else
         ("dependencies", "Dependencies"),
         ("milestones", "Milestones"),
         ("team", "Team"),
+        ("funding", "Funding"),
     ];
 
     [Parameter]

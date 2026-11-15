@@ -374,3 +374,26 @@ h1[tabindex="-1"]:focus { outline: none; }
     .pf-step-label { display: none; }
     .pf-time-table .pf-time-rate { display: none !important; }
 }
+
+/* — funding — */
+
+.pf-fund-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.pf-fund-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
+.pf-fund-table.mud-table { background: transparent; }
+.pf-fund-table .mud-table-container { overflow-x: auto; }
+.pf-fund-table th {
+    font-size: 11px; font-weight: 600 !important; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--color-neutral-500) !important;
+}
+.pf-fund-table td, .pf-fund-table th { border-color: var(--color-neutral-800) !important; padding: 8px 10px !important; }
+.pf-fund-table .pf-right { text-align: right; }
+.pf-fund-table tfoot td { border-bottom: 0 !important; font-weight: 500; }
+/* A row of the cost breakdown: name, a bar relative to the highest cost, the cost and the hours. */
+.pf-cost-row { display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) 96px 64px; gap: 12px; align-items: center; }
+.pf-cost-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-cost-bar { height: 8px; border-radius: 2px; background: var(--color-neutral-900); overflow: hidden; }
+.pf-cost-bar > div { height: 100%; background: var(--color-accent-600); transition: width .6s; }
+@media (max-width: 600px) {
+    .pf-cost-row { grid-template-columns: minmax(0, 120px) minmax(0, 1fr) 84px; }
+    .pf-cost-hours { display: none; }
+}
