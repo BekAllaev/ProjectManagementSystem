@@ -1,0 +1,90 @@
+@using ProjectManagementSystem.Application.Funding
+@using ProjectManagementSystem.Application.Funding.Commands.AddFunding
+@inject IFundingService FundingService
+
+@* Adds a tranche of funding to a project: an amount in the currency of the project, the date the money was released
+   (today or earlier) and an optional reason. Tranches are additions only and can't be edited later. A rule the API
+   rejects (a closed project) keeps the dialog open with the reason. Closes with the amount as text. *@
+<MudDialog Class="pf-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add funding tranche</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudStack Spacing="3">
+                <MudNumericField T="decimal?" @bind-Value="_amount" Label="@($"Amount ({Currency})")" Placeholder="e.g. 15000"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Step="100m" AutoFocus="true"
+                                 Required="true" RequiredError="Enter the amount."
+                                 Validation="@(new Func<decimal?, string?>(ValidateAmount))" />
+                <MudDatePicker @bind-Date="_date" Label="Date" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Required="true" RequiredError="Pick the date." DateFormat="dd MMM yyyy"
+                               MaxDate="DateTime.Today" HelperText="When the money was released: today or earlier." />
+                <MudTextField T="string" @bind-Value="_reason" Label="Reason" Placeholder="e.g. Q1 budget release"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="1000" Counter="0"
+                              HelperText="Optional." />
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">
+                    Tranches are additions only and can't be edited later.
+                </MudAlert>
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true" ContentAlignment="HorizontalAlignment.Start">@_error</MudAlert>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving…" : "Add tranche")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Currency { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private decimal? _amount;
+    private DateTime? _date = DateTime.Today;
+    private string? _reason;
+    private string? _error;
+
+    private static string? ValidateAmount(decimal? amount) =>
+        amount is > 0 ? null : "The amount must be greater than 0: funding can only be added, never reduced.";
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || _amount is not { } amount || _date is not { } date)
+            return;
+
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var reason = string.IsNullOrWhiteSpace(_reason) ? null : _reason.Trim();
+            await FundingService.AddFunding(new AddFundingCommand(ProjectId, amount, DateOnly.FromDateTime(date), reason));
+            Dialog.Close(DialogResult.Ok(Display.Money(amount, Currency)));
+        }
+        catch (Exception exception)
+        {
+            _error = GrpcErrors.Describe(exception);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
